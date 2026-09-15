@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  geosync-db:
+    image: postgis/postgis:16-3.4
+    container_name: geosync-postgis
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: geosync_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - geosync_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d geosync_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  geosync_pgdata:
+    driver: local
