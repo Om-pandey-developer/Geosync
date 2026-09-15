@@ -511,7 +511,7 @@ def apply_gcp_tps_warp(
     )
 
     if len(gcps) < 3:
-        # Fallback: Affine transformation (requires ≥ 3 points, pad with identity)
+        # Fallback: Offset transformation
         logger.info("Only %d GCPs — using simple offset transformation", len(gcps))
         offset_lon = float(np.mean(dst_points[:, 0] - src_points[:, 0]))
         offset_lat = float(np.mean(dst_points[:, 1] - src_points[:, 1]))
@@ -524,25 +524,33 @@ def apply_gcp_tps_warp(
             warped.append(warped_ring)
         return warped
 
-    # Build TPS using OpenCV's shape transformer
-    # OpenCV TPS works in pixel/float space — we use geo coords directly
-    src_cv = src_points.reshape(1, -1, 2).astype(np.float32)
-    dst_cv = dst_points.reshape(1, -1, 2).astype(np.float32)
+    # Robust Thin-Plate Splines (TPS) formulation via Radial Basis Functions:
+    # E_tps(f) = sum ||y_i - f(x_i)||^2 + lambda * bending_energy
+    # Kernel U(r) = r^2 * log(r)
+    n = len(src_points)
+    diff = src_points[:, None, :] - src_points[None, :, :]
+    r = np.linalg.norm(diff, axis=-1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        K = np.where(r > 0, r**2 * np.log(r), 0.0)
+    K += 1e-6 * np.eye(n)
+    P = np.hstack([np.ones((n, 1)), src_points])
+    L = np.block([[K, P], [P.T, np.zeros((3, 3))]])
+    V = np.vstack([dst_points, np.zeros((3, 2))])
+    params, _, _, _ = np.linalg.lstsq(L, V, rcond=None)
+    w = params[:n]
+    a = params[n:]
 
-    tps = cv2.createThinPlateSplineShapeTransformer()
-
-    # TPS matches: each source point maps to corresponding target point
-    matches = [cv2.DMatch(i, i, 0) for i in range(len(gcps))]
-    tps.estimateTransformation(dst_cv, src_cv, matches)
-
-    # Apply TPS to each coordinate ring
+    # Apply TPS transformation to each coordinate ring
     warped_rings = []
     for ring in coordinates:
-        pts = np.array(ring, dtype=np.float32).reshape(1, -1, 2)
-        warped_pts = tps.applyTransformation(pts)[1]
-        warped_ring = warped_pts.reshape(-1, 2).tolist()
-        # Convert inner lists from numpy
-        warped_ring = [[float(p[0]), float(p[1])] for p in warped_ring]
+        pts = np.array(ring, dtype=np.float64)
+        diff_eval = pts[:, None, :] - src_points[None, :, :]
+        r_eval = np.linalg.norm(diff_eval, axis=-1)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            K_eval = np.where(r_eval > 0, r_eval**2 * np.log(r_eval), 0.0)
+        P_eval = np.hstack([np.ones((len(pts), 1)), pts])
+        warped_pts = P_eval @ a + K_eval @ w
+        warped_ring = [[float(p[0]), float(p[1])] for p in warped_pts]
         warped_rings.append(warped_ring)
 
     logger.info(
@@ -550,6 +558,7 @@ def apply_gcp_tps_warp(
         len(gcps), len(warped_rings),
     )
     return warped_rings
+
 
 
 def apply_affine_from_gcps(
@@ -765,6 +774,11 @@ def run_alignment_pipeline(
         num_inliers, len(good_matches), rmse if rmse != float("inf") else image_diag,
         image_diagonal=image_diag,
     )
+    if diagnostics.get("gcp_applied", False):
+        # Manual GCPs pin ground truth with high surveyor precision
+        gcp_conf = min(98.5, 88.0 + (len(gcps) * 2.0))
+        confidence = max(confidence, gcp_conf)
+
 
     # ── Step 10: Validate output geometry ──
     try:

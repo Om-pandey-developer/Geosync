@@ -18,10 +18,26 @@ from datetime import datetime, timezone
 
 from sqlalchemy import Column, String, Float, DateTime, Enum, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.types import TypeDecorator, Text
 from geoalchemy2 import Geometry
 from sqlalchemy.orm import relationship
 
 from database import Base
+
+
+class SafeGeometry(TypeDecorator):
+    """
+    Dual-engine geometry type:
+    Uses PostGIS Geometry('POLYGON', srid=4326) on PostgreSQL,
+    and Text (storing WKT / GeoJSON) on SQLite for offline air-gap demo resilience.
+    """
+    impl = Text
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(Geometry("POLYGON", srid=4326))
+        return dialect.type_descriptor(Text())
 
 
 class Parcel(Base):
@@ -47,7 +63,7 @@ class Parcel(Base):
     centroid_lon = Column(Float, nullable=True)
 
     # PostGIS geometry column: stores the parcel polygon in WGS84 (SRID 4326)
-    geometry = Column(Geometry("POLYGON", srid=4326), nullable=False)
+    geometry = Column(SafeGeometry(), nullable=False)
 
     # Alignment metadata
     alignment_status = Column(

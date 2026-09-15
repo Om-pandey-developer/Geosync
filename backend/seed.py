@@ -1,20 +1,35 @@
 """
 GeoSync Database Seeder — Mock 1-Ward Spatial Dataset
+=====================================================
 
 Generates ~18 realistic land parcels for Ward 12, Mohanlalganj Tehsil, Lucknow.
 Parcels are positioned around real coordinates near Lucknow (26.76°N, 80.90°E)
 with realistic Khasra numbers, owner names, and polygon geometries.
 
+Supports both:
+- PostgreSQL + PostGIS (via ST_GeomFromEWKT)
+- Resilient SQLite + Shapely offline database (storing GeoJSON/WKT)
+
 Run: python seed.py
 """
 
 import sys
+import os
 import uuid
-from database import engine, Base, SessionLocal
+import json
+from datetime import datetime, timezone
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from sqlalchemy import text
+from shapely.geometry import Polygon, mapping
 
-
-# ────────────────── Mock Parcel Data ──────────────────
+from database import engine, Base, SessionLocal, IS_SQLITE
+from models import Parcel, ApprovalRequest
 
 # Base coordinates: Near Mohanlalganj, Lucknow (~26.76°N, 80.90°E)
 BASE_LAT = 26.7605
@@ -42,15 +57,10 @@ MOCK_PARCELS = [
 ]
 
 
-def make_polygon_wkt(lat_offset: float, lon_offset: float, size: float = 0.001) -> str:
-    """
-    Creates a slightly irregular rectangular polygon WKT string.
-    Adds small random-ish offsets to make parcels look more realistic.
-    """
+def make_polygon(lat_offset: float, lon_offset: float, size: float = 0.001) -> Polygon:
+    """Creates a slightly irregular realistic cadastral parcel polygon."""
     lat = BASE_LAT + lat_offset
     lon = BASE_LON + lon_offset
-
-    # Slight irregularity for realistic shapes
     jitter = size * 0.08
 
     coords = [
@@ -58,58 +68,84 @@ def make_polygon_wkt(lat_offset: float, lon_offset: float, size: float = 0.001) 
         (lon + size + jitter, lat + jitter * 0.5),
         (lon + size, lat + size),
         (lon - jitter * 0.3, lat + size - jitter * 0.4),
-        (lon, lat),  # close ring
+        (lon, lat),
     ]
-
-    coord_str = ", ".join(f"{c[0]:.6f} {c[1]:.6f}" for c in coords)
-    return f"SRID=4326;POLYGON(({coord_str}))"
+    return Polygon(coords)
 
 
-def seed_database():
-    """Seeds the database with mock parcel data."""
+def seed_database(force: bool = False):
+    """Seeds the database with mock 1-ward parcel data."""
     db = SessionLocal()
 
     try:
-        # Check if data already exists
-        count = db.execute(text("SELECT COUNT(*) FROM parcels")).scalar()
-        if count > 0:
+        count = db.query(Parcel).count()
+        if count > 0 and not force:
             print(f"⚠️  Database already has {count} parcels. Skipping seed.")
-            print("   To re-seed, run: python seed.py --force")
-            if "--force" not in sys.argv:
-                return
+            return
+
+        if force and count > 0:
             print("   --force flag detected. Clearing existing data...")
-            db.execute(text("DELETE FROM approval_requests"))
-            db.execute(text("DELETE FROM parcels"))
+            db.query(ApprovalRequest).delete()
+            db.query(Parcel).delete()
             db.commit()
 
-        print(f"🌱 Seeding {len(MOCK_PARCELS)} parcels for Ward 12, Mohanlalganj, Lucknow...\n")
+        print(f"🌱 Seeding {len(MOCK_PARCELS)} parcels for Ward 12, Mohanlalganj, Lucknow...")
 
         for p in MOCK_PARCELS:
-            parcel_id = str(uuid.uuid4())
-            wkt = make_polygon_wkt(p["offset"][0], p["offset"][1])
+            poly = make_polygon(p["offset"][0], p["offset"][1])
+            geo_dict = mapping(poly)
+            
+            # Compute centroid and approximate area
+            c = poly.centroid
+            lat_rad = (c.y * 3.141592653589793) / 180.0
+            area_sqm = round(poly.area * 111320.0 * (111320.0 * 0.89), 2)
 
-            db.execute(
-                text("""
-                    INSERT INTO parcels (id, khasra_no, owner_name, village, tehsil, district, state, geometry, alignment_status, created_at, updated_at)
-                    VALUES (:id, :khasra, :owner, :village, :tehsil, :district, :state, ST_GeomFromEWKT(:wkt), 'raw', NOW(), NOW())
-                """),
-                {
-                    "id": parcel_id,
-                    "khasra": p["khasra"],
-                    "owner": p["owner"],
-                    "village": "Mohanlalganj",
-                    "tehsil": "Mohanlalganj",
-                    "district": "Lucknow",
-                    "state": "Uttar Pradesh",
-                    "wkt": wkt,
-                }
-            )
-            print(f"   ✅ Khasra {p['khasra']:>6} — {p['owner']}")
+            parcel_id = uuid.uuid4()
+
+            if IS_SQLITE:
+                # Store GeoJSON string on SQLite
+                parcel = Parcel(
+                    id=parcel_id,
+                    khasra_no=p["khasra"],
+                    owner_name=p["owner"],
+                    village="Mohanlalganj",
+                    tehsil="Mohanlalganj",
+                    district="Lucknow",
+                    state="Uttar Pradesh",
+                    geometry=json.dumps(geo_dict),
+                    alignment_status="raw",
+                    centroid_lat=round(c.y, 6),
+                    centroid_lon=round(c.x, 6),
+                    area_sqm=area_sqm,
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
+                )
+                db.add(parcel)
+            else:
+                # PostGIS insert using ST_GeomFromGeoJSON
+                wkt_str = f"SRID=4326;{poly.wkt}"
+                db.execute(
+                    text("""
+                        INSERT INTO parcels (id, khasra_no, owner_name, village, tehsil, district, state, geometry, alignment_status, centroid_lat, centroid_lon, area_sqm, created_at, updated_at)
+                        VALUES (:id, :khasra, :owner, :village, :tehsil, :district, :state, ST_GeomFromEWKT(:wkt), 'raw', :lat, :lon, :area, NOW(), NOW())
+                    """),
+                    {
+                        "id": str(parcel_id),
+                        "khasra": p["khasra"],
+                        "owner": p["owner"],
+                        "village": "Mohanlalganj",
+                        "tehsil": "Mohanlalganj",
+                        "district": "Lucknow",
+                        "state": "Uttar Pradesh",
+                        "wkt": wkt_str,
+                        "lat": round(c.y, 6),
+                        "lon": round(c.x, 6),
+                        "area": area_sqm,
+                    }
+                )
 
         db.commit()
-        print(f"\n🎉 Successfully seeded {len(MOCK_PARCELS)} parcels!")
-        print(f"   📍 Location: Ward 12, Mohanlalganj, Lucknow (26.76°N, 80.90°E)")
-        print(f"   🗂️  Status: All parcels set to 'raw' (unaligned)")
+        print(f"🎉 Successfully seeded {len(MOCK_PARCELS)} parcels for offline/online evaluation!")
 
     except Exception as e:
         db.rollback()
@@ -120,7 +156,6 @@ def seed_database():
 
 
 if __name__ == "__main__":
-    # Create tables first
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables ready\n")
-    seed_database()
+    force = "--force" in sys.argv
+    seed_database(force=force)

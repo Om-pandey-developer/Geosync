@@ -233,3 +233,73 @@ class DashboardStats(BaseModel):
     pending_approvals: int
     approved_count: int
     rejected_count: int
+
+
+# ──────────────────── GeoSAM Boundary Extraction Schemas ────────────────────
+
+class BoundaryExtractionRequest(BaseModel):
+    """Payload for POST /api/v1/extract-boundaries (GeoSAM ViT-H)."""
+    bbox: List[float] = Field(..., min_length=4, max_length=4, description="[min_lon, min_lat, max_lon, max_lat]")
+    legacy_polygon: Optional[dict] = Field(default=None, description="Optional legacy polygon GeoJSON")
+    ward_name: Optional[str] = Field(default="Ward 12, Mohanlalganj", description="Ward identification")
+
+
+class BoundaryExtractionResponse(BaseModel):
+    """Response from POST /api/v1/extract-boundaries."""
+    feature: dict = Field(..., description="Extracted physical boundary GeoJSON Feature")
+    confidence_score: float = Field(..., description="Confidence score 0-100%")
+    is_occluded: bool = Field(..., description="True if tree canopy / shadow occludes ground")
+    occlusion_reason: str
+    hitl_review_required: bool
+    model_backbone: str = "GeoSAM-ViT-H-LoRA"
+    embedding_dimension: int = 1024
+    inference_time_ms: float
+
+
+# ──────────────────── Strict Form Validation Schemas ────────────────────
+
+class OfficerValidationRequest(BaseModel):
+    """
+    Strict validation schema for Revenue Officer registration / KYC.
+    - officer_name: Only alphabets and spaces allowed (no numbers)
+    - phone_number: Exactly 10 digits numeric only (no alphabets or special chars)
+    - designation: Patwari, Tehsildar, or Naib Tehsildar
+    """
+    officer_name: str = Field(
+        ...,
+        pattern=r"^[A-Za-z\s]{2,100}$",
+        description="Officer name (alphabetic and spaces only, no numbers)",
+    )
+    phone_number: str = Field(
+        ...,
+        pattern=r"^\d{10}$",
+        description="10-digit mobile number (digits only, exactly 10 digits)",
+    )
+    designation: str = Field(
+        ...,
+        pattern=r"^(Patwari|Tehsildar|Naib Tehsildar|Revenue Inspector)$",
+        description="Official revenue department designation",
+    )
+    jurisdiction_ward: str = Field(..., min_length=2, max_length=100)
+
+
+class OfficerValidationResponse(BaseModel):
+    valid: bool
+    message: str
+    officer_id: str
+    verified_at: datetime
+
+
+class RegisterParcelRequest(BaseModel):
+    """
+    Strict validation schema for registering a new cadastral land parcel.
+    """
+    khasra_no: str = Field(..., pattern=r"^[0-9]+(/[0-9]+)?$", description="Khasra number (e.g. 101 or 106/1)")
+    owner_name: str = Field(..., pattern=r"^[A-Za-z\s]{2,100}$", description="Owner name (alphabets only)")
+    owner_phone: str = Field(..., pattern=r"^\d{10}$", description="Owner 10-digit phone number")
+    village: str = Field(..., min_length=2, max_length=100)
+    tehsil: str = Field(..., min_length=2, max_length=100)
+    district: str = Field(default="Lucknow")
+    state: str = Field(default="Uttar Pradesh")
+    geometry_geojson: dict = Field(..., description="Parcel polygon GeoJSON")
+

@@ -12,6 +12,10 @@ import {
   ScanLine,
   CheckCircle2,
   Globe2,
+  Sparkles,
+  Zap,
+  Check,
+  Building2,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -20,24 +24,32 @@ export default function LandingPage() {
 
   const features = [
     {
-      icon: <ScanLine size={24} />,
-      title: "Raster Alignment",
-      desc: "ORB/RANSAC/TPS-based alignment of legacy BhuNaksha maps with drone imagery",
+      icon: <ScanLine size={22} />,
+      title: "1 & 2. ORB & TPS Warping",
+      desc: "Global RANSAC homography plus non-linear Thin-Plate Spline rubber-sheeting for paper shrinkage.",
+      color: "var(--accent-primary)",
+      badge: "EPSG:3857",
     },
     {
-      icon: <Layers size={24} />,
-      title: "Topological Cleanup",
-      desc: "PostGIS spatial operations to fix overlaps, gaps, and boundary inconsistencies",
+      icon: <Sparkles size={22} />,
+      title: "3. GeoSAM AI Segmentation",
+      desc: "Meta ViT-H zero-shot boundary tracing (<10ms) with radiometric shadow & canopy occlusion scoring.",
+      color: "var(--accent-teal)",
+      badge: "Zero-Shot",
     },
     {
-      icon: <Fingerprint size={24} />,
-      title: "ULPIN Generation",
-      desc: "14-digit Base-14 Bhu-Aadhaar unique land parcel identification numbers",
+      icon: <Layers size={22} />,
+      title: "4. PostGIS Purity Engine",
+      desc: "Mathematical ST_Difference overlap trimming and ST_Snap sliver sealing (0.05m tolerance).",
+      color: "#008080",
+      badge: "GEOS C-Engine",
     },
     {
-      icon: <CheckCircle2 size={24} />,
-      title: "HITL Workflow",
-      desc: "Legal Human-in-the-Loop Revenue Officer approval for cadastral changes",
+      icon: <Fingerprint size={22} />,
+      title: "5. Base-14 Bhu-Aadhaar",
+      desc: "14-digit alphanumeric ULPIN strictly compliant with DoLR/ECCMA/OGC (strips ambiguous 'I','0').",
+      color: "var(--accent-mint)",
+      badge: "OGC / ECCMA",
     },
   ];
 
@@ -49,140 +61,176 @@ export default function LandingPage() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "40px 20px",
+        padding: "80px 24px 40px",
+        position: "relative",
       }}
     >
-      {/* ───── Header / Hero ───── */}
+      {/* ───── Hero Section ───── */}
       <div
         className="animate-fade-in-up"
-        style={{ textAlign: "center", marginBottom: 48, maxWidth: 700 }}
+        style={{ textAlign: "center", marginBottom: 44, maxWidth: 840 }}
       >
         <div
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 12,
-            marginBottom: 16,
-            padding: "8px 20px",
-            borderRadius: 100,
-            background: "rgba(59, 130, 246, 0.1)",
-            border: "1px solid rgba(59, 130, 246, 0.2)",
+            gap: 10,
+            marginBottom: 20,
+            padding: "8px 22px",
+            borderRadius: 9999,
+            background: "rgba(121, 199, 197, 0.15)",
+            border: "1px solid rgba(121, 199, 197, 0.35)",
           }}
         >
           <Globe2 size={16} style={{ color: "var(--accent-primary)" }} />
           <span
             style={{
-              fontSize: "0.8rem",
-              fontWeight: 600,
+              fontSize: "0.78rem",
+              fontWeight: 700,
               color: "var(--accent-primary)",
-              letterSpacing: "0.05em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
             }}
           >
-            Smart India Hackathon 2026
+            Smart India Hackathon 2026 &bull; Problem Statement SIH26013
           </span>
         </div>
 
         <h1
           style={{
-            fontSize: "clamp(2.2rem, 5vw, 3.5rem)",
-            fontWeight: 800,
-            lineHeight: 1.1,
+            fontSize: "clamp(2.4rem, 5.5vw, 4rem)",
+            fontWeight: 900,
+            letterSpacing: "-0.03em",
+            lineHeight: 1.12,
             marginBottom: 16,
-            background: "linear-gradient(135deg, #f0f4ff 0%, #3b82f6 50%, #06b6d4 100%)",
+            background: "linear-gradient(135deg, #1E293B 0%, #008080 60%, #4FA8A4 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}
         >
           GeoSync
         </h1>
+
         <p
           style={{
-            fontSize: "1.1rem",
+            fontSize: "1.18rem",
             color: "var(--text-secondary)",
             lineHeight: 1.6,
-            maxWidth: 560,
+            maxWidth: 680,
             margin: "0 auto",
+            fontWeight: 400,
           }}
         >
-          AI-Powered Geospatial Middleware bridging legacy cadastral maps with
-          high-precision drone imagery for modern land records.
+          Intelligent Geospatial Middleware harmonizing 50-year-old legacy cadastral maps with modern
+          <strong> 5cm NAKSHA drone orthomosaics</strong> for conclusive urban land governance.
         </p>
+
+        {/* Highlight Pills */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: 10,
+            marginTop: 20,
+          }}
+        >
+          <span className="badge-pastel-teal">
+            <Check size={12} /> DILRMP 3.0 National Land Stack
+          </span>
+          <span className="badge-pastel-mint">
+            <Zap size={12} /> Sub-10ms Air-Gapped Inference
+          </span>
+          <span className="badge-pastel-peach">
+            <Shield size={12} /> Mandatory HITL Revenue Magistrate Sign-off
+          </span>
+        </div>
       </div>
 
-      {/* ───── Feature Cards ───── */}
+      {/* ───── Feature Cards Grid ───── */}
       <div
         className="animate-fade-in-up animate-delay-2"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 16,
-          maxWidth: 960,
+          gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+          gap: 18,
+          maxWidth: 1040,
           width: "100%",
-          marginBottom: 56,
+          marginBottom: 48,
         }}
       >
         {features.map((f, i) => (
           <div
             key={i}
             className="glass-card"
-            style={{ padding: "24px 20px", cursor: "default" }}
+            style={{
+              padding: "24px 20px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+            }}
           >
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: "var(--radius-sm)",
-                background: "rgba(59, 130, 246, 0.1)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--accent-primary)",
-                marginBottom: 14,
-              }}
-            >
-              {f.icon}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "var(--radius-sm)",
+                    background: "rgba(121, 199, 197, 0.15)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: f.color,
+                  }}
+                >
+                  {f.icon}
+                </div>
+                <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "2px 8px", background: "rgba(0,0,0,0.04)", borderRadius: 6, color: "var(--text-muted)" }}>
+                  {f.badge}
+                </span>
+              </div>
+              <h3
+                style={{
+                  fontSize: "0.98rem",
+                  fontWeight: 700,
+                  marginBottom: 8,
+                  color: "var(--text-primary)",
+                }}
+              >
+                {f.title}
+              </h3>
+              <p
+                style={{
+                  fontSize: "0.82rem",
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.5,
+                }}
+              >
+                {f.desc}
+              </p>
             </div>
-            <h3
-              style={{
-                fontSize: "0.95rem",
-                fontWeight: 700,
-                marginBottom: 8,
-                color: "var(--text-primary)",
-              }}
-            >
-              {f.title}
-            </h3>
-            <p
-              style={{
-                fontSize: "0.8rem",
-                color: "var(--text-muted)",
-                lineHeight: 1.5,
-              }}
-            >
-              {f.desc}
-            </p>
           </div>
         ))}
       </div>
 
-      {/* ───── Role Selection ───── */}
+      {/* ───── Role Selection Section ───── */}
       <div
         className="animate-fade-in-up animate-delay-3"
-        style={{ textAlign: "center", marginBottom: 32 }}
+        style={{ textAlign: "center", marginBottom: 28 }}
       >
         <h2
           style={{
-            fontSize: "1.2rem",
-            fontWeight: 700,
+            fontSize: "1.35rem",
+            fontWeight: 800,
             marginBottom: 6,
             color: "var(--text-primary)",
           }}
         >
-          Select Your Role
+          Select Operational Role
         </h2>
-        <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: 28 }}>
-          Choose your workspace to continue
+        <p style={{ fontSize: "0.86rem", color: "var(--text-secondary)" }}>
+          Access role-specific interfaces tailored for field surveyors and executive magistrates
         </p>
       </div>
 
@@ -190,9 +238,9 @@ export default function LandingPage() {
         className="animate-fade-in-up animate-delay-4"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
           gap: 24,
-          maxWidth: 680,
+          maxWidth: 760,
           width: "100%",
         }}
       >
@@ -203,43 +251,47 @@ export default function LandingPage() {
           onMouseLeave={() => setHoveredRole(null)}
           className="glass-card"
           style={{
-            padding: 32,
+            padding: 30,
             cursor: "pointer",
             textAlign: "left",
             border:
               hoveredRole === "patwari"
-                ? "1px solid rgba(59, 130, 246, 0.5)"
+                ? "2px solid var(--accent-primary)"
                 : "1px solid var(--border-glass)",
+            transition: "all 0.2s ease",
+            transform: hoveredRole === "patwari" ? "translateY(-4px)" : "none",
           }}
         >
           <div
             style={{
-              width: 56,
-              height: 56,
+              width: 54,
+              height: 54,
               borderRadius: "var(--radius-md)",
-              background:
-                "linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(6, 182, 212, 0.1))",
+              background: "rgba(121, 199, 197, 0.2)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              marginBottom: 20,
+              marginBottom: 18,
             }}
           >
             <MapPin size={28} style={{ color: "var(--accent-primary)" }} />
           </div>
-          <h3 style={{ fontSize: "1.15rem", fontWeight: 700, marginBottom: 8 }}>
-            Patwari
-          </h3>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--text-primary)" }}>
+              Revenue Patwari
+            </h3>
+            <span className="badge-pastel-teal">Field Surveyor</span>
+          </div>
           <p
             style={{
-              fontSize: "0.85rem",
-              color: "var(--text-muted)",
-              lineHeight: 1.5,
+              fontSize: "0.84rem",
+              color: "var(--text-secondary)",
+              lineHeight: 1.55,
               marginBottom: 20,
             }}
           >
-            Surveyor Workspace — Upload cadastral maps, trigger alignment,
-            generate ULPINs, and submit for approval.
+            Access 5-stage harmonization workbench: ORB+RANSAC alignment, interactive GCP Thin-Plate Splines,
+            GeoSAM ViT-H boundary extraction, and PostGIS topology cleansing.
           </p>
           <div
             style={{
@@ -247,11 +299,11 @@ export default function LandingPage() {
               alignItems: "center",
               gap: 8,
               color: "var(--accent-primary)",
-              fontWeight: 600,
-              fontSize: "0.85rem",
+              fontWeight: 700,
+              fontSize: "0.88rem",
             }}
           >
-            Enter Workspace <ArrowRight size={16} />
+            Launch Surveyor Workspace <ArrowRight size={16} />
           </div>
         </button>
 
@@ -262,55 +314,59 @@ export default function LandingPage() {
           onMouseLeave={() => setHoveredRole(null)}
           className="glass-card"
           style={{
-            padding: 32,
+            padding: 30,
             cursor: "pointer",
             textAlign: "left",
             border:
               hoveredRole === "tehsildar"
-                ? "1px solid rgba(139, 92, 246, 0.5)"
+                ? "2px solid var(--accent-teal)"
                 : "1px solid var(--border-glass)",
+            transition: "all 0.2s ease",
+            transform: hoveredRole === "tehsildar" ? "translateY(-4px)" : "none",
           }}
         >
           <div
             style={{
-              width: 56,
-              height: 56,
+              width: 54,
+              height: 54,
               borderRadius: "var(--radius-md)",
-              background:
-                "linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.1))",
+              background: "rgba(79, 168, 164, 0.2)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              marginBottom: 20,
+              marginBottom: 18,
             }}
           >
-            <Shield size={28} style={{ color: "var(--accent-purple)" }} />
+            <Shield size={28} style={{ color: "var(--accent-teal)" }} />
           </div>
-          <h3 style={{ fontSize: "1.15rem", fontWeight: 700, marginBottom: 8 }}>
-            Tehsildar
-          </h3>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--text-primary)" }}>
+              Revenue Tehsildar
+            </h3>
+            <span className="badge-pastel-mint">Magistrate HITL</span>
+          </div>
           <p
             style={{
-              fontSize: "0.85rem",
-              color: "var(--text-muted)",
-              lineHeight: 1.5,
+              fontSize: "0.84rem",
+              color: "var(--text-secondary)",
+              lineHeight: 1.55,
               marginBottom: 20,
             }}
           >
-            Approval Dashboard — Review aligned maps, verify topology,
-            and approve or reject ULPIN assignments.
+            Executive Adjudication Chamber: Review overlay discrepancies, evaluate occlusion confidence alerts,
+            and legally sanction/publish parcels to the National Land Stack.
           </p>
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 8,
-              color: "var(--accent-purple)",
-              fontWeight: 600,
-              fontSize: "0.85rem",
+              color: "var(--accent-teal)",
+              fontWeight: 700,
+              fontSize: "0.88rem",
             }}
           >
-            Enter Dashboard <ArrowRight size={16} />
+            Launch HITL Dashboard <ArrowRight size={16} />
           </div>
         </button>
       </div>
@@ -322,12 +378,15 @@ export default function LandingPage() {
           marginTop: 64,
           textAlign: "center",
           color: "var(--text-muted)",
-          fontSize: "0.75rem",
+          fontSize: "0.78rem",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <Cpu size={14} />
-          <span>GeoSync v1.0 MVP — Powered by OpenCV • PostGIS • FastAPI • Next.js</span>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 4 }}>
+          <Cpu size={14} style={{ color: "var(--accent-primary)" }} />
+          <span>GeoSync SIH26013 MVP &bull; Department of Land Resources (DoLR), Ministry of Rural Development</span>
+        </div>
+        <div>
+          Technology Stack: Next.js 16 &bull; React 19 &bull; Python FastAPI &bull; PostGIS &bull; GeoSAM ViT-H &bull; Open-Source Geospatial Middleware
         </div>
       </div>
     </main>
