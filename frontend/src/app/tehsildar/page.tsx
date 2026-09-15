@@ -14,12 +14,7 @@ import {
   FileCheck,
   ShieldCheck,
   Stamp,
-  Sliders,
-  Sparkles,
   Info,
-  Calendar,
-  User,
-  MapPin,
 } from "lucide-react";
 import type { FeatureCollection } from "geojson";
 
@@ -61,7 +56,6 @@ export default function TehsildarPage() {
   const [selectedApproval, setSelectedApproval] = useState<PendingApproval | null>(null);
   const [remarks, setRemarks] = useState("");
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pending" | "audit">("pending");
 
   const fetchData = useCallback(async () => {
     try {
@@ -90,8 +84,8 @@ export default function TehsildarPage() {
     const tId = toast.loading(`Executing legal HITL validation for Khasra ${selectedApproval.khasra_no}...`);
 
     try {
-      // Step 1: Legal Database Commit (locks ULPIN and marks parcel PUBLISHED)
-      const commitRes = await fetch(`${API}/v1/commit-parcel`, {
+      // 1. Legal Database Commit
+      await fetch(`${API}/v1/commit-parcel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -102,7 +96,7 @@ export default function TehsildarPage() {
         }),
       });
 
-      // Step 2: Update workflow approval docket
+      // 2. Update workflow approval status
       await fetch(`${API}/approvals/${selectedApproval.approval_id}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -113,7 +107,7 @@ export default function TehsildarPage() {
         }),
       });
 
-      toast.success(`Khasra ${selectedApproval.khasra_no} approved & legally committed to Land Stack!`, { id: tId });
+      toast.success(`Khasra ${selectedApproval.khasra_no} approved & published to Land Stack!`, { id: tId });
       setSelectedApproval(null);
       setRemarks("");
       await fetchData();
@@ -151,95 +145,98 @@ export default function TehsildarPage() {
 
   const statCards = [
     {
-      label: "Total Ward Parcels",
+      label: "Total Ward Parcels", /* Fix Issue 5: Normal sentence case */
       value: stats?.total_parcels ?? 18,
-      icon: <Layers size={18} />,
-      bg: "rgba(121, 199, 197, 0.15)",
-      border: "rgba(121, 199, 197, 0.4)",
-      color: "#008080",
+      icon: <Layers size={20} />,
+      bg: "var(--accent-primary-bg)",
+      border: "#99F6E4",
+      color: "var(--accent-primary)",
     },
     {
       label: "Bhu-Aadhaar Assigned",
       value: stats?.ulpin_assigned_count ?? 12,
-      icon: <Fingerprint size={18} />,
-      bg: "rgba(168, 230, 207, 0.25)",
-      border: "rgba(168, 230, 207, 0.5)",
-      color: "#1B5E20",
+      icon: <Fingerprint size={20} />,
+      bg: "var(--accent-mint-bg)",
+      border: "#A7F3D0",
+      color: "var(--accent-mint)",
     },
     {
       label: "Pending HITL Reviews",
       value: pendingApprovals.length,
-      icon: <Clock size={18} />,
-      bg: "rgba(255, 211, 182, 0.3)",
-      border: "rgba(255, 211, 182, 0.6)",
-      color: "#A85324",
+      icon: <Clock size={20} />,
+      bg: "var(--accent-sun-bg)",
+      border: "#FDE68A",
+      color: "var(--accent-sun)",
     },
     {
       label: "Legally Committed",
       value: stats?.approved_count ?? 5,
-      icon: <CheckCircle2 size={18} />,
-      bg: "rgba(79, 168, 164, 0.18)",
-      border: "rgba(79, 168, 164, 0.4)",
-      color: "#4FA8A4",
+      icon: <CheckCircle2 size={20} />,
+      bg: "var(--accent-lavender-bg)",
+      border: "#DDD6FE",
+      color: "var(--accent-lavender)",
     },
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", paddingTop: 60, overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", paddingTop: 64, overflow: "hidden" }}>
       <main style={{ flex: 1, padding: "20px 24px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         
-        {/* ───── Header Bar ───── */}
+        {/* ───── Header Bar (Fix for Issue 6 & 7: Perfect vertical flex alignment) ───── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <h1 style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--text-primary)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <h1 style={{ fontSize: "1.45rem", fontWeight: 800, color: "var(--text-primary)" }}>
                 Revenue Magistrate HITL Adjudication Chamber
               </h1>
-              <span className="badge-pastel-teal" style={{ fontSize: "0.7rem", fontWeight: 700 }}>
+              {/* Fix Issue 4 & 6: 13px badge vertically centered */}
+              <span className="badge-pastel-teal">
                 DILRMP 3.0 / NAKSHA Pilot
               </span>
             </div>
-            <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: 2 }}>
+            {/* Fix Issue 3: 14px body text */}
+            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginTop: 3 }}>
               Mohanlalganj Tehsil, Lucknow District &mdash; Human-in-the-Loop Legal Validation Engine
             </p>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button className="btn-ghost" onClick={fetchData} style={{ padding: "8px 14px", fontSize: "0.82rem" }}>
-              <RefreshCw size={14} /> Refresh Records
-            </button>
-          </div>
+          {/* Fix Issue 7: Grouped Refresh button aligned with header */}
+          <button className="btn-secondary" onClick={fetchData}>
+            <RefreshCw size={15} style={{ color: "var(--accent-primary)" }} /> Refresh Records
+          </button>
         </div>
 
-        {/* ───── Stat Cards Bar ───── */}
+        {/* ───── Stat Cards Bar (Fix Issue 1: Standardized --radius-lg) ───── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 16 }}>
           {statCards.map((card, i) => (
             <div
               key={i}
               className="glass-card"
               style={{
-                padding: "14px 18px",
+                padding: "16px 20px",
                 background: card.bg,
                 border: `1px solid ${card.border}`,
+                borderRadius: "var(--radius-lg)",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: "0.72rem", fontWeight: 700, color: card.color, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                {/* Fix Issue 5: Sentence case, no all-caps, 13px */}
+                <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: card.color }}>
                   {card.label}
                 </span>
                 <span style={{ color: card.color }}>{card.icon}</span>
               </div>
-              <div style={{ fontSize: "1.7rem", fontWeight: 800, color: card.color }}>
+              <div style={{ fontSize: "1.85rem", fontWeight: 800, color: card.color }}>
                 {card.value}
               </div>
             </div>
           ))}
         </div>
 
-        {/* ───── Split View: Left List + Center GIS Canvas + Right Review Dossier ───── */}
+        {/* ───── Split View: Left List + Center Map + Right Dossier ───── */}
         <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
           
           {/* Left Panel: Pending Approvals Queue */}
@@ -251,7 +248,8 @@ export default function TehsildarPage() {
               flexDirection: "column",
               padding: 0,
               overflow: "hidden",
-              background: "rgba(255, 255, 255, 0.94)",
+              background: "#FFFFFF",
+              borderRadius: "var(--radius-lg)",
             }}
           >
             <div
@@ -261,13 +259,13 @@ export default function TehsildarPage() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                background: "rgba(121, 199, 197, 0.1)",
+                background: "var(--bg-secondary)",
               }}
             >
-              <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "#008080", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--text-primary)" }}>
                 Magistrate Queue ({pendingApprovals.length})
               </span>
-              <Clock size={15} style={{ color: "var(--accent-primary)" }} />
+              <Clock size={16} style={{ color: "var(--accent-sun)" }} />
             </div>
 
             <div style={{ flex: 1, overflowY: "auto" }}>
@@ -283,9 +281,9 @@ export default function TehsildarPage() {
                       width: "100%",
                       display: "flex",
                       alignItems: "flex-start",
-                      gap: 10,
-                      padding: "12px 14px",
-                      background: isSelected ? "rgba(121, 199, 197, 0.22)" : "transparent",
+                      gap: 12,
+                      padding: "14px 16px",
+                      background: isSelected ? "var(--accent-primary-bg)" : "transparent",
                       border: "none",
                       borderBottom: "1px solid var(--border-subtle)",
                       cursor: "pointer",
@@ -303,28 +301,29 @@ export default function TehsildarPage() {
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <strong style={{ fontSize: "0.88rem", color: "var(--text-primary)" }}>
+                        <strong style={{ fontSize: "0.9375rem", color: "var(--text-primary)" }}>
                           Khasra {a.khasra_no}
                         </strong>
                         {isLowConf && (
                           <span
                             style={{
-                              fontSize: "0.65rem",
+                              fontSize: "0.6875rem",
                               fontWeight: 700,
-                              background: "rgba(255, 211, 182, 0.6)",
-                              color: "#A85324",
-                              padding: "1px 6px",
-                              borderRadius: 4,
+                              background: "var(--accent-sun-bg)",
+                              color: "var(--accent-sun)",
+                              padding: "2px 6px",
+                              borderRadius: "var(--radius-sm)",
+                              border: "1px solid #FDE68A",
                             }}
                           >
                             Occlusion
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: 2 }}>
+                      <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: 2 }}>
                         {a.owner_name} &bull; {a.village}
                       </div>
-                      <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: 2 }}>
+                      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 2 }}>
                         Submitted by: {a.requested_by}
                       </div>
                     </div>
@@ -334,16 +333,16 @@ export default function TehsildarPage() {
 
               {pendingApprovals.length === 0 && (
                 <div style={{ padding: 36, textAlign: "center", color: "var(--text-muted)" }}>
-                  <CheckCircle2 size={32} style={{ margin: "0 auto 10px", color: "var(--accent-primary)", opacity: 0.6 }} />
-                  <p style={{ fontSize: "0.85rem", fontWeight: 600 }}>All Wards Reconciled</p>
-                  <p style={{ fontSize: "0.75rem", marginTop: 4 }}>No pending cadastral disputes in current docket.</p>
+                  <CheckCircle2 size={32} style={{ margin: "0 auto 10px", color: "var(--accent-primary)", opacity: 0.8 }} />
+                  <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-primary)" }}>All Wards Reconciled</p>
+                  <p style={{ fontSize: "0.8125rem", marginTop: 4 }}>No pending cadastral disputes in docket.</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Center Panel: Interactive Map */}
-          <div className="glass-card" style={{ flex: 1, padding: 0, overflow: "hidden", position: "relative" }}>
+          {/* Center Panel: Map Canvas */}
+          <div className="glass-card" style={{ flex: 1, padding: 0, overflow: "hidden", position: "relative", borderRadius: "var(--radius-lg)" }}>
             <MapViewer
               geojsonData={geojson}
               selectedParcelId={selectedApproval?.parcel_id || null}
@@ -355,7 +354,7 @@ export default function TehsildarPage() {
             />
           </div>
 
-          {/* Right Panel: Legal Adjudication Dossier */}
+          {/* Right Panel: Dossier (Fix Issue 9: Heading and icon prominent, matching visual hierarchy) */}
           <div
             className="glass-card"
             style={{
@@ -363,78 +362,81 @@ export default function TehsildarPage() {
               padding: "20px",
               display: "flex",
               flexDirection: "column",
-              background: "rgba(255, 255, 255, 0.95)",
+              background: "#FFFFFF",
+              borderRadius: "var(--radius-lg)",
               overflowY: "auto",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-              <ShieldCheck size={20} style={{ color: "var(--accent-primary)" }} />
-              <h2 style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--text-primary)" }}>
+            {/* Fix Issue 9: Prominent, high-contrast heading matching left panel */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 34, height: 34, borderRadius: "var(--radius-sm)", background: "var(--accent-primary-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent-primary)" }}>
+                <ShieldCheck size={20} />
+              </div>
+              <h2 style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--text-primary)" }}>
                 Statutory Approval Dossier
               </h2>
             </div>
 
             {selectedApproval ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {/* Parcel Metadata Card */}
-                <div style={{ background: "rgba(121, 199, 197, 0.1)", padding: 14, borderRadius: 10, border: "1px solid rgba(121, 199, 197, 0.3)" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: "6px 8px", fontSize: "0.82rem" }}>
-                    <span style={{ color: "var(--text-muted)" }}>Khasra No:</span>
+                <div style={{ background: "var(--bg-secondary)", padding: 14, borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "95px 1fr", gap: "8px 10px", fontSize: "0.875rem" }}>
+                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Khasra No:</span>
                     <strong style={{ color: "var(--text-primary)" }}>{selectedApproval.khasra_no}</strong>
 
-                    <span style={{ color: "var(--text-muted)" }}>Landholder:</span>
+                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Landholder:</span>
                     <strong style={{ color: "var(--text-primary)" }}>{selectedApproval.owner_name}</strong>
 
-                    <span style={{ color: "var(--text-muted)" }}>Jurisdiction:</span>
+                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Location:</span>
                     <span style={{ color: "var(--text-secondary)" }}>{selectedApproval.village}, {selectedApproval.tehsil}</span>
 
-                    <span style={{ color: "var(--text-muted)" }}>Clean Area:</span>
+                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Area:</span>
                     <span style={{ color: "var(--text-secondary)" }}>{selectedApproval.area_sqm ? `${Number(selectedApproval.area_sqm).toFixed(1)} m²` : "Calculated"}</span>
 
-                    <span style={{ color: "var(--text-muted)" }}>Confidence:</span>
-                    <span style={{ fontWeight: 700, color: (selectedApproval.alignment_confidence ?? 1) >= 0.8 ? "#1B5E20" : "#A85324" }}>
+                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Confidence:</span>
+                    <span style={{ fontWeight: 800, color: (selectedApproval.alignment_confidence ?? 1) >= 0.8 ? "var(--accent-mint)" : "var(--accent-sun)" }}>
                       {((selectedApproval.alignment_confidence ?? 0.88) * 100).toFixed(1)}%
                     </span>
                   </div>
                 </div>
 
-                {/* Occlusion Alert if Low Confidence */}
+                {/* Occlusion Warning Alert */}
                 {(selectedApproval.alignment_confidence ?? 1) < 0.8 && (
                   <div
                     style={{
-                      background: "rgba(255, 211, 182, 0.4)",
-                      border: "1px solid #FFD3B6",
-                      borderRadius: 8,
-                      padding: 10,
-                      fontSize: "0.75rem",
-                      color: "#9C4221",
+                      background: "var(--accent-sun-bg)",
+                      border: "1px solid #FDE68A",
+                      borderRadius: "var(--radius-md)",
+                      padding: "10px 12px",
+                      fontSize: "0.8125rem",
+                      color: "#92400E",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, marginBottom: 2 }}>
-                      <AlertTriangle size={14} /> Tree Canopy Occlusion Flagged
+                      <AlertTriangle size={15} /> Tree Canopy Occlusion Flagged
                     </div>
-                    AI feature extraction detected partial shadow obstruction. Ensure manual confirmation against physical survey stones.
+                    AI feature extraction detected partial shadow obstruction. Ensure physical survey stone verification before signing.
                   </div>
                 )}
 
                 {/* Bhu-Aadhaar Box */}
                 {selectedApproval.ulpin && (
-                  <div style={{ background: "rgba(168, 230, 207, 0.25)", border: "1px solid #A8E6CF", borderRadius: 8, padding: 12 }}>
-                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#1B5E20", textTransform: "uppercase" }}>
+                  <div style={{ background: "var(--accent-mint-bg)", border: "1px solid #A7F3D0", borderRadius: "var(--radius-md)", padding: 12 }}>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--accent-mint)", textTransform: "uppercase" }}>
                       Assigned Bhu-Aadhaar (ULPIN)
                     </div>
-                    <div style={{ fontFamily: "monospace", fontSize: "1.15rem", fontWeight: 800, color: "#008080", marginTop: 4, letterSpacing: "1px" }}>
+                    <div style={{ fontFamily: "monospace", fontSize: "1.15rem", fontWeight: 800, color: "var(--accent-mint)", marginTop: 4, letterSpacing: "1.5px" }}>
                       {selectedApproval.ulpin}
                     </div>
-                    <div style={{ fontSize: "0.68rem", color: "var(--text-secondary)", marginTop: 4 }}>
-                      Compliant with DoLR / ECCMA / OGC 14-char standard
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: 4 }}>
+                      Compliant with DoLR / ECCMA / OGC standards
                     </div>
                   </div>
                 )}
 
-                {/* Remarks textarea */}
+                {/* Endorsement textarea */}
                 <div>
-                  <label style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>
+                  <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>
                     Magistrate Legal Endorsement / Audit Note:
                   </label>
                   <textarea
@@ -445,62 +447,47 @@ export default function TehsildarPage() {
                     style={{
                       width: "100%",
                       padding: "8px 12px",
-                      borderRadius: 8,
-                      border: "1px solid var(--border-subtle)",
-                      fontSize: "0.8rem",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--border-glass)",
+                      fontSize: "0.875rem",
                       fontFamily: "inherit",
-                      background: "rgba(255, 255, 255, 0.9)",
+                      background: "#FFFFFF",
+                      color: "var(--text-primary)",
                     }}
                   />
                 </div>
 
-                {/* Statutory Action Buttons */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+                {/* Action Buttons */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <button
                     className="btn-primary"
                     onClick={handleApproveAndCommit}
                     disabled={loading}
-                    style={{
-                      background: "linear-gradient(135deg, #4FA8A4 0%, #008080 100%)",
-                      padding: "11px 16px",
-                      fontSize: "0.88rem",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                    }}
+                    style={{ width: "100%", padding: "11px 16px" }}
                   >
                     <Stamp size={16} /> Sanction & Publish to Land Stack
                   </button>
 
                   <button
+                    className="btn-secondary"
                     onClick={handleReject}
                     disabled={loading}
                     style={{
-                      padding: "9px 16px",
-                      borderRadius: 8,
-                      border: "1px solid #FFD3B6",
-                      background: "rgba(255, 211, 182, 0.3)",
-                      color: "#A85324",
-                      fontSize: "0.82rem",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
+                      width: "100%",
+                      color: "var(--accent-coral) !important",
+                      borderColor: "#FECDD3",
                     }}
                   >
-                    <XCircle size={15} /> Return to Patwari for Re-survey
+                    <XCircle size={16} style={{ color: "var(--accent-coral)" }} /> Return for Re-survey
                   </button>
                 </div>
               </div>
             ) : (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "var(--text-muted)", padding: 20 }}>
-                <Info size={32} style={{ color: "var(--accent-primary)", marginBottom: 12, opacity: 0.5 }} />
-                <p style={{ fontSize: "0.85rem", fontWeight: 600 }}>Select a Pending Docket</p>
-                <p style={{ fontSize: "0.78rem", marginTop: 4 }}>
-                  Choose a parcel from the magistrate queue to inspect topological overlays, review occlusion indices, and execute statutory sign-off.
+                <Info size={32} style={{ color: "var(--accent-primary)", marginBottom: 12, opacity: 0.7 }} />
+                <p style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text-primary)" }}>Select a Pending Docket</p>
+                <p style={{ fontSize: "0.8125rem", marginTop: 4, color: "var(--text-secondary)" }}>
+                  Choose a parcel from the queue to inspect boundaries, check occlusion indices, and execute statutory sign-off.
                 </p>
               </div>
             )}
