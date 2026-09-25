@@ -108,7 +108,6 @@ export default function TehsildarPage() {
         }),
       });
 
-<<<<<<< HEAD
       // Step 2: Update workflow approval docket
       if (!selectedApproval.approval_id.startsWith("preview-")) {
         await fetch(`${API}/approvals/${selectedApproval.approval_id}/action`, {
@@ -121,18 +120,6 @@ export default function TehsildarPage() {
           }),
         });
       }
-=======
-      // 2. Update workflow approval status
-      await fetch(`${API}/approvals/${selectedApproval.approval_id}/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reviewed_by: "tehsildar_mohanlalganj",
-          action: "approved",
-          remarks: remarks || "Verified boundary conforms to NAKSHA 5cm drone survey.",
-        }),
-      });
->>>>>>> origin/master
 
       toast.success(`Khasra ${selectedApproval.khasra_no} approved & published to Land Stack!`, { id: tId });
       setSelectedApproval(null);
@@ -239,21 +226,14 @@ export default function TehsildarPage() {
             </p>
           </div>
 
-<<<<<<< HEAD
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button className="btn-pastel-secondary" onClick={handleResetDemo} style={{ padding: "8px 14px", fontSize: "0.82rem", display: "flex", alignItems: "center", gap: 6 }}>
-              <Sparkles size={14} /> Reset Demo Dockets
+              <RefreshCw size={14} /> Reset Demo Dockets
             </button>
             <button className="btn-ghost" onClick={fetchData} style={{ padding: "8px 14px", fontSize: "0.82rem" }}>
               <RefreshCw size={14} /> Refresh Records
             </button>
           </div>
-=======
-          {/* Fix Issue 7: Grouped Refresh button aligned with header */}
-          <button className="btn-secondary" onClick={fetchData}>
-            <RefreshCw size={15} style={{ color: "var(--accent-primary)" }} /> Refresh Records
-          </button>
->>>>>>> origin/master
         </div>
 
         {/* ───── Stat Cards Bar (Fix Issue 1: Standardized --radius-lg) ───── */}
@@ -383,18 +363,12 @@ export default function TehsildarPage() {
 
               {pendingApprovals.length === 0 && (
                 <div style={{ padding: 36, textAlign: "center", color: "var(--text-muted)" }}>
-<<<<<<< HEAD
-                  <CheckCircle2 size={32} style={{ margin: "0 auto 10px", color: "var(--accent-primary)", opacity: 0.6 }} />
-                  <p style={{ fontSize: "0.85rem", fontWeight: 600 }}>All Wards Reconciled</p>
-                  <p style={{ fontSize: "0.75rem", marginTop: 4, marginBottom: 12 }}>No pending cadastral disputes in current docket.</p>
+                  <CheckCircle2 size={32} style={{ margin: "0 auto 10px", color: "var(--accent-primary)", opacity: 0.8 }} />
+                  <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-primary)" }}>All Wards Reconciled</p>
+                  <p style={{ fontSize: "0.8125rem", marginTop: 4, marginBottom: 12 }}>No pending cadastral disputes in current docket.</p>
                   <button onClick={handleResetDemo} className="btn-primary" style={{ padding: "6px 14px", fontSize: "0.78rem" }}>
                     Load Demo Dockets
                   </button>
-=======
-                  <CheckCircle2 size={32} style={{ margin: "0 auto 10px", color: "var(--accent-primary)", opacity: 0.8 }} />
-                  <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-primary)" }}>All Wards Reconciled</p>
-                  <p style={{ fontSize: "0.8125rem", marginTop: 4 }}>No pending cadastral disputes in docket.</p>
->>>>>>> origin/master
                 </div>
               )}
             </div>
