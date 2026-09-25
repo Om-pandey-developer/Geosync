@@ -7,8 +7,6 @@ import {
   Compass,
   UserCheck,
   Layers,
-  Sparkles,
-  ShieldAlert,
 } from "lucide-react";
 import OnboardingTour from "@/components/OnboardingTour";
 import RegistrationModal from "@/components/RegistrationModal";
@@ -26,26 +24,27 @@ export default function TopNavbar() {
 
   return (
     <>
-      <div
+      <header
         style={{
           height: 64,
           width: "100%",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 28px",
-          borderBottom: "1px solid var(--border-glass)",
+          padding: "0 24px",
+          borderBottom: "1px solid var(--border-subtle)",
           background: "var(--bg-glass-strong)",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
           position: "fixed",
           top: 0,
           left: 0,
           zIndex: 1000,
+          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
         }}
       >
         {/* Left: Brand & National Context */}
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <button
             onClick={() => router.push("/")}
             style={{
@@ -56,14 +55,15 @@ export default function TopNavbar() {
               background: "none",
               border: "none",
             }}
+            aria-label="GeoSync Home"
           >
             <div
               style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                background: "rgba(121, 199, 197, 0.2)",
-                border: "1px solid rgba(121, 199, 197, 0.4)",
+                width: 36,
+                height: 36,
+                borderRadius: "var(--radius-md)",
+                background: "var(--accent-primary-bg)",
+                border: "1px solid var(--accent-primary-light)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -74,10 +74,10 @@ export default function TopNavbar() {
             </div>
             <span
               style={{
-                fontSize: "1.2rem",
+                fontSize: "1.25rem",
                 fontWeight: 800,
                 color: "var(--text-primary)",
-                letterSpacing: "-0.3px",
+                letterSpacing: "-0.02em",
               }}
             >
               GeoSync
@@ -90,83 +90,74 @@ export default function TopNavbar() {
               display: "inline-flex",
               alignItems: "center",
               gap: 8,
-              padding: "5px 14px",
-              borderRadius: 100,
-              fontSize: "0.74rem",
+              padding: "6px 14px",
+              borderRadius: "var(--radius-sm)",
+              fontSize: "0.875rem", /* Fixed Issue 3: 14px body text */
               fontWeight: 600,
             }}
           >
             <div
               style={{
-                width: 7,
-                height: 7,
+                width: 8,
+                height: 8,
                 borderRadius: "50%",
-                background: "#79C7C5",
-                boxShadow: "0 0 10px #79C7C5",
+                background: "var(--accent-primary)",
+                boxShadow: "0 0 8px var(--accent-primary)",
               }}
             />
-            <span>DILRMP 3.0 / NAKSHA Pilot — Ward 12 Lucknow</span>
+            <span>DILRMP 3.0 / NAKSHA Pilot &mdash; Ward 12 Lucknow</span>
           </div>
         </div>
 
-        {/* Right: Actions, Tour, KYC, Role Switcher */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        {/* Right: Consolidated Action Cluster */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {/* Quick Onboarding Tour Button */}
           <button
             onClick={() => setTourOpen(true)}
-            className="btn-pastel-secondary"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "7px 14px",
-              fontSize: "0.8rem",
-            }}
+            className="btn-secondary"
             title="Start Guided System Tour"
           >
-            <Compass size={15} /> Quick Tour
+            <Compass size={16} style={{ color: "var(--accent-primary)" }} /> Quick Tour
           </button>
 
           {/* Strict Officer KYC / Parcel Registration */}
           <button
             onClick={() => setRegModalOpen(true)}
-            className="btn-pastel-secondary"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "7px 14px",
-              fontSize: "0.8rem",
-            }}
+            className="btn-secondary"
             title="Verify Officer / Add Parcel"
           >
-            <UserCheck size={15} /> Verify / Register
+            <UserCheck size={16} style={{ color: "var(--accent-primary)" }} /> Verify / Register
           </button>
 
-          <div style={{ width: 1, height: 26, background: "var(--border-glass)" }} />
+          <div style={{ width: 1, height: 24, background: "var(--border-subtle)", margin: "0 2px" }} />
 
-          {/* Role Navigation Toggle */}
+          {/* Role Segmented Control */}
           <div
+            role="group"
+            aria-label="Workspace Role Switcher"
             style={{
               display: "flex",
-              background: "rgba(18, 32, 35, 0.7)",
-              borderRadius: 10,
-              padding: 4,
-              border: "1px solid var(--border-glass)",
+              alignItems: "center",
+              background: "var(--bg-secondary)",
+              borderRadius: "var(--radius-md)",
+              padding: 3,
+              border: "1px solid var(--border-subtle)",
+              gap: 2,
             }}
           >
             <button
               onClick={() => router.push("/patwari")}
               style={{
-                padding: "6px 14px",
-                fontSize: "0.78rem",
+                padding: "6px 12px",
+                fontSize: "0.8125rem",
                 fontWeight: 600,
-                borderRadius: 8,
-                background: isPatwari ? "var(--accent-primary)" : "transparent",
-                color: isPatwari ? "#091416" : "var(--text-muted)",
-                border: "none",
+                borderRadius: "var(--radius-sm)",
+                background: isPatwari ? "#FFFFFF" : "transparent",
+                color: isPatwari ? "var(--accent-primary)" : "var(--text-secondary)",
+                border: isPatwari ? "1px solid var(--border-subtle)" : "1px solid transparent",
                 cursor: "pointer",
-                transition: "all 0.2s ease",
+                transition: "all 0.15s ease",
+                boxShadow: isPatwari ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
               }}
             >
               Patwari (Surveyor)
@@ -174,22 +165,23 @@ export default function TopNavbar() {
             <button
               onClick={() => router.push("/tehsildar")}
               style={{
-                padding: "6px 14px",
-                fontSize: "0.78rem",
+                padding: "6px 12px",
+                fontSize: "0.8125rem",
                 fontWeight: 600,
-                borderRadius: 8,
-                background: isTehsildar ? "var(--accent-secondary)" : "transparent",
-                color: isTehsildar ? "#091416" : "var(--text-muted)",
-                border: "none",
+                borderRadius: "var(--radius-sm)",
+                background: isTehsildar ? "#FFFFFF" : "transparent",
+                color: isTehsildar ? "var(--accent-primary)" : "var(--text-secondary)",
+                border: isTehsildar ? "1px solid var(--border-subtle)" : "1px solid transparent",
                 cursor: "pointer",
-                transition: "all 0.2s ease",
+                transition: "all 0.15s ease",
+                boxShadow: isTehsildar ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
               }}
             >
-              Tehsildar (HITL Approval)
+              Tehsildar (Magistrate)
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Global Modals */}
       <OnboardingTour isOpen={tourOpen} onClose={() => setTourOpen(false)} />

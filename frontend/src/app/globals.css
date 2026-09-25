@@ -1,45 +1,54 @@
 @import "tailwindcss";
 
-/* ───────────────── Apple-Grade Pastel Design Tokens ───────────────── */
+/* ───────────────── Luminous Bright Pastel Design System ───────────────── */
 :root {
-  /* Soothing Dark Pastel Teal/Slate Canvas */
-  --bg-primary: #0b1416;
-  --bg-secondary: #101c1e;
-  --bg-card: rgba(18, 32, 35, 0.65);
-  --bg-card-hover: rgba(24, 42, 46, 0.78);
-  --bg-glass: rgba(18, 32, 35, 0.55);
-  --bg-glass-strong: rgba(16, 28, 31, 0.85);
+  /* Clean, Luminous Surfaces (High Legibility over Satellite Imagery) */
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #F1F5F9;
+  --bg-card: rgba(255, 255, 255, 0.95);
+  --bg-card-hover: #FFFFFF;
+  --bg-glass: rgba(255, 255, 255, 0.92);
+  --bg-glass-strong: rgba(255, 255, 255, 0.98);
 
-  /* Curated Pastel Teal & Aqua Palette (Non-Generic, Apple Pro Vibe) */
-  --accent-primary: #79C7C5;        /* Soothing Pastel Teal */
-  --accent-primary-hover: #98D8D6;  /* Soft Aqua Glow */
-  --accent-primary-glow: rgba(121, 199, 197, 0.25);
-  --accent-secondary: #B4ECE7;      /* Gentle Aqua Highlight */
-  --accent-mint: #A8E6CF;           /* Pastel Mint for Clean / Published */
-  --accent-peach: #FFD3B6;          /* Pastel Peach for Occlusion / Warnings */
-  --accent-coral: #FFAAA6;          /* Pastel Coral for Disputed / Rejected */
-  --accent-lavender: #D8B4E2;       /* Pastel Lavender for AI GeoSAM */
+  /* Vibrant, Cheerful Pastel Palette (Khile Khile Fresh Colors) */
+  --accent-primary: #0D9488;          /* Vibrant Deep Mint/Teal (AAA Accessible) */
+  --accent-primary-light: #2DD4BF;    /* Radiant Mint Glow */
+  --accent-primary-bg: #CCFBF1;       /* Soft Bright Mint Background */
+  
+  --accent-sky: #0284C7;              /* Lively Sky Blue */
+  --accent-sky-light: #38BDF8;        /* Fresh Sky Glow */
+  --accent-sky-bg: #E0F2FE;           /* Bright Sky Tint */
 
-  /* Text Hierarchy (High Contrast, Low Fatigue) */
-  --text-primary: #F2F8F8;
-  --text-secondary: #A2C0BE;
-  --text-muted: #6B8B8A;
+  --accent-mint: #059669;             /* Fresh Emerald Mint (Published / Approved) */
+  --accent-mint-bg: #D1FAE5;          /* Bright Spring Green Tint */
 
-  /* Frosted Glass Borders & Separators */
-  --border-subtle: rgba(121, 199, 197, 0.12);
-  --border-glass: rgba(121, 199, 197, 0.20);
-  --border-accent: rgba(121, 199, 197, 0.45);
+  --accent-sun: #D97706;              /* Warm Amber Sunshine (Pending / Warnings) */
+  --accent-sun-bg: #FEF3C7;           /* Bright Sunlight Tint */
 
-  /* Subtle Layered Ambient Shadows */
-  --shadow-glow: 0 0 24px rgba(121, 199, 197, 0.18);
-  --shadow-card: 0 8px 32px 0 rgba(0, 20, 22, 0.45);
-  --shadow-elevated: 0 16px 48px 0 rgba(0, 15, 17, 0.65);
+  --accent-coral: #E11D48;            /* Vibrant Coral Rose (Disputes / Rejections) */
+  --accent-coral-bg: #FFE4E6;         /* Soft Bright Rose Tint */
 
-  /* Refined Apple Curvature */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
+  --accent-lavender: #7C3AED;        /* Radiant Lavender Purple (GeoSAM AI) */
+  --accent-lavender-bg: #F3E8FF;      /* Bright Violet Tint */
+
+  /* Crystal-Clear Text Hierarchy (WCAG AAA Contrast > 7:1) */
+  --text-primary: #0F172A;            /* Deep Navy Slate (100% Crisp) */
+  --text-secondary: #334155;          /* Crisp Slate Gray */
+  --text-muted: #64748B;              /* Medium Slate */
+
+  /* Clean Crisp Borders & Dividers */
+  --border-subtle: #E2E8F0;
+  --border-glass: #CBD5E1;
+  --border-accent: #2DD4BF;
+
+  /* Ambient Layered Shadows */
+  --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --shadow-elevated: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
+
+  /* Unified Strict Radii (Exactly 3 System Tokens to resolve consistency) */
+  --radius-sm: 6px;                  /* Badges, micro-tags, small inputs */
+  --radius-md: 10px;                 /* Buttons, inputs, segmented controls */
+  --radius-lg: 16px;                 /* Panels, cards, modals, drawers */
 }
 
 /* ───────────────── Global Reset & Base ───────────────── */
@@ -55,14 +64,14 @@ html {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
-  background: radial-gradient(circle at 50% 0%, #132427 0%, var(--bg-primary) 70%);
+  background: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ───────────────── Glassmorphism Utilities ───────────────── */
+/* ───────────────── Glassmorphism & Panel Utilities ───────────────── */
 .glass-card {
   background: var(--bg-glass);
   backdrop-filter: blur(20px);
@@ -70,14 +79,13 @@ body {
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-card:hover {
   background: var(--bg-card-hover);
-  border-color: var(--border-accent);
-  box-shadow: var(--shadow-glow), var(--shadow-card);
-  transform: translateY(-2px);
+  border-color: var(--accent-primary-light);
+  box-shadow: var(--shadow-elevated);
 }
 
 .glass-card-static {
@@ -89,113 +97,148 @@ body {
   box-shadow: var(--shadow-card);
 }
 
-.glass-sidebar {
-  background: var(--bg-glass-strong);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-right: 1px solid var(--border-glass);
-}
-
 .glass-modal {
-  background: rgba(14, 25, 28, 0.88);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-elevated), var(--shadow-glow);
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-elevated);
 }
 
-/* ───────────────── Status Pills & Indicators ───────────────── */
-.badge-pastel-mint {
-  background: rgba(168, 230, 207, 0.15);
-  color: #A8E6CF;
-  border: 1px solid rgba(168, 230, 207, 0.3);
+/* ───────────────── Unified Button System (Exactly 3 Standard Styles) ───────────────── */
+
+/* 1. Primary Action Button */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--accent-primary);
+  color: #FFFFFF !important;
+  font-weight: 600;
+  font-size: 0.875rem; /* 14px */
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(13, 148, 136, 0.2);
 }
 
+.btn-primary:hover:not(:disabled) {
+  background: #0f766e;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(13, 148, 136, 0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 2. Secondary Outline / White Button */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #FFFFFF;
+  color: var(--text-primary) !important;
+  font-weight: 600;
+  font-size: 0.875rem; /* 14px */
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary) !important;
+}
+
+/* 3. Ghost / Subtle Icon Button */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--text-secondary) !important;
+  font-weight: 600;
+  font-size: 0.875rem; /* 14px */
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--text-primary) !important;
+}
+
+/* ───────────────── Cheerful Pastel Badges ───────────────── */
 .badge-pastel-teal {
-  background: rgba(121, 199, 197, 0.15);
-  color: #79C7C5;
-  border: 1px solid rgba(121, 199, 197, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-primary-bg);
+  color: var(--accent-primary);
+  border: 1px solid #99F6E4;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 700;
 }
 
-.badge-pastel-peach {
-  background: rgba(255, 211, 182, 0.15);
-  color: #FFD3B6;
-  border: 1px solid rgba(255, 211, 182, 0.3);
+.badge-pastel-mint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-mint-bg);
+  color: var(--accent-mint);
+  border: 1px solid #A7F3D0;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 700;
+}
+
+.badge-pastel-sun {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-sun-bg);
+  color: var(--accent-sun);
+  border: 1px solid #FDE68A;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 700;
 }
 
 .badge-pastel-coral {
-  background: rgba(255, 170, 166, 0.15);
-  color: #FFAAA6;
-  border: 1px solid rgba(255, 170, 166, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-coral-bg);
+  color: var(--accent-coral);
+  border: 1px solid #FECDD3;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 700;
 }
 
-.badge-pastel-lavender {
-  background: rgba(216, 180, 226, 0.15);
-  color: #D8B4E2;
-  border: 1px solid rgba(216, 180, 226, 0.3);
-}
-
-/* ───────────────── Button Utilities ───────────────── */
-.btn-pastel-primary {
-  background: linear-gradient(135deg, #79C7C5 0%, #4FA8A4 100%);
-  color: #061012;
-  font-weight: 600;
-  border: none;
-  border-radius: var(--radius-md);
-  padding: 10px 18px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(121, 199, 197, 0.3);
-}
-
-.btn-pastel-primary:hover {
-  background: linear-gradient(135deg, #98D8D6 0%, #63B8B4 100%);
-  box-shadow: 0 6px 20px rgba(121, 199, 197, 0.45);
-  transform: translateY(-1px);
-}
-
-.btn-pastel-secondary {
-  background: rgba(121, 199, 197, 0.12);
-  color: #79C7C5;
-  font-weight: 600;
-  border: 1px solid rgba(121, 199, 197, 0.28);
-  border-radius: var(--radius-md);
-  padding: 10px 18px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-pastel-secondary:hover {
-  background: rgba(121, 199, 197, 0.22);
-  border-color: #79C7C5;
-  transform: translateY(-1px);
-}
-
-/* ───────────────── Leaflet Map Overrides ───────────────── */
-.leaflet-container {
-  background: #091214 !important;
-  font-family: inherit !important;
-}
-
-.custom-popup .leaflet-popup-content-wrapper {
-  background: rgba(14, 25, 28, 0.92) !important;
-  backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(121, 199, 197, 0.3) !important;
-  border-radius: 14px !important;
-  color: #F2F8F8 !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
-}
-
-.custom-popup .leaflet-popup-tip {
-  background: rgba(14, 25, 28, 0.92) !important;
-}
-
-/* ───────────────── Keyframe Animations ───────────────── */
+/* ───────────────── Smooth Micro-Animations ───────────────── */
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -203,19 +246,6 @@ body {
   }
 }
 
-@keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 12px rgba(121, 199, 197, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 24px rgba(121, 199, 197, 0.45);
-  }
-}
-
 .animate-fade-in-up {
-  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 2.5s infinite ease-in-out;
+  animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
