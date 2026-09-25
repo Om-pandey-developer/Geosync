@@ -19,6 +19,22 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7.2-alpine
+    container_name: geosync-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - geosync_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   geosync_pgdata:
+    driver: local
+  geosync_redisdata:
     driver: local

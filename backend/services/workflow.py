@@ -1,60 +1,75 @@
 """
 GeoSync Workflow Service — HITL Revenue Officer Approval
+========================================================
 
 Implements the legal Human-in-the-Loop approval workflow:
 1. Patwari submits an aligned parcel for approval
 2. Tehsildar reviews alignment quality, topology, and ULPIN
 3. Tehsildar approves, rejects, or requests revision
+
+Designed with SQLAlchemy ORM for 100% cross-compatibility across
+both production PostgreSQL/PostGIS and offline air-gapped SQLite environments.
 """
 
+import uuid
 from datetime import datetime, timezone
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import func
+
+from models import Parcel, ApprovalRequest
+
+
+def _resolve_uuid(val: Any) -> uuid.UUID:
+    """Helper to convert string or UUID to UUID object."""
+    if isinstance(val, uuid.UUID):
+        return val
+    return uuid.UUID(str(val))
 
 
 def create_approval_request(db: Session, parcel_id: str, requested_by: str = "patwari_01") -> dict:
     """Creates a new approval request for a parcel."""
-    # Check parcel exists and has ULPIN
-    parcel = db.execute(
-        text("SELECT id, khasra_no, alignment_status, ulpin FROM parcels WHERE id = :pid"),
-        {"pid": parcel_id}
-    ).fetchone()
+    pid = _resolve_uuid(parcel_id)
+    parcel = db.query(Parcel).filter(Parcel.id == pid).first()
 
     if parcel is None:
         raise ValueError(f"Parcel {parcel_id} not found")
 
     if parcel.alignment_status not in ("ulpin_assigned", "cleaned", "aligned"):
-        raise ValueError(f"Parcel must be at least aligned before submitting for approval. Current: {parcel.alignment_status}")
+        raise ValueError(
+            f"Parcel must be at least aligned before submitting for approval. Current: {parcel.alignment_status}"
+        )
 
     # Check for existing pending request
-    existing = db.execute(
-        text("SELECT id FROM approval_requests WHERE parcel_id = :pid AND status = 'pending'"),
-        {"pid": parcel_id}
-    ).fetchone()
+    existing = db.query(ApprovalRequest).filter(
+        ApprovalRequest.parcel_id == pid,
+        ApprovalRequest.status == 'pending',
+    ).first()
 
     if existing:
         return {
             "id": str(existing.id),
-            "parcel_id": parcel_id,
+            "parcel_id": str(parcel_id),
             "status": "pending",
             "message": "An approval request is already pending for this parcel.",
         }
 
     # Create new request
-    result = db.execute(
-        text("""
-            INSERT INTO approval_requests (id, parcel_id, requested_by, status, requested_at)
-            VALUES (gen_random_uuid(), :pid, :req_by, 'pending', NOW())
-            RETURNING id
-        """),
-        {"pid": parcel_id, "req_by": requested_by}
+    new_id = uuid.uuid4()
+    new_req = ApprovalRequest(
+        id=new_id,
+        parcel_id=pid,
+        requested_by=requested_by,
+        status="pending",
+        requested_at=datetime.now(timezone.utc),
     )
+    db.add(new_req)
     db.commit()
-    new_id = result.fetchone().id
+    db.refresh(new_req)
 
     return {
-        "id": str(new_id),
-        "parcel_id": parcel_id,
+        "id": str(new_req.id),
+        "parcel_id": str(parcel_id),
         "requested_by": requested_by,
         "status": "pending",
         "message": f"Approval request created for Khasra {parcel.khasra_no}.",
@@ -66,16 +81,14 @@ def process_approval_action(
     approval_id: str,
     action: str,
     reviewed_by: str = "tehsildar_01",
-    remarks: str = None,
+    remarks: Optional[str] = None,
 ) -> dict:
     """
     Tehsildar processes an approval request.
     Actions: 'approved', 'rejected', 'revision_requested'
     """
-    approval = db.execute(
-        text("SELECT id, parcel_id, status FROM approval_requests WHERE id = :aid"),
-        {"aid": approval_id}
-    ).fetchone()
+    aid = _resolve_uuid(approval_id)
+    approval = db.query(ApprovalRequest).filter(ApprovalRequest.id == aid).first()
 
     if approval is None:
         raise ValueError(f"Approval request {approval_id} not found")
@@ -84,30 +97,22 @@ def process_approval_action(
         raise ValueError(f"Cannot process. Request is already '{approval.status}'.")
 
     # Update approval status
-    db.execute(
-        text("""
-            UPDATE approval_requests
-            SET status = :action,
-                reviewed_by = :rev_by,
-                remarks = :remarks,
-                reviewed_at = NOW()
-            WHERE id = :aid
-        """),
-        {"action": action, "rev_by": reviewed_by, "remarks": remarks, "aid": approval_id}
-    )
+    approval.status = action
+    approval.reviewed_by = reviewed_by
+    approval.remarks = remarks
+    approval.reviewed_at = datetime.now(timezone.utc)
 
     # If rejected or revision_requested, reset parcel status
     if action in ("rejected", "revision_requested"):
         new_parcel_status = "raw" if action == "rejected" else "aligned"
-        db.execute(
-            text("UPDATE parcels SET alignment_status = :status WHERE id = :pid"),
-            {"status": new_parcel_status, "pid": str(approval.parcel_id)}
-        )
+        parcel = db.query(Parcel).filter(Parcel.id == approval.parcel_id).first()
+        if parcel:
+            parcel.alignment_status = new_parcel_status
 
     db.commit()
 
     return {
-        "approval_id": approval_id,
+        "approval_id": str(approval.id),
         "parcel_id": str(approval.parcel_id),
         "action": action,
         "reviewed_by": reviewed_by,
@@ -118,82 +123,54 @@ def process_approval_action(
 
 def get_pending_approvals(db: Session) -> list:
     """Returns all pending approval requests with parcel details."""
-    results = db.execute(
-        text("""
-            SELECT
-                ar.id as approval_id,
-                ar.parcel_id,
-                ar.requested_by,
-                ar.status,
-                ar.requested_at,
-                p.khasra_no,
-                p.owner_name,
-                p.village,
-                p.tehsil,
-                p.district,
-                p.ulpin,
-                p.area_sqm,
-                p.alignment_status,
-                p.alignment_confidence
-            FROM approval_requests ar
-            JOIN parcels p ON ar.parcel_id = p.id
-            WHERE ar.status = 'pending'
-            ORDER BY ar.requested_at ASC
-        """)
-    ).fetchall()
+    records = (
+        db.query(ApprovalRequest, Parcel)
+        .join(Parcel, ApprovalRequest.parcel_id == Parcel.id)
+        .filter(ApprovalRequest.status == "pending")
+        .order_by(ApprovalRequest.requested_at.asc())
+        .all()
+    )
 
     return [
         {
-            "approval_id": str(r.approval_id),
-            "parcel_id": str(r.parcel_id),
-            "requested_by": r.requested_by,
-            "status": r.status,
-            "requested_at": r.requested_at.isoformat() if r.requested_at else None,
-            "khasra_no": r.khasra_no,
-            "owner_name": r.owner_name,
-            "village": r.village,
-            "tehsil": r.tehsil,
-            "district": r.district,
-            "ulpin": r.ulpin,
-            "area_sqm": r.area_sqm,
-            "alignment_status": r.alignment_status,
-            "alignment_confidence": r.alignment_confidence,
+            "approval_id": str(ar.id),
+            "parcel_id": str(ar.parcel_id),
+            "requested_by": ar.requested_by,
+            "status": ar.status,
+            "requested_at": ar.requested_at.isoformat() if ar.requested_at else None,
+            "khasra_no": p.khasra_no,
+            "owner_name": p.owner_name,
+            "village": p.village,
+            "tehsil": p.tehsil,
+            "district": p.district,
+            "ulpin": p.ulpin,
+            "area_sqm": p.area_sqm,
+            "alignment_status": p.alignment_status,
+            "alignment_confidence": p.alignment_confidence,
         }
-        for r in results
+        for ar, p in records
     ]
 
 
 def get_dashboard_stats(db: Session) -> dict:
     """Returns aggregate statistics for the Tehsildar dashboard."""
-    parcel_stats = db.execute(
-        text("""
-            SELECT
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE alignment_status = 'raw') as raw_count,
-                COUNT(*) FILTER (WHERE alignment_status = 'aligned') as aligned_count,
-                COUNT(*) FILTER (WHERE alignment_status = 'cleaned') as cleaned_count,
-                COUNT(*) FILTER (WHERE alignment_status = 'ulpin_assigned') as ulpin_count
-            FROM parcels
-        """)
-    ).fetchone()
+    total = db.query(func.count(Parcel.id)).scalar() or 0
+    raw_count = db.query(func.count(Parcel.id)).filter(Parcel.alignment_status == "raw").scalar() or 0
+    aligned_count = db.query(func.count(Parcel.id)).filter(Parcel.alignment_status == "aligned").scalar() or 0
+    cleaned_count = db.query(func.count(Parcel.id)).filter(Parcel.alignment_status == "cleaned").scalar() or 0
+    ulpin_count = db.query(func.count(Parcel.id)).filter(Parcel.alignment_status == "ulpin_assigned").scalar() or 0
 
-    approval_stats = db.execute(
-        text("""
-            SELECT
-                COUNT(*) FILTER (WHERE status = 'pending') as pending,
-                COUNT(*) FILTER (WHERE status = 'approved') as approved,
-                COUNT(*) FILTER (WHERE status = 'rejected') as rejected
-            FROM approval_requests
-        """)
-    ).fetchone()
+    pending = db.query(func.count(ApprovalRequest.id)).filter(ApprovalRequest.status == "pending").scalar() or 0
+    approved = db.query(func.count(ApprovalRequest.id)).filter(ApprovalRequest.status == "approved").scalar() or 0
+    rejected = db.query(func.count(ApprovalRequest.id)).filter(ApprovalRequest.status == "rejected").scalar() or 0
 
     return {
-        "total_parcels": parcel_stats.total,
-        "raw_count": parcel_stats.raw_count,
-        "aligned_count": parcel_stats.aligned_count,
-        "cleaned_count": parcel_stats.cleaned_count,
-        "ulpin_assigned_count": parcel_stats.ulpin_count,
-        "pending_approvals": approval_stats.pending,
-        "approved_count": approval_stats.approved,
-        "rejected_count": approval_stats.rejected,
+        "total_parcels": total,
+        "raw_count": raw_count,
+        "aligned_count": aligned_count,
+        "cleaned_count": cleaned_count,
+        "ulpin_assigned_count": ulpin_count,
+        "pending_approvals": pending,
+        "approved_count": approved,
+        "rejected_count": rejected,
     }
