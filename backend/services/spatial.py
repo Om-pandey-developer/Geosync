@@ -377,26 +377,24 @@ def check_bhuvan_infrastructure_overlap(
     Returns:
         Structured diagnostics dictionary with encroachment risk and infrastructure flags.
     """
-    import requests
-
     min_lon, min_lat, max_lon, max_lat = bbox
-    wms_params = {
-        "SERVICE": "WMS",
-        "VERSION": "1.1.1",
-        "REQUEST": "GetFeatureInfo",
-        "LAYERS": layer_name,
-        "QUERY_LAYERS": layer_name,
-        "BBOX": f"{min_lon},{min_lat},{max_lon},{max_lat}",
-        "WIDTH": "256",
-        "HEIGHT": "256",
-        "SRS": "EPSG:4326",
-        "X": "128",
-        "Y": "128",
-        "INFO_FORMAT": "text/html",
-        "FEATURE_COUNT": "5",
-    }
-
     try:
+        import requests
+        wms_params = {
+            "SERVICE": "WMS",
+            "VERSION": "1.1.1",
+            "REQUEST": "GetFeatureInfo",
+            "LAYERS": layer_name,
+            "QUERY_LAYERS": layer_name,
+            "BBOX": f"{min_lon},{min_lat},{max_lon},{max_lat}",
+            "WIDTH": "256",
+            "HEIGHT": "256",
+            "SRS": "EPSG:4326",
+            "X": "128",
+            "Y": "128",
+            "INFO_FORMAT": "text/html",
+            "FEATURE_COUNT": "5",
+        }
         response = requests.get(BHUVAN_WMS_ENDPOINT, params=wms_params, timeout=timeout_seconds)
         if response.status_code == 200 and response.text:
             content = response.text.lower()
