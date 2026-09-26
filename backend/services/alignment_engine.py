@@ -18,6 +18,9 @@ Dependencies: opencv-python-headless, numpy, shapely
 
 from __future__ import annotations
 
+import os
+import json
+import math
 import logging
 import time
 from typing import List, Optional, Tuple
@@ -28,6 +31,114 @@ from shapely.geometry import shape, mapping, Polygon, MultiPolygon
 from shapely.affinity import affine_transform
 
 logger = logging.getLogger("geosync.alignment_engine")
+
+# ━━━━━━━━━━━━━━━━━━ CRS Normalization (pyproj / Math) ━━━━━━━━━━━━━━━━━━
+
+try:
+    from pyproj import Transformer
+    _transformer_4326_to_3857 = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+    _transformer_3857_to_4326 = Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)
+    HAS_PYPROJ = True
+except ImportError:
+    HAS_PYPROJ = False
+    _transformer_4326_to_3857 = None
+    _transformer_3857_to_4326 = None
+
+def project_wgs84_to_webmercator(lon: float, lat: float) -> Tuple[float, float]:
+    """Transforms WGS84 (EPSG:4326) degrees into Web Mercator (EPSG:3857) meters."""
+    if HAS_PYPROJ and _transformer_4326_to_3857:
+        x, y = _transformer_4326_to_3857.transform(lon, lat)
+        return float(x), float(y)
+    x = lon * 20037508.34 / 180.0
+    lat_rad = max(min(lat, 89.5), -89.5) * math.pi / 180.0
+    y = math.log(math.tan((math.pi / 4.0) + (lat_rad / 2.0))) * 20037508.34 / math.pi
+    return float(x), float(y)
+
+def project_webmercator_to_wgs84(x: float, y: float) -> Tuple[float, float]:
+    """Transforms Web Mercator (EPSG:3857) meters into WGS84 (EPSG:4326) degrees."""
+    if HAS_PYPROJ and _transformer_3857_to_4326:
+        lon, lat = _transformer_3857_to_4326.transform(x, y)
+        return float(lon), float(lat)
+    lon = x * 180.0 / 20037508.34
+    lat = (2.0 * math.atan(math.exp(y * math.pi / 20037508.34)) - (math.pi / 2.0)) * 180.0 / math.pi
+    return float(lon), float(lat)
+
+def normalize_geojson_crs(
+    coordinates: List[List[List[float]]],
+    source_crs: str = "EPSG:4326",
+    target_crs: str = "EPSG:3857",
+) -> List[List[List[float]]]:
+    """
+    Normalizes coordinates from source CRS to target metric CRS.
+    Supports EPSG:4326 -> EPSG:3857 (metric) and vice versa.
+    """
+    if source_crs == target_crs:
+        return coordinates
+
+    transformed_rings = []
+    for ring in coordinates:
+        new_ring = []
+        for pt in ring:
+            if target_crs == "EPSG:3857" and source_crs == "EPSG:4326":
+                x, y = project_wgs84_to_webmercator(pt[0], pt[1])
+            elif target_crs == "EPSG:4326" and source_crs == "EPSG:3857":
+                x, y = project_webmercator_to_wgs84(pt[0], pt[1])
+            else:
+                x, y = pt[0], pt[1]
+            new_ring.append([
+                round(x, 4 if target_crs == "EPSG:3857" else 8),
+                round(y, 4 if target_crs == "EPSG:3857" else 8),
+            ])
+        transformed_rings.append(new_ring)
+    return transformed_rings
+
+# ━━━━━━━━━━━━━━━━━━ Redis Draft Caching ━━━━━━━━━━━━━━━━━━
+
+try:
+    import redis
+    REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+    REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+    redis_client = redis.Redis(
+        host=REDIS_HOST, port=REDIS_PORT, db=0,
+        decode_responses=True, socket_connect_timeout=1.0,
+    )
+    # Don't block if redis is not running yet
+    redis_client.ping()
+    HAS_REDIS = True
+except Exception:
+    redis_client = None
+    HAS_REDIS = False
+
+def cache_aligned_draft(parcel_id: str, alignment_data: dict, ttl_seconds: int = 86400) -> bool:
+    """Caches aligned GeoJSON and metadata with status ALIGNED_DRAFT in Redis."""
+    global HAS_REDIS, redis_client
+    if not HAS_REDIS or not redis_client:
+        return False
+    try:
+        key = f"geosync:alignment:{parcel_id}"
+        payload = {
+            "status": "ALIGNED_DRAFT",
+            "cached_at": time.time(),
+            **alignment_data
+        }
+        redis_client.setex(key, ttl_seconds, json.dumps(payload))
+        logger.info("Cached ALIGNED_DRAFT for parcel %s in Redis (TTL: %ds)", parcel_id, ttl_seconds)
+        return True
+    except Exception as e:
+        logger.warning("Redis cache error: %s", e)
+        return False
+
+def get_cached_aligned_draft(parcel_id: str) -> Optional[dict]:
+    """Retrieves cached ALIGNED_DRAFT for parcel_id from Redis."""
+    global HAS_REDIS, redis_client
+    if not HAS_REDIS or not redis_client:
+        return None
+    try:
+        key = f"geosync:alignment:{parcel_id}"
+        val = redis_client.get(key)
+        return json.loads(val) if val else None
+    except Exception:
+        return None
 
 
 # ━━━━━━━━━━━━━━━━━━ Constants ━━━━━━━━━━━━━━━━━━
@@ -177,14 +288,16 @@ def create_reference_raster_from_metadata(
     image_size: Tuple[int, int] = (2048, 2048),
 ) -> Tuple[np.ndarray, dict]:
     """
-    Generates a synthetic reference contour image from drone raster metadata.
+    Generates or loads a reference raster image from drone raster metadata.
 
-    In production, this would load the actual drone orthophoto GeoTIFF.
-    For Phase 2, we synthesize a reference from the raster metadata's
-    coverage extent and any known control features.
+    If 'image_path' is provided in raster_metadata and exists on disk, it loads
+    the real drone orthophoto raster via OpenCV, applies CLAHE (Contrast Limited
+    Adaptive Histogram Equalization) for contrast enhancement, and resizes it.
+
+    Otherwise, synthesizes a reference contour image from metadata coverage extent.
 
     Args:
-        raster_metadata: Dict with keys like 'bounds', 'resolution_cm',
+        raster_metadata: Dict with keys like 'image_path', 'bounds', 'resolution_cm',
                          'crs', 'reference_features' (optional GeoJSON coords)
 
     Returns:
@@ -210,6 +323,23 @@ def create_reference_raster_from_metadata(
         "image_width": w,
         "image_height": h,
     }
+
+    # ── Stage 2A: Real Drone Raster Loading & CLAHE Pre-processing ──
+    image_path = raster_metadata.get("image_path")
+    if image_path and os.path.exists(image_path):
+        try:
+            raw_img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+            if raw_img is not None and raw_img.size > 0:
+                logger.info("Loaded real drone raster from %s (%dx%d)", image_path, raw_img.shape[1], raw_img.shape[0])
+                # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+                # This sharpens field bunds and boundary demarcations under shadows
+                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+                enhanced_img = clahe.apply(raw_img)
+                # Standardize to target processing resolution
+                processed_img = cv2.resize(enhanced_img, image_size, interpolation=cv2.INTER_AREA)
+                return processed_img, geo_transform
+        except Exception as e:
+            logger.warning("Failed to process real raster at %s: %s. Falling back to synthetic.", image_path, e)
 
     img = np.zeros((h, w), dtype=np.uint8)
 

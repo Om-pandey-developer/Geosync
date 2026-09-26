@@ -253,8 +253,8 @@ class BoundaryExtractionResponse(BaseModel):
     is_occluded: bool = Field(..., description="True if tree canopy / shadow occludes ground")
     occlusion_reason: str
     hitl_review_required: bool
-    model_backbone: str = "GeoSAM-ViT-H-LoRA"
-    embedding_dimension: int = 1024
+    model_backbone: str = "GeoSAM-ViT-B-LoRA"
+    embedding_dimension: int = 768
     inference_time_ms: float
 
 

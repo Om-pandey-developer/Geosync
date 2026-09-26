@@ -66,9 +66,21 @@ export default function TehsildarPage() {
         fetch(`${API}/parcels/geojson`),
       ]);
       if (!statsRes.ok || !pendingRes.ok || !geojsonRes.ok) throw new Error("Data error");
-      setStats(await statsRes.json());
-      setPendingApprovals(await pendingRes.json());
-      setGeojson(await geojsonRes.json());
+      const statsData = await statsRes.json();
+      const pendingData = await pendingRes.json();
+      const geojsonData = await geojsonRes.json();
+
+      setStats(statsData);
+      setPendingApprovals(pendingData);
+      setGeojson(geojsonData);
+
+      // Auto-select first docket if none selected
+      setSelectedApproval((prev) => {
+        if (prev && pendingData.some((a: PendingApproval) => a.approval_id === prev.approval_id)) {
+          return prev;
+        }
+        return pendingData.length > 0 ? pendingData[0] : null;
+      });
     } catch {
       toast.error("Using offline local proxy database...");
     }
@@ -97,16 +109,18 @@ export default function TehsildarPage() {
         }),
       });
 
-      // 2. Update workflow approval status
-      await fetch(`${API}/approvals/${selectedApproval.approval_id}/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reviewed_by: "tehsildar_mohanlalganj",
-          action: "approved",
-          remarks: remarks || "Verified boundary conforms to NAKSHA 5cm drone survey.",
-        }),
-      });
+      // Step 2: Update workflow approval docket
+      if (!selectedApproval.approval_id.startsWith("preview-")) {
+        await fetch(`${API}/approvals/${selectedApproval.approval_id}/action`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reviewed_by: "tehsildar_mohanlalganj",
+            action: "approved",
+            remarks: remarks || "Verified boundary conforms to NAKSHA 5cm drone survey.",
+          }),
+        });
+      }
 
       toast.success(`Khasra ${selectedApproval.khasra_no} approved & published to Land Stack!`, { id: tId });
       setSelectedApproval(null);
@@ -118,28 +132,40 @@ export default function TehsildarPage() {
     setLoading(false);
   };
 
+  const handleResetDemo = async () => {
+    try {
+      const tId = toast.loading("Restoring demo dockets...");
+      await fetch(`${API}/approvals/seed-demo`, { method: "POST" });
+      await fetchData();
+      toast.success("Loaded 4 demo approval dockets!", { id: tId });
+    } catch {
+      toast.error("Failed to seed demo dockets");
+    }
+  };
+
   const handleReject = async () => {
     if (!selectedApproval) return;
     setLoading(true);
     const tId = toast.loading(`Returning Khasra ${selectedApproval.khasra_no} for re-survey...`);
 
     try {
-      await fetch(`${API}/approvals/${selectedApproval.approval_id}/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reviewed_by: "tehsildar_mohanlalganj",
-          action: "rejected",
-          remarks: remarks || "Boundary discrepancy detected under canopy shadow. Re-survey required.",
-        }),
-      });
-
-      toast.success(`Khasra ${selectedApproval.khasra_no} returned to Patwari docket.`, { id: tId });
+      if (!selectedApproval.approval_id.startsWith("preview-")) {
+        await fetch(`${API}/approvals/${selectedApproval.approval_id}/action`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reviewed_by: "tehsildar_mohanlalganj",
+            action: "rejected",
+            remarks: remarks || "Boundary discrepancy detected against 5cm drone raster.",
+          }),
+        });
+      }
+      toast.success(`Khasra ${selectedApproval.khasra_no} returned to Patwari field queue`, { id: tId });
       setSelectedApproval(null);
       setRemarks("");
       await fetchData();
     } catch {
-      toast.error("Error processing rejection", { id: tId });
+      toast.error("Error returning parcel to queue", { id: tId });
     }
     setLoading(false);
   };
@@ -201,10 +227,14 @@ export default function TehsildarPage() {
             </p>
           </div>
 
-          {/* Fix Issue 7: Grouped Refresh button aligned with header */}
-          <button className="btn-secondary" onClick={fetchData}>
-            <RefreshCw size={15} style={{ color: "var(--accent-primary)" }} /> Refresh Records
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button className="btn-pastel-secondary" onClick={handleResetDemo} style={{ padding: "8px 14px", fontSize: "0.82rem", display: "flex", alignItems: "center", gap: 6 }}>
+              <RefreshCw size={14} /> Reset Demo Dockets
+            </button>
+            <button className="btn-ghost" onClick={fetchData} style={{ padding: "8px 14px", fontSize: "0.82rem" }}>
+              <RefreshCw size={14} /> Refresh Records
+            </button>
+          </div>
         </div>
 
         {/* ───── Stat Cards Bar (Fix Issue 1: Standardized --radius-lg) ───── */}
@@ -336,7 +366,10 @@ export default function TehsildarPage() {
                 <div style={{ padding: 36, textAlign: "center", color: "var(--text-muted)" }}>
                   <CheckCircle2 size={32} style={{ margin: "0 auto 10px", color: "var(--accent-primary)", opacity: 0.8 }} />
                   <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-primary)" }}>All Wards Reconciled</p>
-                  <p style={{ fontSize: "0.8125rem", marginTop: 4 }}>No pending cadastral disputes in docket.</p>
+                  <p style={{ fontSize: "0.8125rem", marginTop: 4, marginBottom: 12 }}>No pending cadastral disputes in current docket.</p>
+                  <button onClick={handleResetDemo} className="btn-primary" style={{ padding: "6px 14px", fontSize: "0.78rem" }}>
+                    Load Demo Dockets
+                  </button>
                 </div>
               )}
             </div>
@@ -349,7 +382,29 @@ export default function TehsildarPage() {
               selectedParcelId={selectedApproval?.parcel_id || null}
               onParcelClick={(id) => {
                 const match = pendingApprovals.find((a) => a.parcel_id === id);
-                if (match) setSelectedApproval(match);
+                if (match) {
+                  setSelectedApproval(match);
+                } else if (geojson) {
+                  const feat = geojson.features.find((f: any) => f.properties?.id === id);
+                  if (feat?.properties) {
+                    setSelectedApproval({
+                      approval_id: "preview-" + id,
+                      parcel_id: id,
+                      requested_by: "patwari_mohanlalganj",
+                      status: "pending",
+                      requested_at: new Date().toISOString(),
+                      khasra_no: feat.properties.khasra_no || "N/A",
+                      owner_name: feat.properties.owner_name || "Unknown",
+                      village: feat.properties.village || "Mohanlalganj",
+                      tehsil: feat.properties.tehsil || "Mohanlalganj",
+                      district: "Lucknow",
+                      ulpin: feat.properties.ulpin || "2601A4B7C9D2E3",
+                      area_sqm: feat.properties.area_sqm || 1420.5,
+                      alignment_status: feat.properties.alignment_status || "aligned",
+                      alignment_confidence: feat.properties.alignment_confidence ?? 0.94,
+                    });
+                  }
+                }
               }}
               showOcclusionAlerts={true}
             />
