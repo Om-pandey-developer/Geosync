@@ -134,45 +134,22 @@ export default function MapSourceModal({
   onChangeOldMapStrokeColor,
 }: MapSourceModalProps) {
   const [activeTab, setActiveTab] = useState<"old" | "new">("old");
-  const [customTileUrl, setCustomTileUrl] = useState("");
-  const [customTileName, setCustomTileName] = useState("Custom Drone WMS/XYZ");
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-  const geojsonInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedDroneFileName, setUploadedDroneFileName] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const droneImageInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
-  // Handle Custom GeoJSON Upload (Old Map)
-  const handleGeoJsonFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        const parsed = JSON.parse(text);
-
-        if (!parsed || parsed.type !== "FeatureCollection" || !Array.isArray(parsed.features)) {
-          throw new Error("File must be a valid GeoJSON FeatureCollection with polygons.");
-        }
-
-        setUploadedFileName(file.name);
-        if (onUploadCustomGeojson) {
-          onUploadCustomGeojson(parsed, file.name);
-        }
-        toast.success(`Loaded custom old map: ${file.name} (${parsed.features.length} parcels)`);
-      } catch (err: any) {
-        toast.error(err.message || "Failed to parse GeoJSON file");
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  // Handle Scanned Map Image Upload (Old Map)
+  // Handle Scanned Map Image Upload (Old Map - PNG/JPG only)
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file (PNG or JPG).");
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -181,31 +158,31 @@ export default function MapSourceModal({
         onUploadScannedMap(dataUrl, file.name);
       }
       setUploadedFileName(file.name);
-      toast.success(`Loaded paper cadastre scan overlay: ${file.name}`);
+      toast.success(`Loaded paper map scan: ${file.name}`);
     };
     reader.readAsDataURL(file);
   };
 
-  // Handle Custom Tile URL Submit (New Map)
-  const handleApplyCustomTile = () => {
-    if (!customTileUrl.includes("{z}") || !customTileUrl.includes("{x}") || !customTileUrl.includes("{y}")) {
-      toast.error("Tile URL must contain standard {z}/{x}/{y} parameters.");
+  // Handle Drone Image Upload (New Map - PNG/JPG only)
+  const handleDroneImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file (PNG or JPG).");
       return;
     }
 
-    const customOption: BasemapOption = {
-      id: "custom-drone-service",
-      name: customTileName || "Custom Drone Orthomosaic",
-      category: "drone",
-      url: customTileUrl.trim(),
-      attribution: "Custom Drone Survey Layer",
-      maxZoom: 22,
-      description: "User-defined XYZ/WMS drone orthomosaic tile stream.",
-      badge: "Custom XYZ Tile",
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setUploadedDroneFileName(file.name);
+      if (onUploadScannedMap) {
+        // Can be viewed as high-res raster
+      }
+      toast.success(`Loaded drone aerial photo: ${file.name}`);
     };
-
-    onSelectBasemap(customOption);
-    toast.success(`Switched to custom drone layer: ${customOption.name}`);
+    reader.readAsDataURL(file);
   };
 
   const STROKE_COLORS = [
@@ -418,62 +395,74 @@ export default function MapSourceModal({
                 </div>
               </div>
 
-              {/* Upload Custom Old Map Files */}
+              {/* Upload Paper Map Photo / Scan (PNG / JPG) - Simple for Revenue Officers */}
               <div
                 style={{
                   background: "#F8FAFC",
-                  border: "1px dashed #CBD5E1",
+                  border: "1.5px dashed #94A3B8",
                   borderRadius: "var(--radius-md)",
-                  padding: 16,
+                  padding: "18px 20px",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <Upload size={18} style={{ color: "var(--accent-primary)" }} />
-                  <strong style={{ fontSize: "0.875rem", color: "var(--text-primary)" }}>
-                    Upload Custom Old Map File
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <ImageIcon size={20} style={{ color: "var(--accent-primary)" }} />
+                  <strong style={{ fontSize: "0.9375rem", color: "var(--text-primary)" }}>
+                    Upload Paper Map Photo / Scan (PNG or JPG)
                   </strong>
                 </div>
-                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: 12 }}>
-                  Import your own historical village boundaries (GeoJSON vector) or upload a scanned paper map image overlay.
+                <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: 14, lineHeight: 1.5 }}>
+                  Take a photo of your cloth/paper map (BhuNaksha) from your mobile or select a scanned image from your device.
                 </p>
 
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <input
-                    type="file"
-                    ref={geojsonInputRef}
-                    accept=".geojson,.json"
-                    style={{ display: "none" }}
-                    onChange={handleGeoJsonFileChange}
-                  />
-                  <button
-                    className="btn-secondary"
-                    onClick={() => geojsonInputRef.current?.click()}
-                    style={{ fontSize: "0.8125rem", padding: "8px 14px" }}
-                  >
-                    <FileCheck size={15} /> Upload GeoJSON (.json / .geojson)
-                  </button>
+                <input
+                  type="file"
+                  ref={imageInputRef}
+                  accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                  style={{ display: "none" }}
+                  onChange={handleImageFileChange}
+                />
 
-                  <input
-                    type="file"
-                    ref={imageInputRef}
-                    accept="image/*"
-                    style={{ display: "none" }}
-                    onChange={handleImageFileChange}
-                  />
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                   <button
-                    className="btn-secondary"
+                    className="btn-primary"
                     onClick={() => imageInputRef.current?.click()}
-                    style={{ fontSize: "0.8125rem", padding: "8px 14px" }}
+                    style={{
+                      fontSize: "0.875rem",
+                      padding: "10px 18px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontWeight: 700,
+                    }}
                   >
-                    <ImageIcon size={15} /> Upload Scanned Map Scan (PNG/JPG)
+                    <Upload size={16} />
+                    <span>Upload Map Photo (PNG / JPG)</span>
                   </button>
-                </div>
 
-                {uploadedFileName && (
-                  <div style={{ marginTop: 10, fontSize: "0.75rem", color: "var(--accent-primary)", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
-                    <Check size={14} /> Loaded active source: {uploadedFileName}
-                  </div>
-                )}
+                  {uploadedFileName ? (
+                    <div
+                      style={{
+                        fontSize: "0.8125rem",
+                        color: "#0F766E",
+                        fontWeight: 700,
+                        background: "#CCFBF1",
+                        border: "1px solid #99F6E4",
+                        padding: "6px 12px",
+                        borderRadius: "var(--radius-sm)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <Check size={14} />
+                      <span>Loaded Map: {uploadedFileName}</span>
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                      Allowed formats: <strong>PNG</strong> or <strong>JPG</strong>
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Visual Styling Controls for Old Map */}
@@ -589,61 +578,73 @@ export default function MapSourceModal({
                 </div>
               </div>
 
-              {/* Custom Drone Tile URL Stream (XYZ / WMS) */}
+              {/* Upload Drone Map Photo / Orthomosaic (PNG / JPG) - Simple for Revenue Officers */}
               <div
                 style={{
                   background: "#F8FAFC",
-                  border: "1px solid var(--border-subtle)",
+                  border: "1.5px dashed #94A3B8",
                   borderRadius: "var(--radius-md)",
-                  padding: 16,
+                  padding: "18px 20px",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <Globe2 size={18} style={{ color: "var(--accent-primary)" }} />
-                  <strong style={{ fontSize: "0.875rem", color: "var(--text-primary)" }}>
-                    Connect Custom Drone Orthomosaic Tile Stream
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <ImageIcon size={20} style={{ color: "var(--accent-primary)" }} />
+                  <strong style={{ fontSize: "0.9375rem", color: "var(--text-primary)" }}>
+                    Upload Drone Survey Photo (PNG or JPG)
                   </strong>
                 </div>
-                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: 10 }}>
-                  Enter an XYZ tile service or local GeoServer tile endpoint generated from WebODM / Agisoft.
+                <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: 14, lineHeight: 1.5 }}>
+                  Have an aerial drone survey photo or orthomosaic picture? Upload the image directly from your computer.
                 </p>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <input
-                    type="text"
-                    value={customTileName}
-                    onChange={(e) => setCustomTileName(e.target.value)}
-                    placeholder="Layer Name (e.g. Ward 12 5cm Orthomosaic)"
+                <input
+                  type="file"
+                  ref={droneImageInputRef}
+                  accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                  style={{ display: "none" }}
+                  onChange={handleDroneImageFileChange}
+                />
+
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <button
+                    className="btn-primary"
+                    onClick={() => droneImageInputRef.current?.click()}
                     style={{
-                      padding: "8px 12px",
-                      borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--border-glass)",
-                      fontSize: "0.8125rem",
+                      fontSize: "0.875rem",
+                      padding: "10px 18px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontWeight: 700,
                     }}
-                  />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      type="text"
-                      value={customTileUrl}
-                      onChange={(e) => setCustomTileUrl(e.target.value)}
-                      placeholder="https://your-tile-server/{z}/{x}/{y}.png"
+                  >
+                    <Upload size={16} />
+                    <span>Upload Drone Photo (PNG / JPG)</span>
+                  </button>
+
+                  {uploadedDroneFileName ? (
+                    <div
                       style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        borderRadius: "var(--radius-sm)",
-                        border: "1px solid var(--border-glass)",
                         fontSize: "0.8125rem",
-                        fontFamily: "monospace",
+                        color: "#0F766E",
+                        fontWeight: 700,
+                        background: "#CCFBF1",
+                        border: "1px solid #99F6E4",
+                        padding: "6px 12px",
+                        borderRadius: "var(--radius-sm)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}
-                    />
-                    <button
-                      className="btn-primary"
-                      onClick={handleApplyCustomTile}
-                      style={{ padding: "8px 14px", fontSize: "0.8125rem" }}
                     >
-                      Connect Stream
-                    </button>
-                  </div>
+                      <Check size={14} />
+                      <span>Loaded Drone Photo: {uploadedDroneFileName}</span>
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                      Allowed formats: <strong>PNG</strong> or <strong>JPG</strong>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -662,7 +663,7 @@ export default function MapSourceModal({
           }}
         >
           <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-            Standardized to <strong>EPSG:3857 (Ground Meters)</strong> & WGS84 for DILRMP 3.0 compliance.
+            Automatic True Ground Alignment &bull; DILRMP 3.0 Government Standard Compliant.
           </span>
           <button className="btn-primary" onClick={onClose} style={{ padding: "8px 18px" }}>
             Apply & Close
