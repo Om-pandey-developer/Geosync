@@ -16,7 +16,9 @@ Handles:
 import math
 import json
 import uuid
+import hashlib
 import logging
+from datetime import datetime, timezone
 from typing import Tuple, Dict, Any, List, Optional
 
 from sqlalchemy.orm import Session
@@ -26,7 +28,7 @@ from shapely.ops import snap, unary_union
 import shapely.validation
 
 from database import IS_SQLITE
-from models import Parcel
+from models import Parcel, AlignmentStatusEnum, CadastralAuditLog
 
 logger = logging.getLogger("geosync.spatial_service")
 
@@ -191,37 +193,46 @@ def calculate_area_sqm(db: Session, parcel_id: str) -> float:
     return round(sqm, 2)
 
 
-def run_topological_cleanup_geojson(db: Session, geojson: dict) -> dict:
+def run_topological_cleanup_geojson(
+    db: Session, 
+    geojson: dict, 
+    exclude_parcel_id: Optional[str] = None
+) -> dict:
     """
     Phase 3: Real Topological Cleanup using ST_Difference and ST_Snap.
     Accepts candidate GeoJSON polygon and returns cleaned GeoJSON + Area.
     Tolerance: 0.05 meters (approx 0.0000005 degrees in WGS84).
+    Prevents self-intersection bug by excluding candidate parcel from ST_Difference / union.
     """
     tolerance_deg = 0.0000005  # 5cm tolerance in WGS84
 
     if not IS_SQLITE:
         try:
             geojson_str = json.dumps(geojson)
+            exclude_uuid = _resolve_parcel_id(exclude_parcel_id) if exclude_parcel_id else None
             query = """
             WITH input_geom AS (
                 SELECT ST_MakeValid(ST_GeomFromGeoJSON(:geojson)) as geom
             ),
+            neighbor_union AS (
+                SELECT ST_Union(p.geometry) as geom
+                FROM parcels p, input_geom i
+                WHERE ST_Intersects(i.geom, p.geometry)
+                  AND (:exclude_id IS NULL OR p.id != :exclude_id)
+            ),
             diff_geom AS (
                 SELECT COALESCE(
-                    (
-                        SELECT ST_Difference(i.geom, ST_Union(p.geometry))
-                        FROM input_geom i
-                        CROSS JOIN parcels p
-                        WHERE ST_Intersects(i.geom, p.geometry)
-                        GROUP BY i.geom
-                    ),
-                    (SELECT geom FROM input_geom)
+                    ST_Difference(i.geom, n.geom),
+                    i.geom
                 ) as geom
+                FROM input_geom i
+                LEFT JOIN neighbor_union n ON n.geom IS NOT NULL
             ),
             snapped_geom AS (
                 SELECT ST_Snap(d.geom, p.geometry, 0.0000005) as geom
                 FROM diff_geom d
                 LEFT JOIN parcels p ON ST_DWithin(d.geom, p.geometry, 0.0000005)
+                   AND (:exclude_id IS NULL OR p.id != :exclude_id)
                 ORDER BY ST_Distance(d.geom, p.geometry) ASC
                 LIMIT 1
             )
@@ -229,13 +240,14 @@ def run_topological_cleanup_geojson(db: Session, geojson: dict) -> dict:
                 ST_AsGeoJSON(COALESCE((SELECT geom FROM snapped_geom), (SELECT geom FROM diff_geom)))::json as cleaned_geojson,
                 ST_Area(COALESCE((SELECT geom FROM snapped_geom), (SELECT geom FROM diff_geom))::geography) as area_sqm
             """
-            result = db.execute(text(query), {"geojson": geojson_str}).fetchone()
+            result = db.execute(text(query), {"geojson": geojson_str, "exclude_id": str(exclude_uuid) if exclude_uuid else None}).fetchone()
             if result and result.cleaned_geojson:
                 return {
                     "cleaned_geojson": result.cleaned_geojson,
                     "area_sqm": round(float(result.area_sqm), 2)
                 }
         except Exception as e:
+            db.rollback()
             logger.warning("PostGIS cleanup failed, using Shapely engine: %s", e)
             try:
                 db.rollback()
@@ -246,8 +258,13 @@ def run_topological_cleanup_geojson(db: Session, geojson: dict) -> dict:
     candidate_poly = shape(geojson)
     candidate_poly = shapely.validation.make_valid(candidate_poly)
 
-    # Fetch all other existing parcels from database
-    other_parcels = db.query(Parcel).all()
+    # Fetch all other existing parcels from database (excluding target parcel)
+    exclude_uuid = _resolve_parcel_id(exclude_parcel_id) if exclude_parcel_id else None
+    query = db.query(Parcel)
+    if exclude_uuid:
+        query = query.filter(Parcel.id != exclude_uuid)
+    other_parcels = query.all()
+
     other_geoms = []
     for op in other_parcels:
         try:
@@ -294,14 +311,14 @@ def run_topological_cleanup_geojson(db: Session, geojson: dict) -> dict:
 
 
 def run_topological_cleanup(db: Session, parcel_id: str) -> dict:
-    """Cleans up an existing parcel in the DB and saves the cleaned geometry."""
+    """Cleans up an existing parcel in the DB and saves the cleaned geometry with TOPOLOGY_CLEANED status."""
     pid_uuid = _resolve_parcel_id(parcel_id)
     parcel = db.query(Parcel).filter(Parcel.id == pid_uuid).first()
     if not parcel:
         raise ValueError(f"Parcel {parcel_id} not found")
 
     geom_dict = mapping(_parse_geometry_to_shapely(parcel.geometry))
-    result = run_topological_cleanup_geojson(db, geom_dict)
+    result = run_topological_cleanup_geojson(db, geom_dict, exclude_parcel_id=str(parcel.id))
 
     # Save back to DB
     if IS_SQLITE:
@@ -310,7 +327,7 @@ def run_topological_cleanup(db: Session, parcel_id: str) -> dict:
         parcel.geometry = text(f"ST_SetSRID(ST_GeomFromGeoJSON('{json.dumps(result['cleaned_geojson'])}'), 4326)")
 
     parcel.area_sqm = result["area_sqm"]
-    parcel.alignment_status = "cleaned"
+    parcel.alignment_status = AlignmentStatusEnum.TOPOLOGY_CLEANED
     db.commit()
 
     return result
@@ -322,7 +339,7 @@ def assign_ulpin_to_parcel(db: Session, parcel_id: str) -> dict:
     1. Calculate centroid in EPSG:4326
     2. Calculate area in sqm
     3. Generate 14-digit Base-14 ULPIN
-    4. Store results in DB
+    4. Store results in DB with ULPIN_ASSIGNED status
     """
     pid_uuid = _resolve_parcel_id(parcel_id)
     parcel = db.query(Parcel).filter(Parcel.id == pid_uuid).first()
@@ -337,7 +354,7 @@ def assign_ulpin_to_parcel(db: Session, parcel_id: str) -> dict:
     parcel.centroid_lat = lat
     parcel.centroid_lon = lon
     parcel.area_sqm = area
-    parcel.alignment_status = "ulpin_assigned"
+    parcel.alignment_status = AlignmentStatusEnum.ULPIN_ASSIGNED
     db.commit()
 
     return {
@@ -358,25 +375,56 @@ def commit_parcel_to_db(
 ) -> dict:
     """
     Phase 3: Database Commit Service (HITL Finalization).
-    Updates parcel status to 'PUBLISHED', attaches ULPIN, and logs audit metadata.
+    Updates parcel status to 'PUBLISHED', attaches ULPIN, records CadastralAuditLog
+    with authoritative SHA-256 digital signature.
     """
     pid_uuid = _resolve_parcel_id(parcel_id)
     parcel = db.query(Parcel).filter(Parcel.id == pid_uuid).first()
     if not parcel:
         raise ValueError(f"Parcel {parcel_id} not found")
 
+    prev_state = json.dumps({
+        "status": parcel.alignment_status.value if hasattr(parcel.alignment_status, "value") else str(parcel.alignment_status),
+        "ulpin": parcel.ulpin,
+        "area_sqm": parcel.area_sqm
+    })
+
     parcel.ulpin = ulpin
-    parcel.alignment_status = "ulpin_assigned"
+    parcel.alignment_status = AlignmentStatusEnum.PUBLISHED
     db.commit()
     db.refresh(parcel)
 
+    new_state = json.dumps({
+        "status": AlignmentStatusEnum.PUBLISHED.value,
+        "ulpin": ulpin,
+        "area_sqm": parcel.area_sqm,
+        "notes": audit_notes
+    })
+
+    # Cryptographic SHA-256 Digital Signature
+    timestamp_str = parcel.updated_at.isoformat() if parcel.updated_at else datetime.now(timezone.utc).isoformat()
+    raw_payload = f"{parcel.id}:{ulpin}:{officer_id}:{timestamp_str}:{new_state}"
+    signature = hashlib.sha256(raw_payload.encode("utf-8")).hexdigest()
+
+    audit_entry = CadastralAuditLog(
+        parcel_id=parcel.id,
+        officer_id=officer_id,
+        officer_role="TEHSILDAR",
+        action="COMMITTED",
+        previous_state=prev_state,
+        new_state=new_state,
+        digital_signature=signature
+    )
+    db.add(audit_entry)
+    db.commit()
 
     return {
         "parcel_id": str(parcel.id),
         "status": "PUBLISHED",
         "ulpin": ulpin,
         "committed_at": parcel.updated_at,
-        "officer_id": officer_id
+        "officer_id": officer_id,
+        "digital_signature": signature
     }
 
 

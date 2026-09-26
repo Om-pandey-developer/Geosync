@@ -45,3 +45,11 @@ out/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Storage & Large Model Weights
+backend/storage/models/*.pth
+backend/storage/models/*.onnx
+backend/storage/models/*.pt
+backend/storage/uploads/
+backend/storage/sam_cache/*.pkl
+

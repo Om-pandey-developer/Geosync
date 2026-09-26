@@ -17,7 +17,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from models import Parcel, ApprovalRequest
+from models import Parcel, ApprovalRequest, AlignmentStatusEnum
 
 
 def _resolve_uuid(val: Any) -> uuid.UUID:
@@ -104,7 +104,7 @@ def process_approval_action(
 
     # If rejected or revision_requested, reset parcel status
     if action in ("rejected", "revision_requested"):
-        new_parcel_status = "raw" if action == "rejected" else "aligned"
+        new_parcel_status = AlignmentStatusEnum.DRAFT if action == "rejected" else AlignmentStatusEnum.ALIGNED_DRAFT
         parcel = db.query(Parcel).filter(Parcel.id == approval.parcel_id).first()
         if parcel:
             parcel.alignment_status = new_parcel_status
@@ -145,7 +145,7 @@ def get_pending_approvals(db: Session) -> list:
             "district": p.district,
             "ulpin": p.ulpin,
             "area_sqm": p.area_sqm,
-            "alignment_status": p.alignment_status,
+            "alignment_status": p.alignment_status.value if hasattr(p.alignment_status, "value") else str(p.alignment_status),
             "alignment_confidence": p.alignment_confidence,
         }
         for ar, p in records
@@ -155,10 +155,21 @@ def get_pending_approvals(db: Session) -> list:
 def get_dashboard_stats(db: Session) -> dict:
     """Returns aggregate statistics for the Tehsildar dashboard."""
     total = db.query(func.count(Parcel.id)).scalar() or 0
-    raw_count = db.query(func.count(Parcel.id)).filter(Parcel.alignment_status == "raw").scalar() or 0
-    aligned_count = db.query(func.count(Parcel.id)).filter(Parcel.alignment_status == "aligned").scalar() or 0
-    cleaned_count = db.query(func.count(Parcel.id)).filter(Parcel.alignment_status == "cleaned").scalar() or 0
-    ulpin_count = db.query(func.count(Parcel.id)).filter(Parcel.alignment_status == "ulpin_assigned").scalar() or 0
+    raw_count = db.query(func.count(Parcel.id)).filter(
+        (Parcel.alignment_status == AlignmentStatusEnum.DRAFT) | (Parcel.alignment_status == "raw")
+    ).scalar() or 0
+    aligned_count = db.query(func.count(Parcel.id)).filter(
+        (Parcel.alignment_status == AlignmentStatusEnum.ALIGNED_DRAFT) | (Parcel.alignment_status == "aligned")
+    ).scalar() or 0
+    cleaned_count = db.query(func.count(Parcel.id)).filter(
+        (Parcel.alignment_status == AlignmentStatusEnum.TOPOLOGY_CLEANED) | (Parcel.alignment_status == "cleaned")
+    ).scalar() or 0
+    ulpin_count = db.query(func.count(Parcel.id)).filter(
+        (Parcel.alignment_status == AlignmentStatusEnum.ULPIN_ASSIGNED) | (Parcel.alignment_status == "ulpin_assigned")
+    ).scalar() or 0
+    published_count = db.query(func.count(Parcel.id)).filter(
+        (Parcel.alignment_status == AlignmentStatusEnum.PUBLISHED) | (Parcel.alignment_status == "PUBLISHED")
+    ).scalar() or 0
 
     pending = db.query(func.count(ApprovalRequest.id)).filter(ApprovalRequest.status == "pending").scalar() or 0
     approved = db.query(func.count(ApprovalRequest.id)).filter(ApprovalRequest.status == "approved").scalar() or 0
@@ -170,6 +181,7 @@ def get_dashboard_stats(db: Session) -> dict:
         "aligned_count": aligned_count,
         "cleaned_count": cleaned_count,
         "ulpin_assigned_count": ulpin_count,
+        "published_count": published_count,
         "pending_approvals": pending,
         "approved_count": approved,
         "rejected_count": rejected,

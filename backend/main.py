@@ -17,7 +17,8 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from database import engine, Base
+from sqlalchemy import text
+from database import engine, Base, IS_SQLITE
 from routers.tasks import router as tasks_router
 from routers.alignment import router as alignment_router
 
@@ -30,11 +31,32 @@ logging.basicConfig(
 logger = logging.getLogger("geosync.main")
 
 
+def _migrate_existing_db_enums():
+    """Migrates legacy lowercase status strings to 5-stage formal enum in SQLite/PostGIS."""
+    status_map = {
+        "raw": "DRAFT",
+        "aligned": "ALIGNED_DRAFT",
+        "cleaned": "TOPOLOGY_CLEANED",
+        "ulpin_assigned": "ULPIN_ASSIGNED",
+    }
+    try:
+        with engine.begin() as conn:
+            for old_val, new_val in status_map.items():
+                conn.execute(
+                    text("UPDATE parcels SET alignment_status = :new_val WHERE alignment_status = :old_val"),
+                    {"new_val": new_val, "old_val": old_val}
+                )
+        logger.info("✅ Database enum status migration verified.")
+    except Exception as e:
+        logger.warning("Enum migration check skipped or completed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create database tables on startup."""
+    """Create database tables and verify migrations on startup."""
     Base.metadata.create_all(bind=engine)
     logger.info("✅ Database tables created / verified")
+    _migrate_existing_db_enums()
     yield
     logger.info("🔒 GeoSync shutting down")
 

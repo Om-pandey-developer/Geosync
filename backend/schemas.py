@@ -185,13 +185,58 @@ class CommitParcelRequest(BaseModel):
 
 
 class CommitParcelResponse(BaseModel):
-    """Response from POST /api/v1/commit-parcel"""
+    """Response from POST /api/v1/commit-parcel with cryptographic proof."""
     parcel_id: str
-    status: str = Field(..., description="Will be set to 'PUBLISHED'")
+    status: str = Field(..., description="Set to 'PUBLISHED'")
     ulpin: str
     committed_at: datetime
     officer_id: str
+    digital_signature: str = Field(..., description="Authoritative SHA-256 digital signature hash")
 
+
+class CadastralAuditLogOut(BaseModel):
+    """Response schema for immutable audit ledger items."""
+    id: str
+    parcel_id: str
+    officer_id: str
+    officer_role: str
+    action: str
+    previous_state: Optional[str] = None
+    new_state: str
+    digital_signature: str
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ──────────────────── Batch Alignment Schemas ────────────────────
+
+class BatchAlignRequest(BaseModel):
+    """Payload for POST /api/v1/align-batch"""
+    village: str = Field(..., description="Village name to batch process")
+    ward: Optional[str] = Field(default=None, description="Optional tehsil/ward filter")
+    max_parcels: int = Field(default=50, ge=1, le=500, description="Max parcels to align in single batch")
+
+
+class BatchAlignResponse(BaseModel):
+    """Response from POST /api/v1/align-batch"""
+    batch_id: str
+    status: str
+    total_parcels: int
+    message: str
+
+
+class BatchProgressResponse(BaseModel):
+    """Response from GET /api/v1/align-batch/{batch_id}"""
+    batch_id: str
+    status: str  # QUEUED, PROCESSING, COMPLETED, FAILED
+    total: int
+    completed: int
+    failed: int
+    errors: List[str] = []
+    created_at: float
+    updated_at: float
 
 
 # ──────────────────── Approval Schemas ────────────────────
@@ -230,6 +275,7 @@ class DashboardStats(BaseModel):
     aligned_count: int
     cleaned_count: int
     ulpin_assigned_count: int
+    published_count: int = 0
     pending_approvals: int
     approved_count: int
     rejected_count: int
@@ -238,9 +284,10 @@ class DashboardStats(BaseModel):
 # ──────────────────── GeoSAM Boundary Extraction Schemas ────────────────────
 
 class BoundaryExtractionRequest(BaseModel):
-    """Payload for POST /api/v1/extract-boundaries (GeoSAM ViT-H)."""
+    """Payload for POST /api/v1/extract-boundaries (GeoSAM ViT-B)."""
     bbox: List[float] = Field(..., min_length=4, max_length=4, description="[min_lon, min_lat, max_lon, max_lat]")
     legacy_polygon: Optional[dict] = Field(default=None, description="Optional legacy polygon GeoJSON")
+    image_path: Optional[str] = Field(default=None, description="Optional path to drone/orthomosaic GeoTIFF")
     ward_name: Optional[str] = Field(default="Ward 12, Mohanlalganj", description="Ward identification")
 
 
@@ -252,10 +299,13 @@ class BoundaryExtractionResponse(BaseModel):
     confidence_score: float = Field(..., description="Confidence score 0-100%")
     is_occluded: bool = Field(..., description="True if tree canopy / shadow occludes ground")
     occlusion_reason: str
+    shadow_ratio: float = 0.0
+    canopy_ratio: float = 0.0
     hitl_review_required: bool
-    model_backbone: str = "GeoSAM-ViT-B-LoRA"
+    model_backbone: str = "Meta-SAM-ViT-B"
     embedding_dimension: int = 768
     inference_time_ms: float
+    device_accelerator: str = "cpu"
 
 
 # ──────────────────── Strict Form Validation Schemas ────────────────────

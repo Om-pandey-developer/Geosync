@@ -27,17 +27,19 @@ import json
 import shutil
 from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from database import get_db, IS_SQLITE
-from models import Parcel, ApprovalRequest
+from models import Parcel, ApprovalRequest, AlignmentStatusEnum, CadastralAuditLog
 from schemas import (
     ParcelOut, ParcelSummary, AlignmentRequest, AlignmentResult,
     GenerateULPINResponse, ApprovalRequestCreate, ApprovalAction, ApprovalOut,
     DashboardStats, TopologyCleanupRequest, TopologyCleanupResponse,
     GenerateULPINRequest, CommitParcelRequest, CommitParcelResponse,
+    CadastralAuditLogOut,
+    BatchAlignRequest, BatchAlignResponse, BatchProgressResponse,
     BoundaryExtractionRequest, BoundaryExtractionResponse,
     OfficerValidationRequest, OfficerValidationResponse,
     RegisterParcelRequest,
@@ -47,6 +49,10 @@ from services.alignment_engine import (
     normalize_geojson_crs,
     cache_aligned_draft,
     get_cached_aligned_draft,
+    discard_cached_aligned_draft,
+    init_batch_progress,
+    update_batch_progress,
+    get_batch_progress,
 )
 from services.geosam_engine import geosam_engine
 from services.spatial import (
@@ -277,7 +283,7 @@ def align_parcel(parcel_id: str, db: Session = Depends(get_db)):
         "diagnostics": result["diagnostics"],
     })
 
-    parcel.alignment_status = "aligned"
+    parcel.alignment_status = AlignmentStatusEnum.ALIGNED_DRAFT
     parcel.alignment_confidence = confidence
     if IS_SQLITE:
         parcel.geometry = json.dumps(aligned_geo)
@@ -290,11 +296,158 @@ def align_parcel(parcel_id: str, db: Session = Depends(get_db)):
     msg = f"ORB-RANSAC aligned with {matched_kp} inliers. Confidence: {result['confidence_score']:.1f}%"
     return AlignmentResult(
         parcel_id=parcel_id,
-        status="aligned",
+        status="ALIGNED_DRAFT",
         confidence=confidence,
         matched_keypoints=matched_kp,
         message=msg,
     )
+
+
+# ──────────────────── Redis Temporary Draft APIs ────────────────────
+
+@router.get("/v1/aligned-draft/{parcel_id}", tags=["Alignment Drafts"])
+def get_aligned_draft(parcel_id: str):
+    """
+    GET /api/v1/aligned-draft/{parcel_id}
+    Retrieves uncommitted aligned boundary candidate cached in Redis.
+    """
+    draft = get_cached_aligned_draft(parcel_id)
+    if not draft:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No uncommitted aligned draft found in Redis for parcel {parcel_id}"
+        )
+    return {
+        "parcel_id": parcel_id,
+        "status": "ALIGNED_DRAFT",
+        "draft": draft,
+    }
+
+
+@router.delete("/v1/aligned-draft/{parcel_id}", tags=["Alignment Drafts"])
+def discard_aligned_draft(parcel_id: str, db: Session = Depends(get_db)):
+    """
+    DELETE /api/v1/aligned-draft/{parcel_id}
+    Discards uncommitted aligned boundary draft from Redis and reverts parcel status to DRAFT.
+    """
+    parcel = db.query(Parcel).filter(Parcel.id == parcel_id).first()
+    if not parcel:
+        raise HTTPException(status_code=404, detail="Parcel not found")
+
+    discard_cached_aligned_draft(parcel_id)
+    parcel.alignment_status = AlignmentStatusEnum.DRAFT
+    parcel.alignment_confidence = None
+    db.commit()
+
+    return {
+        "parcel_id": parcel_id,
+        "status": "DRAFT",
+        "message": f"Draft alignment for parcel {parcel_id} successfully discarded.",
+    }
+
+
+# ──────────────────── Asynchronous Batch Alignment ────────────────────
+
+def _execute_batch_alignment_task(batch_id: str, parcel_ids: List[str]):
+    """Background task executing alignment for each parcel in the batch."""
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        for pid in parcel_ids:
+            try:
+                parcel = db.query(Parcel).filter(Parcel.id == pid).first()
+                if not parcel:
+                    update_batch_progress(batch_id, success=False, error_msg=f"Parcel {pid} not found")
+                    continue
+
+                geo = _get_geojson_dict(parcel)
+                coords = geo.get("coordinates", [])
+                if not coords:
+                    update_batch_progress(batch_id, success=False, error_msg=f"Parcel {pid} has empty coordinates")
+                    continue
+
+                lat = parcel.centroid_lat or 26.84
+                lon = parcel.centroid_lon or 80.94
+                raster_meta = {
+                    "bounds": {
+                        "min_lon": lon - 0.005,
+                        "min_lat": lat - 0.005,
+                        "max_lon": lon + 0.005,
+                        "max_lat": lat + 0.005,
+                    },
+                    "resolution_cm": 5.0,
+                }
+                res = run_alignment_pipeline(coords, raster_meta)
+                cache_aligned_draft(str(parcel.id), {
+                    "aligned_geojson": res["aligned_geojson"],
+                    "confidence_score": res["confidence_score"],
+                    "homography_matrix": res["homography_matrix"],
+                    "diagnostics": res["diagnostics"],
+                })
+
+                parcel.alignment_status = AlignmentStatusEnum.ALIGNED_DRAFT
+                parcel.alignment_confidence = round(res["confidence_score"] / 100.0, 4)
+                if IS_SQLITE:
+                    parcel.geometry = json.dumps(res["aligned_geojson"])
+                else:
+                    poly_s = shape(res["aligned_geojson"])
+                    parcel.geometry = f"SRID=4326;{poly_s.wkt}"
+                db.commit()
+                update_batch_progress(batch_id, success=True)
+            except Exception as e:
+                update_batch_progress(batch_id, success=False, error_msg=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/v1/align-batch", response_model=BatchAlignResponse, status_code=status.HTTP_202_ACCEPTED, tags=["Batch Operations"])
+def align_batch(
+    payload: BatchAlignRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    POST /api/v1/align-batch
+    Queues all DRAFT parcels in a village/ward for asynchronous alignment.
+    """
+    query = db.query(Parcel).filter(
+        Parcel.village == payload.village,
+        (Parcel.alignment_status == AlignmentStatusEnum.DRAFT) | (Parcel.alignment_status == "raw")
+    )
+    if payload.ward:
+        query = query.filter(Parcel.tehsil == payload.ward)
+    
+    parcels = query.limit(payload.max_parcels).all()
+    if not parcels:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No DRAFT parcels found in village '{payload.village}'"
+        )
+
+    batch_id = str(uuid.uuid4())
+    parcel_ids = [str(p.id) for p in parcels]
+
+    init_batch_progress(batch_id, len(parcel_ids))
+    background_tasks.add_task(_execute_batch_alignment_task, batch_id, parcel_ids)
+
+    return BatchAlignResponse(
+        batch_id=batch_id,
+        status="ACCEPTED",
+        total_parcels=len(parcel_ids),
+        message=f"Queued {len(parcel_ids)} parcels for asynchronous alignment.",
+    )
+
+
+@router.get("/v1/align-batch/{batch_id}", response_model=BatchProgressResponse, tags=["Batch Operations"])
+def get_batch_status(batch_id: str):
+    """
+    GET /api/v1/align-batch/{batch_id}
+    Retrieves real-time processing metrics for an asynchronous alignment batch.
+    """
+    progress = get_batch_progress(batch_id)
+    if not progress:
+        raise HTTPException(status_code=404, detail="Batch job not found")
+    return progress
 
 
 # ──────────────────── Topological Cleanup ────────────────────
@@ -443,16 +596,21 @@ def extract_boundaries(payload: BoundaryExtractionRequest):
         result = geosam_engine.extract_boundaries(
             bbox=bbox_tuple,
             legacy_polygon=payload.legacy_polygon,
+            image_path=payload.image_path,
         )
+        props = result["properties"]
         return BoundaryExtractionResponse(
             feature=result,
-            confidence_score=result["properties"]["confidence_score"],
-            is_occluded=result["properties"]["is_occluded"],
-            occlusion_reason=result["properties"]["occlusion_reason"],
-            hitl_review_required=result["properties"]["hitl_review_required"],
-            model_backbone=result["properties"]["model_backbone"],
-            embedding_dimension=result["properties"]["embedding_dimension"],
-            inference_time_ms=result["properties"]["inference_time_ms"],
+            confidence_score=props["confidence_score"],
+            is_occluded=props["is_occluded"],
+            occlusion_reason=props["occlusion_reason"],
+            shadow_ratio=props.get("shadow_ratio", 0.0),
+            canopy_ratio=props.get("canopy_ratio", 0.0),
+            hitl_review_required=props["hitl_review_required"],
+            model_backbone=props.get("model_backbone", "Meta-SAM-ViT-B"),
+            embedding_dimension=props.get("embedding_dimension", 768),
+            inference_time_ms=props.get("inference_time_ms", 0.0),
+            device_accelerator=props.get("device_accelerator", "cpu"),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Boundary extraction failed: {e}")
@@ -520,7 +678,7 @@ def register_parcel(payload: RegisterParcelRequest, db: Session = Depends(get_db
             district=payload.district,
             state=payload.state,
             geometry=json.dumps(geo_dict),
-            alignment_status="raw",
+            alignment_status=AlignmentStatusEnum.DRAFT,
             centroid_lat=round(centroid.y, 6),
             centroid_lon=round(centroid.x, 6),
             area_sqm=area_sqm,
@@ -531,7 +689,7 @@ def register_parcel(payload: RegisterParcelRequest, db: Session = Depends(get_db
         db.execute(
             text("""
                 INSERT INTO parcels (id, khasra_no, owner_name, village, tehsil, district, state, geometry, alignment_status, centroid_lat, centroid_lon, area_sqm, created_at, updated_at)
-                VALUES (:id, :khasra, :owner, :village, :tehsil, :district, :state, ST_GeomFromEWKT(:wkt), 'raw', :lat, :lon, :area, NOW(), NOW())
+                VALUES (:id, :khasra, :owner, :village, :tehsil, :district, :state, ST_GeomFromEWKT(:wkt), 'DRAFT', :lat, :lon, :area, NOW(), NOW())
             """),
             {
                 "id": str(new_id),
@@ -555,6 +713,19 @@ def register_parcel(payload: RegisterParcelRequest, db: Session = Depends(get_db
         "khasra_no": payload.khasra_no,
         "message": f"Parcel Khasra {payload.khasra_no} successfully registered.",
     }
+
+
+# ──────────────────── Cadastral Audit Log Endpoint ────────────────────
+
+@router.get("/v1/parcels/{parcel_id}/audit-logs", response_model=List[CadastralAuditLogOut], tags=["Governance & Validation"])
+def get_parcel_audit_logs(parcel_id: str, db: Session = Depends(get_db)):
+    """
+    GET /api/v1/parcels/{parcel_id}/audit-logs
+    Retrieves the immutable audit trail for a parcel with SHA-256 digital signatures.
+    """
+    pid_uuid = uuid.UUID(parcel_id) if not isinstance(parcel_id, uuid.UUID) else parcel_id
+    logs = db.query(CadastralAuditLog).filter(CadastralAuditLog.parcel_id == pid_uuid).order_by(CadastralAuditLog.timestamp.desc()).all()
+    return logs
 
 
 # ──────────────────── Approval Workflow (HITL) ────────────────────
@@ -583,7 +754,7 @@ def seed_demo_approvals(db: Session = Depends(get_db)):
     confidences = [0.954, 0.732, 0.912, 0.887]
 
     for i, p in enumerate(parcels):
-        p.alignment_status = "ulpin_assigned"
+        p.alignment_status = AlignmentStatusEnum.ULPIN_ASSIGNED
         p.alignment_confidence = confidences[i]
         p.ulpin = ulpins[i]
         

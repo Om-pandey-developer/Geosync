@@ -141,6 +141,119 @@ def get_cached_aligned_draft(parcel_id: str) -> Optional[dict]:
         return None
 
 
+def discard_cached_aligned_draft(parcel_id: str) -> bool:
+    """Removes cached ALIGNED_DRAFT for parcel_id from Redis."""
+    global HAS_REDIS, redis_client
+    if not HAS_REDIS or not redis_client:
+        return True
+    try:
+        key = f"geosync:alignment:{parcel_id}"
+        redis_client.delete(key)
+        logger.info("Discarded Redis draft cache for parcel %s", parcel_id)
+        return True
+    except Exception as e:
+        logger.warning("Failed to delete Redis draft cache for parcel %s: %s", parcel_id, e)
+        return False
+
+
+# In-memory batch store fallback if Redis is unavailable
+_memory_batches: Dict[str, dict] = {}
+
+
+def init_batch_progress(batch_id: str, total_parcels: int) -> dict:
+    """Initializes batch tracking record."""
+    data = {
+        "batch_id": batch_id,
+        "status": "PROCESSING",
+        "total": total_parcels,
+        "completed": 0,
+        "failed": 0,
+        "errors": json.dumps([]),
+        "created_at": time.time(),
+        "updated_at": time.time(),
+    }
+    if HAS_REDIS and redis_client:
+        try:
+            key = f"geosync:batch:{batch_id}"
+            redis_client.hset(key, mapping={k: str(v) for k, v in data.items()})
+            redis_client.expire(key, 86400)
+            return data
+        except Exception as e:
+            logger.warning("Redis batch init failed: %s", e)
+    _memory_batches[batch_id] = data
+    return data
+
+
+def update_batch_progress(batch_id: str, success: bool, error_msg: Optional[str] = None):
+    """Increments progress counters for a batch job."""
+    global HAS_REDIS, redis_client
+    if HAS_REDIS and redis_client:
+        try:
+            key = f"geosync:batch:{batch_id}"
+            if success:
+                redis_client.hincrby(key, "completed", 1)
+            else:
+                redis_client.hincrby(key, "failed", 1)
+                if error_msg:
+                    raw_errors = redis_client.hget(key, "errors") or "[]"
+                    err_list = json.loads(raw_errors)
+                    err_list.append(error_msg)
+                    redis_client.hset(key, "errors", json.dumps(err_list[-10:]))
+            redis_client.hset(key, "updated_at", str(time.time()))
+            # Check if finished
+            total = int(redis_client.hget(key, "total") or 0)
+            comp = int(redis_client.hget(key, "completed") or 0)
+            fail = int(redis_client.hget(key, "failed") or 0)
+            if (comp + fail) >= total and total > 0:
+                redis_client.hset(key, "status", "COMPLETED")
+            return
+        except Exception as e:
+            logger.warning("Redis batch update failed: %s", e)
+
+    # In-memory fallback
+    if batch_id in _memory_batches:
+        b = _memory_batches[batch_id]
+        if success:
+            b["completed"] += 1
+        else:
+            b["failed"] += 1
+            if error_msg:
+                errs = json.loads(b["errors"])
+                errs.append(error_msg)
+                b["errors"] = json.dumps(errs[-10:])
+        b["updated_at"] = time.time()
+        if (b["completed"] + b["failed"]) >= b["total"]:
+            b["status"] = "COMPLETED"
+
+
+def get_batch_progress(batch_id: str) -> Optional[dict]:
+    """Retrieves current batch execution metrics."""
+    global HAS_REDIS, redis_client
+    if HAS_REDIS and redis_client:
+        try:
+            key = f"geosync:batch:{batch_id}"
+            data = redis_client.hgetall(key)
+            if data:
+                return {
+                    "batch_id": data.get("batch_id", batch_id),
+                    "status": data.get("status", "UNKNOWN"),
+                    "total": int(data.get("total", 0)),
+                    "completed": int(data.get("completed", 0)),
+                    "failed": int(data.get("failed", 0)),
+                    "errors": json.loads(data.get("errors", "[]")),
+                    "created_at": float(data.get("created_at", 0)),
+                    "updated_at": float(data.get("updated_at", 0)),
+                }
+        except Exception as e:
+            logger.warning("Redis batch get failed: %s", e)
+
+    if batch_id in _memory_batches:
+        b = _memory_batches[batch_id].copy()
+        b["errors"] = json.loads(b.get("errors", "[]"))
+        return b
+    return None
+
+
 # ━━━━━━━━━━━━━━━━━━ Constants ━━━━━━━━━━━━━━━━━━
 
 # ORB detector parameters

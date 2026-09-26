@@ -13,6 +13,7 @@ Then we can do:
 This gives us type safety, validation, and cleaner code.
 """
 
+import enum
 import uuid
 from datetime import datetime, timezone
 
@@ -40,6 +41,22 @@ class SafeGeometry(TypeDecorator):
         return dialect.type_descriptor(Geometry("POLYGON", srid=4326)) if dialect else Geometry("POLYGON", srid=4326)
 
 
+class AlignmentStatusEnum(str, enum.Enum):
+    """
+    Formal 5-stage lifecycle for cadastral parcel alignments:
+    1. DRAFT: Initial raw digitized plot
+    2. ALIGNED_DRAFT: ORB/RANSAC/TPS aligned candidate in Redis cache
+    3. TOPOLOGY_CLEANED: Overlaps & gaps resolved via ST_Difference / ST_Snap
+    4. ULPIN_ASSIGNED: Bhuvan Base-14 ULPIN generated, pending officer approval
+    5. PUBLISHED: Legally committed by Tehsildar with digital signature
+    """
+    DRAFT = "DRAFT"
+    ALIGNED_DRAFT = "ALIGNED_DRAFT"
+    TOPOLOGY_CLEANED = "TOPOLOGY_CLEANED"
+    ULPIN_ASSIGNED = "ULPIN_ASSIGNED"
+    PUBLISHED = "PUBLISHED"
+
+
 class Parcel(Base):
     """
     Represents a single land parcel (plot) in the cadastral system.
@@ -65,10 +82,10 @@ class Parcel(Base):
     # PostGIS geometry column: stores the parcel polygon in WGS84 (SRID 4326)
     geometry = Column(SafeGeometry(), nullable=False)
 
-    # Alignment metadata
+    # Formal 5-stage alignment lifecycle status
     alignment_status = Column(
-        Enum("raw", "aligned", "cleaned", "ulpin_assigned", name="alignment_status_enum"),
-        default="raw",
+        Enum(AlignmentStatusEnum, name="alignment_status_enum", create_constraint=True),
+        default=AlignmentStatusEnum.DRAFT,
         nullable=False,
     )
     alignment_confidence = Column(Float, nullable=True, comment="ORB/RANSAC match confidence 0-1")
@@ -76,8 +93,9 @@ class Parcel(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    # Relationship to approval requests
+    # Relationships
     approval_requests = relationship("ApprovalRequest", back_populates="parcel")
+    audit_logs = relationship("CadastralAuditLog", back_populates="parcel")
 
     def __repr__(self):
         return f"<Parcel khasra={self.khasra_no} village={self.village} status={self.alignment_status}>"
@@ -110,3 +128,27 @@ class ApprovalRequest(Base):
 
     def __repr__(self):
         return f"<ApprovalRequest parcel={self.parcel_id} status={self.status}>"
+
+
+class CadastralAuditLog(Base):
+    """
+    Immutable cadastral ledger recording every legal commitment and boundary state change
+    with an authoritative SHA-256 cryptographic signature.
+    """
+    __tablename__ = "cadastral_audit_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    parcel_id = Column(UUID(as_uuid=True), ForeignKey("parcels.id"), nullable=False, index=True)
+    officer_id = Column(String(100), nullable=False)
+    officer_role = Column(String(50), nullable=False, default="TEHSILDAR")
+    action = Column(String(50), nullable=False)  # COMMITTED, REJECTED, TOPOLOGY_CLEANED, BOUNDARY_OVERRIDE
+    previous_state = Column(Text, nullable=True)
+    new_state = Column(Text, nullable=False)
+    digital_signature = Column(String(64), nullable=False)  # SHA-256 hash
+    timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    parcel = relationship("Parcel", back_populates="audit_logs")
+
+    def __repr__(self):
+        return f"<CadastralAuditLog parcel={self.parcel_id} action={self.action} officer={self.officer_id}>"
+
