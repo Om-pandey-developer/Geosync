@@ -246,6 +246,8 @@ class BoundaryExtractionRequest(BaseModel):
 
 class BoundaryExtractionResponse(BaseModel):
     """Response from POST /api/v1/extract-boundaries."""
+    model_config = {"protected_namespaces": ()}
+
     feature: dict = Field(..., description="Extracted physical boundary GeoJSON Feature")
     confidence_score: float = Field(..., description="Confidence score 0-100%")
     is_occluded: bool = Field(..., description="True if tree canopy / shadow occludes ground")

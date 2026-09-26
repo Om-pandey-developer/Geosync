@@ -31,13 +31,13 @@ class SafeGeometry(TypeDecorator):
     Uses PostGIS Geometry('POLYGON', srid=4326) on PostgreSQL,
     and Text (storing WKT / GeoJSON) on SQLite for offline air-gap demo resilience.
     """
-    impl = Text
+    impl = Geometry("POLYGON", srid=4326)
     cache_ok = True
 
     def load_dialect_impl(self, dialect):
-        if dialect.name == "postgresql":
-            return dialect.type_descriptor(Geometry("POLYGON", srid=4326))
-        return dialect.type_descriptor(Text())
+        if dialect is not None and dialect.name == "sqlite":
+            return dialect.type_descriptor(Text())
+        return dialect.type_descriptor(Geometry("POLYGON", srid=4326)) if dialect else Geometry("POLYGON", srid=4326)
 
 
 class Parcel(Base):

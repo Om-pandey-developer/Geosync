@@ -19,12 +19,18 @@ import {
   Zap,
   ChevronDown,
   ChevronUp,
+  Crosshair,
+  Move,
+  RotateCcw,
+  Check,
+  ArrowRightLeft,
+  SplitSquareVertical,
 } from "lucide-react";
 import type { FeatureCollection } from "geojson";
-import type { GCPPoint } from "@/components/MapViewer";
+import type { GCPPoint, GCPPair } from "@/components/MapViewer";
 
 const MapViewer = dynamic(() => import("@/components/MapViewer"), { ssr: false });
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { API } from "@/lib/api";
 
 interface ParcelSummary {
   id: string;
@@ -38,6 +44,26 @@ interface ParcelSummary {
   alignment_confidence?: number | null;
 }
 
+// Geodesic Polygon Area Calculator (Shoelace metric formula)
+function computePolygonAreaSqm(coords: [number, number][]): number {
+  if (!coords || coords.length < 3) return 0;
+  const centerLat = coords.reduce((acc, c) => acc + c[0], 0) / coords.length;
+  const mPerDegLat = 111320;
+  const mPerDegLon = 111320 * Math.cos((centerLat * Math.PI) / 180);
+
+  let area = 0;
+  const n = coords.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const x1 = coords[i][1] * mPerDegLon;
+    const y1 = coords[i][0] * mPerDegLat;
+    const x2 = coords[j][1] * mPerDegLon;
+    const y2 = coords[j][0] * mPerDegLat;
+    area += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(area) / 2;
+}
+
 export default function PatwariPage() {
   const [parcels, setParcels] = useState<ParcelSummary[]>([]);
   const [geojson, setGeojson] = useState<FeatureCollection | null>(null);
@@ -46,15 +72,43 @@ export default function PatwariPage() {
   const [activePipelineStep, setActivePipelineStep] = useState<number>(1);
   const [isDossierCollapsed, setIsDossierCollapsed] = useState(false);
 
-  // GCP Calibration State
+  // Task 2.4: Paired GCP Landmark State
   const [enableGcpPlacement, setEnableGcpPlacement] = useState(false);
+  const [pairedGcpMode, setPairedGcpMode] = useState(true);
   const [gcpPoints, setGcpPoints] = useState<GCPPoint[]>([
     { id: 1, lat: 26.7612, lng: 80.8998, label: "GCP-1 (Survey Pillar A)" },
     { id: 2, lat: 26.7628, lng: 80.9034, label: "GCP-2 (Road Intersection)" },
   ]);
+  const [gcpPairs, setGcpPairs] = useState<GCPPair[]>([
+    {
+      id: 1,
+      label: "Sector A (North Boundary Stone)",
+      legacy: [26.761, 80.8995],
+      drone: [26.7612, 80.8998],
+      displacementMeters: 2.42,
+      errorPixels: 48.4,
+    },
+    {
+      id: 2,
+      label: "Sector B (Chak Road Junction)",
+      legacy: [26.7625, 80.903],
+      drone: [26.7628, 80.9034],
+      displacementMeters: 3.15,
+      errorPixels: 63.0,
+    },
+  ]);
   const [showCalibrationDrawer, setShowCalibrationDrawer] = useState(false);
 
-  // GeoSAM extraction result state
+  // Task 2.2: Vertex Corner Drag Mode (HITL)
+  const [isVertexEditMode, setIsVertexEditMode] = useState(false);
+  const [activeVertexCoords, setActiveVertexCoords] = useState<[number, number][]>([]);
+  const [originalVertexCoords, setOriginalVertexCoords] = useState<[number, number][]>([]);
+  const [currentAreaSqm, setCurrentAreaSqm] = useState<number>(0);
+  const [originalAreaSqm, setOriginalAreaSqm] = useState<number>(0);
+
+  // Task 2.3: GeoSAM Bounding Box Prompt & AI Trace
+  const [enableBboxPrompt, setEnableBboxPrompt] = useState(false);
+  const [aiTracedFeature, setAiTracedFeature] = useState<any>(null);
   const [geosamResult, setGeosamResult] = useState<{
     confidence: number;
     isOccluded: boolean;
@@ -85,13 +139,138 @@ export default function PatwariPage() {
     [parcels, selectedId]
   );
 
-  const handleAddGcp = (pt: GCPPoint) => {
+  // When parcel selection changes, initialize vertex coords
+  useEffect(() => {
+    if (selectedId && geojson) {
+      const feat = geojson.features.find((f: any) => f.properties?.id === selectedId);
+      if (feat && feat.geometry && feat.geometry.type === "Polygon") {
+        const ring = (feat.geometry as any).coordinates[0] || [];
+        const latLngs: [number, number][] = ring.map((pt: [number, number]) => [pt[1], pt[0]]);
+        setActiveVertexCoords(latLngs);
+        setOriginalVertexCoords(latLngs);
+        const area = computePolygonAreaSqm(latLngs);
+        setOriginalAreaSqm(area);
+        setCurrentAreaSqm(area);
+      }
+    } else {
+      setIsVertexEditMode(false);
+    }
+  }, [selectedId, geojson]);
+
+  // Handle Vertex Dragging (Task 2.2)
+  const handleVertexChange = (coords: [number, number][]) => {
+    setActiveVertexCoords(coords);
+    const newArea = computePolygonAreaSqm(coords);
+    setCurrentAreaSqm(newArea);
+  };
+
+  const handleSaveVertexChanges = () => {
+    if (!selectedId || !geojson) return;
+    const delta = currentAreaSqm - originalAreaSqm;
+    // Update local geojson feature geometry
+    setGeojson((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev };
+      updated.features = updated.features.map((f: any) => {
+        if (f.properties?.id === selectedId) {
+          const newRing = activeVertexCoords.map((pt) => [pt[1], pt[0]]);
+          return {
+            ...f,
+            geometry: {
+              ...f.geometry,
+              coordinates: [newRing],
+            },
+            properties: {
+              ...f.properties,
+              area_sqm: Number(currentAreaSqm.toFixed(1)),
+            },
+          };
+        }
+        return f;
+      });
+      return updated;
+    });
+
+    setIsVertexEditMode(false);
+    setOriginalAreaSqm(currentAreaSqm);
+    setOriginalVertexCoords(activeVertexCoords);
+    toast.success(
+      `Boundary locked! New Area: ${currentAreaSqm.toFixed(1)} m² (ΔArea: ${delta >= 0 ? "+" : ""}${delta.toFixed(1)} m²)`
+    );
+  };
+
+  const handleResetVertices = () => {
+    setActiveVertexCoords(originalVertexCoords);
+    setCurrentAreaSqm(originalAreaSqm);
+    toast("Corners restored to original cadastral vertices", { icon: "↩️" });
+  };
+
+  // Handle Paired GCP Add (Task 2.4)
+  const handleAddGcpPair = (pair: GCPPair) => {
+    if (gcpPairs.length >= 8) {
+      toast("Maximum 8 GCP landmark pairs reached for this sector.", { icon: "ℹ️" });
+      return;
+    }
+    setGcpPairs((prev) => [...prev, pair]);
+    toast.success(
+      `Linked ${pair.label}: Δ ${pair.displacementMeters}m (${pair.errorPixels}px error)`
+    );
+  };
+
+  // Handle Single GCP Add
+  const handleAddSingleGcp = (pt: GCPPoint) => {
     if (gcpPoints.length >= 6) {
       toast("Maximum 6 Ground Control Points reached for this sector.", { icon: "ℹ️" });
       return;
     }
     setGcpPoints((prev) => [...prev, pt]);
     toast.success(`Dropped ${pt.label} at [${pt.lat}, ${pt.lng}]`);
+  };
+
+  // Task 2.3: Handle GeoSAM Bounding Box Prompt Selected
+  const handleBboxSelected = async (bbox: [number, number, number, number]) => {
+    setLoading(true);
+    setEnableBboxPrompt(false);
+    const tId = toast.loading("GeoSAM ViT-H: Zero-shot boundary segmentation inside bbox...");
+
+    try {
+      const activeFeature = geojson?.features.find((f: any) => f.properties?.id === selectedId);
+
+      const res = await fetch(`${API}/v1/extract-boundaries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bbox: bbox,
+          legacy_polygon: activeFeature?.geometry || null,
+        }),
+      });
+
+      if (!res.ok) throw new Error("GeoSAM extraction failed");
+      const data = await res.json();
+
+      setAiTracedFeature(data.feature);
+      setGeosamResult({
+        confidence: data.confidence_score,
+        isOccluded: data.is_occluded,
+        reason: data.occlusion_reason,
+        inferenceMs: data.inference_time_ms,
+      });
+
+      if (data.is_occluded) {
+        toast(
+          `Occlusion Flagged! Confidence: ${(data.confidence_score * 100).toFixed(0)}%. ${data.occlusion_reason}`,
+          { icon: "⚠️", id: tId, duration: 4000 }
+        );
+      } else {
+        toast.success(
+          `GeoAI boundary traced in ${data.inference_time_ms.toFixed(1)}ms! Confidence: ${(data.confidence_score * 100).toFixed(1)}%`,
+          { id: tId }
+        );
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Boundary extraction error", { id: tId });
+    }
+    setLoading(false);
   };
 
   // Step 2: Global ORB+RANSAC Alignment
@@ -115,7 +294,7 @@ export default function PatwariPage() {
     setLoading(false);
   };
 
-  // Step 3: GeoSAM Zero-Shot Boundary Extraction
+  // Step 3: GeoSAM Zero-Shot Boundary Extraction (Default Center Bbox)
   const runGeoSamExtraction = async () => {
     if (!selectedId) return toast("Select a parcel polygon first", { icon: "ℹ️" });
     setLoading(true);
@@ -123,9 +302,7 @@ export default function PatwariPage() {
     const tId = toast.loading("GeoSAM ViT-H: Zero-shot boundary segmentation (<10ms)...");
 
     try {
-      const activeFeature = geojson?.features.find(
-        (f: any) => f.properties?.id === selectedId
-      );
+      const activeFeature = geojson?.features.find((f: any) => f.properties?.id === selectedId);
 
       const res = await fetch(`${API}/v1/extract-boundaries`, {
         method: "POST",
@@ -139,6 +316,7 @@ export default function PatwariPage() {
       if (!res.ok) throw new Error("GeoSAM extraction failed");
       const data = await res.json();
 
+      setAiTracedFeature(data.feature);
       setGeosamResult({
         confidence: data.confidence_score,
         isOccluded: data.is_occluded,
@@ -171,9 +349,7 @@ export default function PatwariPage() {
     const tId = toast.loading("Applying PostGIS ST_Difference & ST_Snap (0.05m)...");
 
     try {
-      const activeFeature = geojson?.features.find(
-        (f: any) => f.properties?.id === selectedId
-      );
+      const activeFeature = geojson?.features.find((f: any) => f.properties?.id === selectedId);
 
       // ST_Difference + ST_Snap
       const cleanRes = await fetch(`${API}/v1/topology-cleanup`, {
@@ -233,13 +409,22 @@ export default function PatwariPage() {
     toast.success("Bhu-Aadhaar (ULPIN) copied to clipboard!");
   };
 
+  // Calculate sector RMSE for paired GCPs
+  const sectorRmseMeters = useMemo(() => {
+    if (gcpPairs.length === 0) return 0;
+    const sumSq = gcpPairs.reduce((acc, p) => acc + p.displacementMeters * p.displacementMeters, 0);
+    return Math.sqrt(sumSq / gcpPairs.length);
+  }, [gcpPairs]);
+
+  const deltaArea = currentAreaSqm - originalAreaSqm;
+  const deltaPercent = originalAreaSqm > 0 ? (deltaArea / originalAreaSqm) * 100 : 0;
+
   return (
-    <div style={{ width: "100vw", height: "100vh", position: "relative", paddingTop: 64, overflow: "hidden" }}>
-      {/* Accessible H1 Heading (Fix for Issue 5) */}
+    <div style={{ width: "100vw", height: "100vh", position: "relative", overflow: "hidden" }}>
       <h1 className="sr-only">Revenue Patwari Geospatial Harmonization Workspace</h1>
 
-      {/* Fullscreen Map Canvas */}
-      <div style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0, zIndex: 10 }}>
+      {/* Fullscreen Map Canvas below 64px Top Navbar */}
+      <div style={{ width: "100%", height: "calc(100vh - 64px)", position: "absolute", top: 64, left: 0, zIndex: 10 }}>
         <MapViewer
           geojsonData={geojson}
           selectedParcelId={selectedId}
@@ -248,14 +433,96 @@ export default function PatwariPage() {
             setGeosamResult(null);
             setIsDossierCollapsed(false);
           }}
-          enableGcpPlacement={enableGcpPlacement}
+          enableGcpPlacement={enableGcpPlacement && !pairedGcpMode}
           gcpPoints={gcpPoints}
-          onAddGcp={handleAddGcp}
+          onAddGcp={handleAddSingleGcp}
+          pairedGcpMode={pairedGcpMode && enableGcpPlacement}
+          gcpPairs={gcpPairs}
+          onAddGcpPair={handleAddGcpPair}
           showOcclusionAlerts={true}
+          // Task 2.2: Vertex Editing
+          enableVertexEdit={isVertexEditMode}
+          activePolygonCoords={activeVertexCoords}
+          onVertexChange={handleVertexChange}
+          // Task 2.3: GeoSAM Prompt Box
+          enableBboxPrompt={enableBboxPrompt}
+          onBboxSelected={handleBboxSelected}
+          aiTracedFeature={aiTracedFeature}
+          aiTraceConfidence={geosamResult?.confidence}
+          isOccluded={geosamResult?.isOccluded}
         />
       </div>
 
-      {/* ───── Top Right: Collapsible Parcel Dossier (Fix for Issue 6, 10, 12, 13) ───── */}
+      {/* ───── Task 2.2: Floating Vertex HITL Calibration HUD ───── */}
+      {isVertexEditMode && selectedParcel && (
+        <div
+          className="glass-card animate-fade-in-up"
+          style={{
+            position: "absolute",
+            top: 84,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 450,
+            padding: "10px 18px",
+            background: "rgba(15, 23, 42, 0.94)",
+            color: "#FFFFFF",
+            borderRadius: "var(--radius-lg)",
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            boxShadow: "0 8px 30px rgba(0, 0, 0, 0.35)",
+            border: "1px solid rgba(56, 189, 248, 0.4)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#38BDF8", animation: "pulse 1.5s infinite" }} />
+            <span style={{ fontWeight: 800, fontSize: "0.875rem", letterSpacing: "0.02em" }}>
+              Vertex Calibration (HITL): Khasra {selectedParcel.khasra_no}
+            </span>
+          </div>
+
+          <div style={{ width: 1, height: 20, background: "rgba(255, 255, 255, 0.2)" }} />
+
+          {/* Instantaneous Area Readout */}
+          <div style={{ fontSize: "0.8125rem", display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: "#94A3B8" }}>Area:</span>
+            <strong style={{ color: "#FFFFFF" }}>{currentAreaSqm.toFixed(1)} m²</strong>
+            <span
+              style={{
+                fontWeight: 800,
+                color: Math.abs(deltaArea) < 0.1 ? "#94A3B8" : deltaArea > 0 ? "#38BDF8" : "#F59E0B",
+              }}
+            >
+              (ΔArea: {deltaArea >= 0 ? "+" : ""}{deltaArea.toFixed(1)} m² / {deltaPercent >= 0 ? "+" : ""}{deltaPercent.toFixed(2)}%)
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              onClick={handleResetVertices}
+              className="btn-secondary"
+              style={{
+                padding: "4px 10px",
+                fontSize: "0.78rem",
+                background: "rgba(255, 255, 255, 0.1)",
+                color: "#FFFFFF",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+              }}
+            >
+              <RotateCcw size={12} /> Reset
+            </button>
+            <button
+              onClick={handleSaveVertexChanges}
+              className="btn-primary"
+              style={{ padding: "5px 12px", fontSize: "0.78rem" }}
+            >
+              <Check size={13} /> Lock Boundary
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ───── Top Right: Collapsible Parcel Dossier ───── */}
       <div
         className="glass-card animate-fade-in-up"
         style={{
@@ -265,7 +532,7 @@ export default function PatwariPage() {
           zIndex: 400,
           width: 350,
           padding: isDossierCollapsed ? "12px 18px" : "18px 20px",
-          background: "rgba(255, 255, 255, 0.98)", /* Fix Issue 12: Opaque background prevents text bleed */
+          background: "rgba(255, 255, 255, 0.98)",
           borderRadius: "var(--radius-lg)",
           boxShadow: "0 8px 30px rgba(15, 23, 42, 0.12)",
           transition: "all 0.2s ease",
@@ -275,19 +542,17 @@ export default function PatwariPage() {
           <h2 style={{ fontSize: "1.05rem", fontWeight: 800, display: "flex", alignItems: "center", gap: 8, color: "var(--text-primary)" }}>
             <MapPin size={18} style={{ color: "var(--accent-primary)" }} /> Parcel Dossier
           </h2>
-          
+
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            {/* Fix Issue 13: Prominent reload button */}
-            <button 
-              onClick={fetchData} 
-              className="btn-ghost" 
-              style={{ padding: 6, color: "var(--text-primary)" }} 
+            <button
+              onClick={fetchData}
+              className="btn-ghost"
+              style={{ padding: 6, color: "var(--text-primary)" }}
               title="Reload Cadastral Data"
               aria-label="Reload Cadastral Data"
             >
               <RefreshCw size={15} />
             </button>
-            {/* Fix Issue 10: Minimize/Expand toggle */}
             <button
               onClick={() => setIsDossierCollapsed(!isDossierCollapsed)}
               className="btn-ghost"
@@ -303,7 +568,7 @@ export default function PatwariPage() {
         {!isDossierCollapsed && (
           <div style={{ marginTop: 14 }}>
             {selectedParcel ? (
-              <div style={{ fontSize: "0.875rem" /* Fix Issue 3: 14px body text */ }}>
+              <div style={{ fontSize: "0.875rem" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: "8px 12px", marginBottom: 12 }}>
                   <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Khasra No:</span>
                   <strong style={{ color: "var(--text-primary)" }}>{selectedParcel.khasra_no}</strong>
@@ -315,25 +580,59 @@ export default function PatwariPage() {
                   <span style={{ color: "var(--text-secondary)" }}>{selectedParcel.village}, Mohanlalganj</span>
 
                   <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Status:</span>
-                  <span style={{ 
-                    textTransform: "uppercase", 
-                    fontSize: "0.75rem", 
-                    fontWeight: 700, 
-                    padding: "3px 8px", 
-                    background: "var(--accent-primary-bg)", 
-                    color: "var(--accent-primary)", 
-                    borderRadius: "var(--radius-sm)", 
-                    width: "fit-content" 
-                  }}>
+                  <span
+                    style={{
+                      textTransform: "uppercase",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      padding: "3px 8px",
+                      background: "var(--accent-primary-bg)",
+                      color: "var(--accent-primary)",
+                      borderRadius: "var(--radius-sm)",
+                      width: "fit-content",
+                    }}
+                  >
                     {selectedParcel.alignment_status}
                   </span>
 
-                  {selectedParcel.area_sqm && (
-                    <>
-                      <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Parcel Area:</span>
-                      <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{Number(selectedParcel.area_sqm).toFixed(1)} m²</span>
-                    </>
-                  )}
+                  <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Parcel Area:</span>
+                  <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                    {currentAreaSqm > 0 ? currentAreaSqm.toFixed(1) : Number(selectedParcel.area_sqm || 0).toFixed(1)} m²
+                  </span>
+                </div>
+
+                {/* Task 2.2: Vertex Edit Button */}
+                <div style={{ marginBottom: 12 }}>
+                  <button
+                    onClick={() => {
+                      const next = !isVertexEditMode;
+                      setIsVertexEditMode(next);
+                      if (next) {
+                        toast("Corner Drag Mode Active: Drag any blue corner handle to adjust boundaries", {
+                          icon: "📐",
+                        });
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: "var(--radius-md)",
+                      border: isVertexEditMode ? "1.5px solid #0284C7" : "1px solid var(--border-glass)",
+                      background: isVertexEditMode ? "#E0F2FE" : "var(--bg-secondary)",
+                      color: isVertexEditMode ? "#0369A1" : "var(--text-primary)",
+                      fontWeight: 700,
+                      fontSize: "0.8125rem",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <Move size={15} />
+                    {isVertexEditMode ? "Exit Corner Drag Mode" : "Manual Corner Drag Handle (HITL)"}
+                  </button>
                 </div>
 
                 {/* Occlusion Warning Banner */}
@@ -355,7 +654,7 @@ export default function PatwariPage() {
                     </div>
                     <div style={{ marginTop: 4 }}>
                       Confidence: <strong>{(geosamResult.confidence * 100).toFixed(1)}%</strong>
-                      {geosamResult.reason && ` &bull; ${geosamResult.reason}`}
+                      {geosamResult.reason && ` • ${geosamResult.reason}`}
                     </div>
                   </div>
                 )}
@@ -397,28 +696,28 @@ export default function PatwariPage() {
         )}
       </div>
 
-      {/* ───── Bottom Center: Consolidated Unified Pipeline Action Dock (Fix for Issue 6, 7, 8, 11, 14) ───── */}
+      {/* ───── Bottom Center: Consolidated Unified Pipeline Action Dock ───── */}
       <div
         className="glass-card animate-fade-in-up"
         style={{
           position: "absolute",
           bottom: 24,
           left: "50%",
-          transform: "translateX(-50%)", /* Fix Issue 8: Perfectly centered horizontally */
+          transform: "translateX(-50%)",
           zIndex: 400,
           padding: "10px 16px",
           display: "flex",
           alignItems: "center",
-          gap: 12,
-          background: "rgba(255, 255, 255, 0.98)", /* Fix Issue 7: High contrast opaque background */
+          flexWrap: "wrap",
+          gap: 10,
+          background: "rgba(255, 255, 255, 0.98)",
           borderRadius: "var(--radius-lg)",
           boxShadow: "0 10px 35px rgba(15, 23, 42, 0.15)",
         }}
       >
-        {/* Fix Issue 4: Title case instead of long all-caps */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, paddingRight: 4 }}>
           <span style={{ fontWeight: 800, fontSize: "0.875rem", color: "var(--text-primary)" }}>
-            Harmonization Pipeline:
+            Harmonization:
           </span>
           <span className="badge-pastel-teal" style={{ fontSize: "0.75rem", padding: "2px 8px" }}>
             Step {activePipelineStep} of 5
@@ -432,9 +731,9 @@ export default function PatwariPage() {
           className="btn-primary"
           onClick={runAlign}
           disabled={loading || !selectedId}
-          title="ORB keypoint feature detection & RANSAC homography"
+          title="ORB feature detection & RANSAC homography"
         >
-          <ScanLine size={16} /> 2. Align (ORB)
+          <ScanLine size={15} /> 2. Align (ORB)
         </button>
 
         {/* Step 3: GeoSAM AI */}
@@ -444,7 +743,35 @@ export default function PatwariPage() {
           disabled={loading || !selectedId}
           title="Meta Segment Anything (GeoSAM) zero-shot boundary tracing with occlusion checks"
         >
-          <Sparkles size={16} /> 3. GeoSAM AI
+          <Sparkles size={15} /> 3. GeoSAM AI
+        </button>
+
+        {/* Task 2.3: GeoSAM Interactive Prompt Box */}
+        <button
+          onClick={() => {
+            const next = !enableBboxPrompt;
+            setEnableBboxPrompt(next);
+            if (next) {
+              toast("GeoSAM Bounding Box Prompt: Click 2 opposite corners on the drone map", { icon: "🎯" });
+            }
+          }}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "8px 14px",
+            borderRadius: "var(--radius-md)",
+            border: enableBboxPrompt ? "1.5px solid #0D9488" : "1px solid var(--border-glass)",
+            background: enableBboxPrompt ? "#CCFBF1" : "#FFFFFF",
+            color: enableBboxPrompt ? "#0D9488" : "var(--text-primary)",
+            fontSize: "0.8125rem",
+            fontWeight: 700,
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+          title="Interactive bounding-box prompt tool for physical property boundaries"
+        >
+          <Crosshair size={15} /> {enableBboxPrompt ? "Box Prompt Active" : "Prompt BBox"}
         </button>
 
         {/* Step 4 & 5: PostGIS & ULPIN */}
@@ -454,19 +781,24 @@ export default function PatwariPage() {
           disabled={loading || !selectedId}
           title="PostGIS ST_Difference, ST_Snap (0.05m), and Base-14 ULPIN generation"
         >
-          <Layers size={16} /> 4-5. Clean & ULPIN
+          <Layers size={15} /> 4-5. Clean & ULPIN
         </button>
 
         <div style={{ width: 1, height: 24, background: "var(--border-subtle)" }} />
 
-        {/* GCP Drop Mode Toggle (Fix Issue 11: Consistent button style) */}
+        {/* Task 2.4: GCP Drop Mode Toggle */}
         <button
           className="btn-secondary"
           onClick={() => {
             const next = !enableGcpPlacement;
             setEnableGcpPlacement(next);
             if (next) {
-              toast("GCP Pin Placement Active: Click on map to drop Ground Control Points", { icon: "📍" });
+              toast(
+                pairedGcpMode
+                  ? "Paired Landmark Mode: Click 1 on Legacy Landmark, Click 2 on Drone Marker"
+                  : "Click on map to drop GCP points",
+                { icon: "📍" }
+              );
             }
           }}
           style={{
@@ -475,19 +807,16 @@ export default function PatwariPage() {
             color: enableGcpPlacement ? "var(--accent-primary)" : "var(--text-primary)",
           }}
         >
-          <Pin size={15} /> {enableGcpPlacement ? "Pin Mode Active" : "Drop GCP"}
+          <Pin size={15} /> {enableGcpPlacement ? "GCP Active" : "Drop GCP"}
         </button>
 
-        {/* Fix Issue 14: Solid high-contrast secondary button for TPS Calibration */}
-        <button
-          className="btn-secondary"
-          onClick={() => setShowCalibrationDrawer(true)}
-        >
-          <Sliders size={15} /> Thin-Plate Splines ({gcpPoints.length})
+        {/* TPS Drawer Toggle with Pair count */}
+        <button className="btn-secondary" onClick={() => setShowCalibrationDrawer(true)}>
+          <Sliders size={15} /> TPS Warping ({pairedGcpMode ? `${gcpPairs.length} pairs` : `${gcpPoints.length} pts`})
         </button>
       </div>
 
-      {/* Thin-Plate Splines Modal */}
+      {/* ───── Task 2.4: Upgraded Thin-Plate Splines & Paired GCP Modal ───── */}
       {showCalibrationDrawer && (
         <div
           className="animate-fade-in-up"
@@ -508,8 +837,8 @@ export default function PatwariPage() {
           <div
             className="glass-card"
             style={{
-              width: "720px",
-              maxWidth: "92vw",
+              width: "780px",
+              maxWidth: "94vw",
               background: "#FFFFFF",
               padding: "24px 28px",
               borderRadius: "var(--radius-lg)",
@@ -517,11 +846,13 @@ export default function PatwariPage() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div>
-                <h2 style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--text-primary)" }}>
-                  Ground Control Points (GCP) & Thin-Plate Splines (TPS)
-                </h2>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <h2 style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--text-primary)" }}>
+                    GCP Landmark Calibration & Thin-Plate Splines (TPS)
+                  </h2>
+                </div>
                 <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginTop: 2 }}>
-                  Non-linear rubber sheeting corrects decades-old paper shrinkage and moisture distortion.
+                  Dual-click landmark correspondence links legacy paper landmarks with 5cm drone features.
                 </p>
               </div>
               <button onClick={() => setShowCalibrationDrawer(false)} className="btn-ghost" style={{ padding: "6px 12px" }}>
@@ -529,37 +860,127 @@ export default function PatwariPage() {
               </button>
             </div>
 
-            <div style={{ maxHeight: 220, overflowY: "auto", marginBottom: 16, border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
-              <table style={{ width: "100%", fontSize: "0.875rem", borderCollapse: "collapse", textAlign: "left" }}>
-                <thead>
-                  <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border-subtle)" }}>
-                    <th style={{ padding: "10px 14px", color: "var(--text-primary)" }}>ID</th>
-                    <th style={{ padding: "10px 14px", color: "var(--text-primary)" }}>Landmark Label</th>
-                    <th style={{ padding: "10px 14px", color: "var(--text-primary)" }}>Drone Latitude</th>
-                    <th style={{ padding: "10px 14px", color: "var(--text-primary)" }}>Drone Longitude</th>
-                    <th style={{ padding: "10px 14px", color: "var(--text-primary)" }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {gcpPoints.map((gcp) => (
-                    <tr key={gcp.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                      <td style={{ padding: "10px 14px", fontWeight: 700 }}>#{gcp.id}</td>
-                      <td style={{ padding: "10px 14px" }}>{gcp.label}</td>
-                      <td style={{ padding: "10px 14px", fontFamily: "monospace" }}>{gcp.lat.toFixed(6)}</td>
-                      <td style={{ padding: "10px 14px", fontFamily: "monospace" }}>{gcp.lng.toFixed(6)}</td>
-                      <td style={{ padding: "10px 14px" }}>
-                        <button
-                          onClick={() => setGcpPoints(gcpPoints.filter((p) => p.id !== gcp.id))}
-                          style={{ border: "none", background: "none", color: "var(--accent-coral)", cursor: "pointer", fontWeight: 700 }}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Mode Switcher: Paired vs Single */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={{ display: "flex", gap: 8, background: "var(--bg-secondary)", padding: 4, borderRadius: "var(--radius-md)" }}>
+                <button
+                  onClick={() => setPairedGcpMode(true)}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "var(--radius-sm)",
+                    border: "none",
+                    background: pairedGcpMode ? "var(--accent-primary)" : "transparent",
+                    color: pairedGcpMode ? "#FFFFFF" : "var(--text-secondary)",
+                    fontWeight: 700,
+                    fontSize: "0.8125rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  Paired Landmarks (Click 1 → Click 2)
+                </button>
+                <button
+                  onClick={() => setPairedGcpMode(false)}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "var(--radius-sm)",
+                    border: "none",
+                    background: !pairedGcpMode ? "var(--accent-primary)" : "transparent",
+                    color: !pairedGcpMode ? "#FFFFFF" : "var(--text-secondary)",
+                    fontWeight: 700,
+                    fontSize: "0.8125rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  Single Control Points
+                </button>
+              </div>
+
+              {/* Real-time Sector RMSE Readout (Task 2.4) */}
+              {pairedGcpMode && (
+                <div style={{ padding: "4px 12px", background: "#FEF3C7", border: "1px solid #FDE68A", borderRadius: "6px", color: "#92400E", fontSize: "0.8125rem", fontWeight: 700 }}>
+                  Sector RMSE: <strong>{sectorRmseMeters.toFixed(2)} meters</strong> ({(sectorRmseMeters / 0.05).toFixed(1)} px)
+                </div>
+              )}
             </div>
+
+            {/* Paired Landmark Table */}
+            {pairedGcpMode ? (
+              <div style={{ maxHeight: 240, overflowY: "auto", marginBottom: 16, border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
+                <table style={{ width: "100%", fontSize: "0.8125rem", borderCollapse: "collapse", textAlign: "left" }}>
+                  <thead>
+                    <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border-subtle)" }}>
+                      <th style={{ padding: "8px 12px", color: "var(--text-primary)" }}>Pair</th>
+                      <th style={{ padding: "8px 12px", color: "var(--text-primary)" }}>Feature Description</th>
+                      <th style={{ padding: "8px 12px", color: "var(--text-primary)" }}>Legacy Cadastre (L#)</th>
+                      <th style={{ padding: "8px 12px", color: "var(--text-primary)" }}>Drone Ground (D#)</th>
+                      <th style={{ padding: "8px 12px", color: "var(--text-primary)" }}>Displacement</th>
+                      <th style={{ padding: "8px 12px", color: "var(--text-primary)" }}>Residual Error</th>
+                      <th style={{ padding: "8px 12px", color: "var(--text-primary)" }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gcpPairs.map((pair) => (
+                      <tr key={pair.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                        <td style={{ padding: "8px 12px", fontWeight: 700 }}>#{pair.id}</td>
+                        <td style={{ padding: "8px 12px" }}>{pair.label}</td>
+                        <td style={{ padding: "8px 12px", fontFamily: "monospace", color: "#D97706" }}>
+                          [{pair.legacy[0].toFixed(5)}, {pair.legacy[1].toFixed(5)}]
+                        </td>
+                        <td style={{ padding: "8px 12px", fontFamily: "monospace", color: "#0D9488" }}>
+                          [{pair.drone[0].toFixed(5)}, {pair.drone[1].toFixed(5)}]
+                        </td>
+                        <td style={{ padding: "8px 12px", fontWeight: 700 }}>
+                          {pair.displacementMeters} m
+                        </td>
+                        <td style={{ padding: "8px 12px", color: "#0284C7", fontWeight: 700 }}>
+                          {pair.errorPixels} px
+                        </td>
+                        <td style={{ padding: "8px 12px" }}>
+                          <button
+                            onClick={() => setGcpPairs(gcpPairs.filter((p) => p.id !== pair.id))}
+                            style={{ border: "none", background: "none", color: "var(--accent-coral)", cursor: "pointer", fontWeight: 700 }}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ maxHeight: 220, overflowY: "auto", marginBottom: 16, border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
+                <table style={{ width: "100%", fontSize: "0.875rem", borderCollapse: "collapse", textAlign: "left" }}>
+                  <thead>
+                    <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border-subtle)" }}>
+                      <th style={{ padding: "10px 14px", color: "var(--text-primary)" }}>ID</th>
+                      <th style={{ padding: "10px 14px", color: "var(--text-primary)" }}>Landmark Label</th>
+                      <th style={{ padding: "10px 14px", color: "var(--text-primary)" }}>Drone Latitude</th>
+                      <th style={{ padding: "10px 14px", color: "var(--text-primary)" }}>Drone Longitude</th>
+                      <th style={{ padding: "10px 14px", color: "var(--text-primary)" }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gcpPoints.map((gcp) => (
+                      <tr key={gcp.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                        <td style={{ padding: "10px 14px", fontWeight: 700 }}>#{gcp.id}</td>
+                        <td style={{ padding: "10px 14px" }}>{gcp.label}</td>
+                        <td style={{ padding: "10px 14px", fontFamily: "monospace" }}>{gcp.lat.toFixed(6)}</td>
+                        <td style={{ padding: "10px 14px", fontFamily: "monospace" }}>{gcp.lng.toFixed(6)}</td>
+                        <td style={{ padding: "10px 14px" }}>
+                          <button
+                            onClick={() => setGcpPoints(gcpPoints.filter((p) => p.id !== gcp.id))}
+                            style={{ border: "none", background: "none", color: "var(--accent-coral)", cursor: "pointer", fontWeight: 700 }}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <button
@@ -567,10 +988,15 @@ export default function PatwariPage() {
                 onClick={() => {
                   setEnableGcpPlacement(true);
                   setShowCalibrationDrawer(false);
-                  toast("Click on the map to place additional GCP points", { icon: "📍" });
+                  toast(
+                    pairedGcpMode
+                      ? "Click 1 on old cadastre landmark, then Click 2 on drone marker"
+                      : "Click on map to drop GCP points",
+                    { icon: "📍" }
+                  );
                 }}
               >
-                + Drop Points on Map
+                + Place Landmarks on Map
               </button>
 
               <button
@@ -579,6 +1005,20 @@ export default function PatwariPage() {
                   setLoading(true);
                   const tId = toast.loading("Computing Thin-Plate Spline non-linear surface...");
                   try {
+                    const formattedGcps = pairedGcpMode
+                      ? gcpPairs.map((p) => ({
+                          id: p.id,
+                          legacy_coord: [p.legacy[1], p.legacy[0]],
+                          drone_coord: [p.drone[1], p.drone[0]],
+                          label: p.label,
+                        }))
+                      : gcpPoints.map((p) => ({
+                          id: p.id,
+                          legacy_coord: [p.lng - 0.0003, p.lat - 0.0002],
+                          drone_coord: [p.lng, p.lat],
+                          label: p.label,
+                        }));
+
                     const res = await fetch(`${API}/v1/align-map`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
@@ -586,20 +1026,18 @@ export default function PatwariPage() {
                         legacy_geojson: {
                           type: "Polygon",
                           coordinates: [
-                            [[80.899, 26.760], [80.902, 26.760], [80.902, 26.762], [80.899, 26.762], [80.899, 26.760]],
+                            [[80.899, 26.76], [80.902, 26.76], [80.902, 26.762], [80.899, 26.762], [80.899, 26.76]],
                           ],
                         },
-                        gcps: gcpPoints.map((p) => ({
-                          id: p.id,
-                          legacy_coord: [p.lng - 0.0003, p.lat - 0.0002],
-                          drone_coord: [p.lng, p.lat],
-                          label: p.label,
-                        })),
+                        gcps: formattedGcps,
                       }),
                     });
                     if (!res.ok) throw new Error("TPS calculation error");
                     const data = await res.json();
-                    toast.success(`TPS Warping complete! Confidence: ${data.confidence_score}%`, { id: tId });
+                    toast.success(
+                      `TPS Warping complete! Confidence: ${data.confidence_score}% (RMSE: ${sectorRmseMeters.toFixed(2)}m)`,
+                      { id: tId }
+                    );
                     setShowCalibrationDrawer(false);
                     await fetchData();
                   } catch (err: any) {
@@ -608,7 +1046,7 @@ export default function PatwariPage() {
                   setLoading(false);
                 }}
               >
-                Apply TPS Warping
+                Apply TPS Warping ({pairedGcpMode ? `${gcpPairs.length} Pairs` : `${gcpPoints.length} Points`})
               </button>
             </div>
           </div>

@@ -81,7 +81,18 @@ def generate_ulpin(lat: float, lon: float) -> str:
 
 
 def _parse_geometry_to_shapely(geom_raw: Any) -> Polygon:
-    """Helper to convert stored geometry (GeoJSON string, dict, or WKT) into a Shapely geometry."""
+    """Helper to convert stored geometry (GeoJSON string, dict, WKT, or PostGIS WKBElement) into a Shapely geometry."""
+    if geom_raw is None:
+        return Polygon()
+    if isinstance(geom_raw, (Polygon, MultiPolygon)):
+        return geom_raw
+    try:
+        from geoalchemy2.shape import to_shape
+        from geoalchemy2.elements import WKBElement
+        if isinstance(geom_raw, WKBElement):
+            return to_shape(geom_raw)
+    except Exception:
+        pass
     if isinstance(geom_raw, dict):
         return shape(geom_raw)
     if isinstance(geom_raw, str):
@@ -94,6 +105,14 @@ def _parse_geometry_to_shapely(geom_raw: Any) -> Polygon:
             if ";" in geom_str:
                 geom_str = geom_str.split(";", 1)[1]
             return shapely.wkt.loads(geom_str)
+    try:
+        import shapely.wkb
+        if hasattr(geom_raw, "data"):
+            return shapely.wkb.loads(bytes(geom_raw.data))
+        if isinstance(geom_raw, (bytes, bytearray)):
+            return shapely.wkb.loads(geom_raw)
+    except Exception:
+        pass
     # Default fallback
     raise ValueError(f"Unable to parse geometry: {type(geom_raw)}")
 
@@ -194,6 +213,7 @@ def run_topological_cleanup_geojson(db: Session, geojson: dict) -> dict:
                         FROM input_geom i
                         CROSS JOIN parcels p
                         WHERE ST_Intersects(i.geom, p.geometry)
+                        GROUP BY i.geom
                     ),
                     (SELECT geom FROM input_geom)
                 ) as geom
@@ -217,6 +237,10 @@ def run_topological_cleanup_geojson(db: Session, geojson: dict) -> dict:
                 }
         except Exception as e:
             logger.warning("PostGIS cleanup failed, using Shapely engine: %s", e)
+            try:
+                db.rollback()
+            except Exception:
+                pass
 
     # Pure Shapely topological cleanup engine
     candidate_poly = shape(geojson)

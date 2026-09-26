@@ -20,7 +20,7 @@ interface RegistrationModalProps {
   onSuccess?: () => void;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { API } from "@/lib/api";
 
 export default function RegistrationModal({
   isOpen,

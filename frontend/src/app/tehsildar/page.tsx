@@ -19,7 +19,8 @@ import {
 import type { FeatureCollection } from "geojson";
 
 const MapViewer = dynamic(() => import("@/components/MapViewer"), { ssr: false });
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { API } from "@/lib/api";
+import { generateFormIIPdf } from "@/lib/pdfGenerator";
 
 interface DashboardStats {
   total_parcels: number;
@@ -466,6 +467,42 @@ export default function TehsildarPage() {
                     style={{ width: "100%", padding: "11px 16px" }}
                   >
                     <Stamp size={16} /> Sanction & Publish to Land Stack
+                  </button>
+
+                  {/* Task 2.6: Form-II Survey Certificate PDF Export */}
+                  <button
+                    className="btn-secondary"
+                    onClick={() => {
+                      generateFormIIPdf({
+                        khasraNo: selectedApproval.khasra_no,
+                        ownerName: selectedApproval.owner_name,
+                        village: selectedApproval.village,
+                        tehsil: selectedApproval.tehsil,
+                        district: selectedApproval.district,
+                        ulpin: selectedApproval.ulpin || "9YYD56AA2Z9Y3A",
+                        areaSqm: selectedApproval.area_sqm || 5714.41,
+                        alignmentConfidence: selectedApproval.alignment_confidence ?? 0.96,
+                        officerId: "REV-TEH-3210 (Mohanlalganj)",
+                        approvalDate: new Date().toLocaleDateString("en-IN"),
+                        endorsementNote: remarks || "Statutory survey adjudication verified under DILRMP 3.0 protocol.",
+                        isOccluded: (selectedApproval.alignment_confidence ?? 1) < 0.8,
+                      });
+                      toast.success(`Form-II Certificate for Khasra ${selectedApproval.khasra_no} generated!`);
+                    }}
+                    style={{
+                      width: "100%",
+                      background: "#F0FDFA",
+                      borderColor: "#99F6E4",
+                      color: "#0D9488",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      padding: "10px 16px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    <FileCheck size={16} /> Download Form-II Survey Certificate (PDF)
                   </button>
 
                   <button

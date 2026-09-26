@@ -5,8 +5,14 @@ FastAPI Application Entry Point
 Run with: uvicorn main:app --reload --port 8000
 """
 
+import sys
+import os
 import logging
 from contextlib import asynccontextmanager
+
+# Ensure backend root is always on sys.path regardless of where uvicorn is launched
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -43,15 +49,11 @@ app = FastAPI(
 )
 
 
-# ── CORS — Allow frontend dev server & common origins ──
+# ── CORS — Allow frontend dev server & common origins (including network IPs) ──
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-    ],
+    allow_origins=["*"],
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
