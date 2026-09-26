@@ -322,31 +322,28 @@ export default function LandingPage() {
             onClick={() => setIsSourceModalOpen(true)}
             className="btn-secondary"
             style={{ padding: "8px 14px", fontSize: "0.8125rem" }}
-            title="Configure Old Map (Legacy Cadastre) and New Map (Drone Orthomosaic) Sources"
+            title="Upload Old Map (Paper Scan) and New Map (Drone Photo)"
           >
             <Layers size={16} style={{ color: "var(--accent-primary)" }} />
             <span>Map Layers</span>
           </button>
 
-          <button
-            onClick={handleEnterPatwari}
+          <a
+            href="#portals"
             className="btn-primary"
-            style={{ padding: "8px 16px", fontSize: "0.8125rem" }}
-            title="Authenticate as Revenue Patwari / Field Surveyor and open GIS Studio"
+            style={{
+              padding: "8px 16px",
+              fontSize: "0.8125rem",
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              fontWeight: 700,
+            }}
           >
-            <Compass size={16} />
-            <span>Patwari Studio</span>
-          </button>
-
-          <button
-            onClick={handleEnterTehsildar}
-            className="btn-judicial"
-            style={{ padding: "8px 16px", fontSize: "0.8125rem" }}
-            title="Authenticate as Revenue Magistrate and open Judicial Chamber"
-          >
-            <Scale size={16} style={{ color: "#FCD34D" }} />
-            <span>Tehsildar Chamber</span>
-          </button>
+            <Compass size={15} />
+            <span>Officer Portals ↓</span>
+          </a>
         </div>
       </header>
 
@@ -476,33 +473,32 @@ export default function LandingPage() {
             marginTop: 32,
           }}
         >
-          <button
-            onClick={() => router.push("/patwari")}
+          <a
+            href="#portals"
             className="btn-primary"
-            style={{ padding: "14px 28px", fontSize: "0.95rem" }}
+            style={{
+              padding: "14px 28px",
+              fontSize: "0.95rem",
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
+              fontWeight: 800,
+              boxShadow: "0 4px 16px rgba(13, 148, 136, 0.35)",
+            }}
           >
             <Compass size={20} />
-            <span>Launch Surveyor GIS Studio</span>
+            <span>Select Officer Portal Below ↓</span>
             <ArrowRight size={18} />
-          </button>
-
-          <button
-            onClick={() => router.push("/tehsildar")}
-            className="btn-judicial"
-            style={{ padding: "14px 28px", fontSize: "0.95rem" }}
-          >
-            <Scale size={20} style={{ color: "#FCD34D" }} />
-            <span>Enter Magistrate Chamber</span>
-            <ArrowRight size={18} style={{ color: "#FCD34D" }} />
-          </button>
+          </a>
 
           <button
             onClick={() => setIsSourceModalOpen(true)}
             className="btn-secondary"
-            style={{ padding: "14px 22px", fontSize: "0.95rem" }}
+            style={{ padding: "14px 24px", fontSize: "0.95rem" }}
           >
             <Layers size={20} style={{ color: "var(--accent-primary)" }} />
-            <span>Configure Old & New Maps</span>
+            <span>Upload Old &amp; New Maps</span>
           </button>
         </div>
 

@@ -337,63 +337,7 @@ export default function MapSourceModal({
           {/* ═══════════ TAB 1: OLD MAP ═══════════ */}
           {activeTab === "old" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              {/* Presets Grid */}
-              <div>
-                <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-primary)", display: "block", marginBottom: 8 }}>
-                  Select Built-in Legacy Cadastre Dataset:
-                </label>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {OLD_MAP_PRESETS.map((p) => {
-                    const isSelected = activeOldMapPresetId === p.id;
-                    return (
-                      <div
-                        key={p.id}
-                        onClick={() => {
-                          onSelectOldMapPreset(p.id);
-                          toast.success(`Active Old Map: ${p.name}`);
-                        }}
-                        style={{
-                          padding: "12px 14px",
-                          borderRadius: "var(--radius-md)",
-                          border: isSelected ? "2px solid var(--accent-primary)" : "1px solid var(--border-glass)",
-                          background: isSelected ? "var(--accent-primary-bg)" : "#FFFFFF",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          transition: "all 0.15s ease",
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <strong style={{ fontSize: "0.875rem", color: "var(--text-primary)" }}>{p.name}</strong>
-                            <span
-                              style={{
-                                fontSize: "0.7rem",
-                                fontWeight: 700,
-                                padding: "2px 6px",
-                                borderRadius: 4,
-                                background: "#FEF3C7",
-                                color: "#B45309",
-                              }}
-                            >
-                              {p.year}
-                            </span>
-                          </div>
-                          <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: 4 }}>
-                            {p.description}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#FFF", flexShrink: 0 }}>
-                            <Check size={14} />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+
 
               {/* Upload Paper Map Photo / Scan (PNG / JPG) - Simple for Revenue Officers */}
               <div
@@ -521,62 +465,7 @@ export default function MapSourceModal({
           {/* ═══════════ TAB 2: NEW MAP (DRONE / SATELLITE) ═══════════ */}
           {activeTab === "new" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div>
-                <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-primary)", display: "block", marginBottom: 8 }}>
-                  Select Drone Orthomosaic / High-Resolution Basemap:
-                </label>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {BASEMAP_PRESETS.map((b) => {
-                    const isSelected = activeBasemapId === b.id;
-                    return (
-                      <div
-                        key={b.id}
-                        onClick={() => {
-                          onSelectBasemap(b);
-                          toast.success(`Switched New Map to: ${b.name}`);
-                        }}
-                        style={{
-                          padding: "12px 14px",
-                          borderRadius: "var(--radius-md)",
-                          border: isSelected ? "2px solid var(--accent-primary)" : "1px solid var(--border-glass)",
-                          background: isSelected ? "var(--accent-primary-bg)" : "#FFFFFF",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          transition: "all 0.15s ease",
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <strong style={{ fontSize: "0.875rem", color: "var(--text-primary)" }}>{b.name}</strong>
-                            <span
-                              style={{
-                                fontSize: "0.7rem",
-                                fontWeight: 700,
-                                padding: "2px 6px",
-                                borderRadius: 4,
-                                background: b.category === "drone" ? "#CCFBF1" : b.category === "satellite" ? "#E0F2FE" : "#F1F5F9",
-                                color: b.category === "drone" ? "#0F766E" : b.category === "satellite" ? "#0369A1" : "#475569",
-                              }}
-                            >
-                              {b.badge}
-                            </span>
-                          </div>
-                          <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: 4 }}>
-                            {b.description}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#FFF", flexShrink: 0 }}>
-                            <Check size={14} />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+
 
               {/* Upload Drone Map Photo / Orthomosaic (PNG / JPG) - Simple for Revenue Officers */}
               <div
