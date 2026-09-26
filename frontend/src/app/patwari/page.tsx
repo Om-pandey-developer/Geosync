@@ -602,7 +602,6 @@ export default function PatwariPage() {
           oldMapOpacity={oldMapOpacity}
           oldMapStrokeColor={oldMapStrokeColor}
           onOpenMapSourceModal={() => setIsMapSourceModalOpen(true)}
-          toolbarOffsetLeft={isRosterOpen ? 356 : 16}
           leftSlot={
             <button
               onClick={() => setIsRosterOpen(!isRosterOpen)}
@@ -706,11 +705,11 @@ export default function PatwariPage() {
           className="glass-card animate-fade-in-up"
           style={{
             position: "absolute",
-            top: 80,
+            top: 122,
             left: 16,
             zIndex: 430,
             width: 326,
-            maxHeight: "calc(100vh - 180px)",
+            maxHeight: "calc(100vh - 230px)",
             display: "flex",
             flexDirection: "column",
             background: "rgba(255, 255, 255, 0.98)",
@@ -886,10 +885,12 @@ export default function PatwariPage() {
         className="glass-card animate-fade-in-up"
         style={{
           position: "absolute",
-          top: 80,
+          top: 122,
           right: 20,
           zIndex: 400,
           width: 350,
+          maxHeight: "calc(100vh - 230px)",
+          overflowY: "auto",
           padding: isDossierCollapsed ? "12px 18px" : "18px 20px",
           background: "rgba(255, 255, 255, 0.98)",
           borderRadius: "var(--radius-lg)",

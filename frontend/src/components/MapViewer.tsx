@@ -610,16 +610,254 @@ export default function MapViewer({
 
   return (
     <div
-      ref={containerRef}
       style={{
         position: "relative",
         width: "100%",
         height: "100%",
+        display: "flex",
+        flexDirection: "column",
         overflow: "hidden",
-        cursor: isDraggingSlider ? "ew-resize" : undefined,
       }}
     >
-      <MapContainer
+      {/* ───── Integrated GIS Studio Ribbon Bar (Fixed Top Row in Normal Flow) ───── */}
+      <div
+        style={{
+          height: 46,
+          background: "#FFFFFF",
+          borderBottom: "1.5px solid var(--border-subtle)",
+          display: "flex",
+          alignItems: "center",
+          padding: "0 14px",
+          gap: 8,
+          zIndex: 40,
+          boxShadow: "0 1px 4px rgba(15, 23, 42, 0.05)",
+          flexShrink: 0,
+          overflowX: "auto",
+        }}
+      >
+        {/* Leading Slot (e.g. Halqa Parcel Roster trigger button) */}
+        {leftSlot && (
+          <>
+            {leftSlot}
+            <div style={{ width: 1, height: 20, background: "var(--border-subtle)", flexShrink: 0 }} />
+          </>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", flexShrink: 0 }}>
+          <Layers size={16} style={{ color: "var(--accent-primary)" }} />
+          <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>Map View:</span>
+        </div>
+
+        {/* Old & New Map Layer & Source Manager Trigger */}
+        {onOpenMapSourceModal && (
+          <button
+            onClick={onOpenMapSourceModal}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "5px 12px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--accent-primary-light)",
+              background: "#F0FDFA",
+              color: "var(--accent-primary)",
+              fontSize: "0.8125rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              flexShrink: 0,
+            }}
+            title="Configure or upload Old Map (BhuNaksha/Scans) & New Map (Drone/Satellite)"
+          >
+            <Layers size={14} style={{ color: "var(--accent-primary)" }} />
+            <span>Map Layers (Old & New)</span>
+          </button>
+        )}
+
+        {/* Base Layer Switchers */}
+        <div style={{ display: "flex", gap: 6, background: "var(--bg-secondary)", padding: 3, borderRadius: "var(--radius-sm)", flexShrink: 0 }}>
+          <button
+            onClick={() => {
+              setBaseLayer("drone");
+              setIsSwipeActive(false);
+            }}
+            style={{
+              padding: "5px 12px",
+              borderRadius: "var(--radius-sm)",
+              border: !isSwipeActive && baseLayer === "drone" ? "1px solid var(--accent-primary)" : "1px solid var(--border-glass)",
+              fontSize: "0.8125rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              background: !isSwipeActive && baseLayer === "drone" ? "var(--accent-primary)" : "#FFFFFF",
+              color: !isSwipeActive && baseLayer === "drone" ? "#FFFFFF" : "var(--text-secondary)",
+              transition: "all 0.15s ease",
+            }}
+          >
+            5cm Drone
+          </button>
+          <button
+            onClick={() => {
+              setBaseLayer("minimal");
+              setIsSwipeActive(false);
+            }}
+            style={{
+              padding: "5px 12px",
+              borderRadius: "var(--radius-sm)",
+              border: !isSwipeActive && baseLayer === "minimal" ? "1px solid var(--accent-primary)" : "1px solid var(--border-glass)",
+              fontSize: "0.8125rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              background: !isSwipeActive && baseLayer === "minimal" ? "var(--accent-primary)" : "#FFFFFF",
+              color: !isSwipeActive && baseLayer === "minimal" ? "#FFFFFF" : "var(--text-secondary)",
+              transition: "all 0.15s ease",
+            }}
+          >
+            Light Cadastral
+          </button>
+        </div>
+
+        {/* Task 2.1: Split-Screen Curtain Swipe Toggle */}
+        <button
+          onClick={() => setIsSwipeActive(!isSwipeActive)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "5px 12px",
+            borderRadius: "var(--radius-sm)",
+            border: isSwipeActive ? "1px solid #0D9488" : "1px solid var(--border-glass)",
+            background: isSwipeActive ? "#CCFBF1" : "#FFFFFF",
+            color: isSwipeActive ? "#0D9488" : "var(--text-secondary)",
+            fontSize: "0.8125rem",
+            fontWeight: 700,
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+            flexShrink: 0,
+          }}
+        >
+          <SplitSquareVertical size={14} />
+          <span>{isSwipeActive ? "Swipe Mode (ON)" : "Curtain Swipe"}</span>
+        </button>
+
+        <div style={{ width: 1, height: 20, background: "var(--border-subtle)", flexShrink: 0 }} />
+
+        {/* Vectors Visibility Toggle */}
+        <button
+          onClick={() => setShowVectors(!showVectors)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "5px 12px",
+            borderRadius: "var(--radius-sm)",
+            border: "1px solid var(--border-glass)",
+            background: showVectors ? "var(--accent-primary-bg)" : "#FFFFFF",
+            color: showVectors ? "var(--accent-primary)" : "var(--text-secondary)",
+            fontSize: "0.8125rem",
+            fontWeight: 700,
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          <Eye size={14} />
+          <span>{showVectors ? "Cadastre ON" : "Cadastre OFF"}</span>
+        </button>
+
+        {/* Task 2.5: Glassmorphic Vector Opacity Slider */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 8px", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", flexShrink: 0 }}>
+          <Sliders size={13} style={{ color: "var(--text-secondary)" }} />
+          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+            Opacity: {vectorOpacity}%
+          </span>
+          <input
+            type="range"
+            min="10"
+            max="100"
+            value={vectorOpacity}
+            onChange={(e) => setVectorOpacity(Number(e.target.value))}
+            style={{
+              width: 70,
+              height: 4,
+              cursor: "pointer",
+              accentColor: "var(--accent-primary)",
+            }}
+          />
+        </div>
+
+        {/* Active Mode Badges */}
+        {enableBboxPrompt && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              background: "#CCFBF1",
+              border: "1px solid #99F6E4",
+              color: "#0D9488",
+              borderRadius: "var(--radius-sm)",
+              fontWeight: 800,
+              fontSize: "0.78rem",
+              flexShrink: 0,
+            }}
+          >
+            <Crosshair size={13} /> Click 2 corners for GeoSAM AI Bounding Box
+          </div>
+        )}
+
+        {pairedGcpMode && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              background: "#FEF3C7",
+              border: "1px solid #FDE68A",
+              color: "#92400E",
+              borderRadius: "var(--radius-sm)",
+              fontWeight: 800,
+              fontSize: "0.78rem",
+              flexShrink: 0,
+            }}
+          >
+            <Pin size={13} /> Click 1: Legacy landmark → Click 2: Drone marker
+          </div>
+        )}
+
+        {enableVertexEdit && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              background: "#E0F2FE",
+              border: "1px solid #BAE6FD",
+              color: "#0369A1",
+              borderRadius: "var(--radius-sm)",
+              fontWeight: 800,
+              fontSize: "0.78rem",
+              flexShrink: 0,
+            }}
+          >
+            <Move size={13} /> Corner Drag Mode Active (HITL)
+          </div>
+        )}
+      </div>
+
+      {/* ───── Pure Leaflet Map Canvas (Fills Remaining Height) ───── */}
+      <div
+        ref={containerRef}
+        style={{
+          position: "relative",
+          flex: 1,
+          width: "100%",
+          overflow: "hidden",
+          cursor: isDraggingSlider ? "ew-resize" : undefined,
+        }}
+      >
+        <MapContainer
         center={center}
         zoom={zoom}
         style={{ width: "100%", height: "100%" }}
@@ -910,230 +1148,6 @@ export default function MapViewer({
         </>
       )}
 
-      {/* Layer Control Bar & Tools (Tasks 2.1 & 2.5) */}
-      <div
-        className="glass-card animate-fade-in-up"
-        style={{
-          position: "absolute",
-          top: 16,
-          left: toolbarOffsetLeft ?? 16,
-          zIndex: 420,
-          padding: "6px 14px",
-          display: "flex",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 8,
-          background: "rgba(255, 255, 255, 0.98)",
-          borderRadius: "var(--radius-md)",
-          boxShadow: "0 4px 16px rgba(15, 23, 42, 0.12)",
-          border: "1.5px solid var(--border-glass)",
-          transition: "left 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-          maxWidth: "calc(100% - 32px)",
-        }}
-      >
-        {/* Leading Slot (e.g. Halqa Parcel Roster trigger button) */}
-        {leftSlot && (
-          <>
-            {leftSlot}
-            <div style={{ width: 1, height: 20, background: "var(--border-subtle)" }} />
-          </>
-        )}
-
-        <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)" }}>
-          <Layers size={16} style={{ color: "var(--accent-primary)" }} />
-          <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>Map View:</span>
-        </div>
-
-        {/* Old & New Map Layer & Source Manager Trigger */}
-        {onOpenMapSourceModal && (
-          <button
-            onClick={onOpenMapSourceModal}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "5px 12px",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--accent-primary-light)",
-              background: "#F0FDFA",
-              color: "var(--accent-primary)",
-              fontSize: "0.8125rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            title="Configure or upload Old Map (BhuNaksha/Scans) & New Map (Drone/Satellite)"
-          >
-            <Layers size={14} style={{ color: "var(--accent-primary)" }} />
-            <span>Map Layers (Old & New)</span>
-          </button>
-        )}
-
-        {/* Base Layer Switchers */}
-        <div style={{ display: "flex", gap: 6, background: "var(--bg-secondary)", padding: 3, borderRadius: "var(--radius-sm)" }}>
-          <button
-            onClick={() => {
-              setBaseLayer("drone");
-              setIsSwipeActive(false);
-            }}
-            style={{
-              padding: "5px 12px",
-              borderRadius: "var(--radius-sm)",
-              border: !isSwipeActive && baseLayer === "drone" ? "1px solid var(--accent-primary)" : "1px solid var(--border-glass)",
-              fontSize: "0.8125rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              background: !isSwipeActive && baseLayer === "drone" ? "var(--accent-primary)" : "#FFFFFF",
-              color: !isSwipeActive && baseLayer === "drone" ? "#FFFFFF" : "var(--text-secondary)",
-              transition: "all 0.15s ease",
-            }}
-          >
-            5cm Drone
-          </button>
-          <button
-            onClick={() => {
-              setBaseLayer("minimal");
-              setIsSwipeActive(false);
-            }}
-            style={{
-              padding: "5px 12px",
-              borderRadius: "var(--radius-sm)",
-              border: !isSwipeActive && baseLayer === "minimal" ? "1px solid var(--accent-primary)" : "1px solid var(--border-glass)",
-              fontSize: "0.8125rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              background: !isSwipeActive && baseLayer === "minimal" ? "var(--accent-primary)" : "#FFFFFF",
-              color: !isSwipeActive && baseLayer === "minimal" ? "#FFFFFF" : "var(--text-secondary)",
-              transition: "all 0.15s ease",
-            }}
-          >
-            Light Cadastral
-          </button>
-        </div>
-
-        {/* Task 2.1: Split-Screen Curtain Swipe Toggle */}
-        <button
-          onClick={() => setIsSwipeActive(!isSwipeActive)}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "5px 12px",
-            borderRadius: "var(--radius-sm)",
-            border: isSwipeActive ? "1px solid #0D9488" : "1px solid var(--border-glass)",
-            background: isSwipeActive ? "#CCFBF1" : "#FFFFFF",
-            color: isSwipeActive ? "#0D9488" : "var(--text-secondary)",
-            fontSize: "0.8125rem",
-            fontWeight: 700,
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-        >
-          <SplitSquareVertical size={14} />
-          {isSwipeActive ? "Swipe Mode (ON)" : "Curtain Swipe"}
-        </button>
-
-        <div style={{ width: 1, height: 20, background: "var(--border-subtle)" }} />
-
-        {/* Vectors Visibility Toggle */}
-        <button
-          onClick={() => setShowVectors(!showVectors)}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "5px 12px",
-            borderRadius: "var(--radius-sm)",
-            border: "1px solid var(--border-glass)",
-            background: showVectors ? "var(--accent-primary-bg)" : "#FFFFFF",
-            color: showVectors ? "var(--accent-primary)" : "var(--text-secondary)",
-            fontSize: "0.8125rem",
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          <Eye size={14} />
-          {showVectors ? "Cadastre ON" : "Cadastre OFF"}
-        </button>
-
-        {/* Task 2.5: Glassmorphic Vector Opacity Slider */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 8px", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)" }}>
-          <Sliders size={13} style={{ color: "var(--text-secondary)" }} />
-          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)" }}>
-            Opacity: {vectorOpacity}%
-          </span>
-          <input
-            type="range"
-            min="10"
-            max="100"
-            value={vectorOpacity}
-            onChange={(e) => setVectorOpacity(Number(e.target.value))}
-            style={{
-              width: 70,
-              height: 4,
-              cursor: "pointer",
-              accentColor: "var(--accent-primary)",
-            }}
-          />
-        </div>
-
-        {/* Active Mode Badges */}
-        {enableBboxPrompt && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "4px 10px",
-              background: "#CCFBF1",
-              border: "1px solid #99F6E4",
-              color: "#0D9488",
-              borderRadius: "var(--radius-sm)",
-              fontWeight: 800,
-              fontSize: "0.78rem",
-            }}
-          >
-            <Crosshair size={13} /> Click 2 corners for GeoSAM AI Bounding Box
-          </div>
-        )}
-
-        {pairedGcpMode && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "4px 10px",
-              background: "#FEF3C7",
-              border: "1px solid #FDE68A",
-              color: "#92400E",
-              borderRadius: "var(--radius-sm)",
-              fontWeight: 800,
-              fontSize: "0.78rem",
-            }}
-          >
-            <Pin size={13} /> Click 1: Legacy landmark → Click 2: Drone marker
-          </div>
-        )}
-
-        {enableVertexEdit && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "4px 10px",
-              background: "#E0F2FE",
-              border: "1px solid #BAE6FD",
-              color: "#0369A1",
-              borderRadius: "var(--radius-sm)",
-              fontWeight: 800,
-              fontSize: "0.78rem",
-            }}
-          >
-            <Move size={13} /> Corner Drag Mode Active (HITL)
-          </div>
-        )}
       </div>
     </div>
   );
