@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   keywords: ["GeoSync", "BhuNaksha", "ULPIN", "Bhu-Aadhaar", "SIH", "cadastral", "PostGIS"],
 };
 
+import { AuthProvider } from "@/lib/authContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,8 +33,10 @@ export default function RootLayout({
       </head>
       <body>
         <div className="bg-mesh" />
-        <TopNavbar />
-        {children}
+        <AuthProvider>
+          <TopNavbar />
+          {children}
+        </AuthProvider>
         <Toaster 
           position="bottom-right" 
           toastOptions={{

@@ -38,15 +38,27 @@ import {
   Building2,
 } from "lucide-react";
 import MapSourceModal, { BASEMAP_PRESETS, BasemapOption } from "@/components/MapSourceModal";
+import { useAuth } from "@/lib/authContext";
 
 export default function LandingPage() {
   const router = useRouter();
+  const { role: activeAuthRole, loginAs, logout } = useAuth();
   const [hoveredRole, setHoveredRole] = useState<string | null>(null);
   const [sliderPos, setSliderPos] = useState(52);
   const [isSourceModalOpen, setIsSourceModalOpen] = useState(false);
   const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(BASEMAP_PRESETS[0]);
   const [simBasemapMode, setSimBasemapMode] = useState<"drone" | "satellite" | "topo">("drone");
   const [testbedFilter, setTestbedFilter] = useState<string>("ALL");
+
+  const handleEnterPatwari = () => {
+    loginAs("patwari");
+    router.push("/patwari");
+  };
+
+  const handleEnterTehsildar = () => {
+    loginAs("tehsildar");
+    router.push("/tehsildar");
+  };
 
   const workflowSteps = [
     {
@@ -317,18 +329,20 @@ export default function LandingPage() {
           </button>
 
           <button
-            onClick={() => router.push("/patwari")}
+            onClick={handleEnterPatwari}
             className="btn-primary"
             style={{ padding: "8px 16px", fontSize: "0.8125rem" }}
+            title="Authenticate as Revenue Patwari / Field Surveyor and open GIS Studio"
           >
             <Compass size={16} />
             <span>Patwari Studio</span>
           </button>
 
           <button
-            onClick={() => router.push("/tehsildar")}
+            onClick={handleEnterTehsildar}
             className="btn-judicial"
             style={{ padding: "8px 16px", fontSize: "0.8125rem" }}
+            title="Authenticate as Revenue Magistrate and open Judicial Chamber"
           >
             <Scale size={16} style={{ color: "#FCD34D" }} />
             <span>Tehsildar Chamber</span>
@@ -960,7 +974,7 @@ export default function LandingPage() {
         >
           {/* ──────── PORTAL 1: REVENUE PATWARI (SURVEYOR GIS STUDIO) ──────── */}
           <div
-            onClick={() => router.push("/patwari")}
+            onClick={handleEnterPatwari}
             onMouseEnter={() => setHoveredRole("patwari")}
             onMouseLeave={() => setHoveredRole(null)}
             className="card-elevated-hover"
@@ -1048,7 +1062,7 @@ export default function LandingPage() {
                   gap: "10px 14px",
                   fontSize: "0.8125rem",
                   color: "var(--text-secondary)",
-                  marginBottom: 24,
+                  marginBottom: 20,
                   background: "var(--bg-secondary)",
                   padding: 18,
                   borderRadius: "var(--radius-md)",
@@ -1080,6 +1094,26 @@ export default function LandingPage() {
                   <span style={{ fontWeight: 700 }}>50-Parcel Batch Alignment</span>
                 </div>
               </div>
+
+              {/* Role-Based Clearance Status */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "rgba(13, 148, 136, 0.08)",
+                  border: "1px solid rgba(13, 148, 136, 0.2)",
+                  marginBottom: 16,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "#0F766E", fontWeight: 700 }}>
+                  <Shield size={14} />
+                  <span>Authorized Role: Revenue Patwari / Field Surveyor</span>
+                </div>
+                <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)", fontFamily: "monospace", fontWeight: 700 }}>#PAT-442</span>
+              </div>
             </div>
 
             <div
@@ -1096,14 +1130,14 @@ export default function LandingPage() {
                 boxShadow: "0 4px 14px rgba(13, 148, 136, 0.35)",
               }}
             >
-              <span>Launch Surveyor GIS Studio</span>
+              <span>Authenticate &amp; Enter Patwari Studio</span>
               <ArrowRight size={18} />
             </div>
           </div>
 
           {/* ──────── PORTAL 2: REVENUE TEHSILDAR (MAGISTRATE COURT CHAMBER) ──────── */}
           <div
-            onClick={() => router.push("/tehsildar")}
+            onClick={handleEnterTehsildar}
             onMouseEnter={() => setHoveredRole("tehsildar")}
             onMouseLeave={() => setHoveredRole(null)}
             className="card-elevated-hover"
@@ -1191,7 +1225,7 @@ export default function LandingPage() {
                   gap: "10px 14px",
                   fontSize: "0.8125rem",
                   color: "var(--text-secondary)",
-                  marginBottom: 24,
+                  marginBottom: 20,
                   background: "linear-gradient(90deg, #FEF3C7 0%, #F8FAFC 100%)",
                   padding: 18,
                   borderRadius: "var(--radius-md)",
@@ -1223,6 +1257,26 @@ export default function LandingPage() {
                   <span style={{ fontWeight: 700 }}>Statutory Land Stack Sanction</span>
                 </div>
               </div>
+
+              {/* Role-Based Clearance Status */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "rgba(30, 58, 138, 0.08)",
+                  border: "1px solid rgba(30, 58, 138, 0.2)",
+                  marginBottom: 16,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "#1E3A8A", fontWeight: 700 }}>
+                  <Scale size={14} />
+                  <span>Authorized Role: Judicial Revenue Magistrate</span>
+                </div>
+                <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)", fontFamily: "monospace", fontWeight: 700 }}>#SDM-081</span>
+              </div>
             </div>
 
             <div
@@ -1240,7 +1294,7 @@ export default function LandingPage() {
                 border: "1px solid rgba(245, 158, 11, 0.4)",
               }}
             >
-              <span>Enter Magistrate Chamber</span>
+              <span>Authenticate &amp; Enter Magistrate Chamber</span>
               <ArrowRight size={18} style={{ color: "#FCD34D" }} />
             </div>
           </div>

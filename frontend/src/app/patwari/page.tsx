@@ -35,6 +35,7 @@ import { formatAlignmentStatus } from "@/lib/statusHelper";
 
 const MapViewer = dynamic(() => import("@/components/MapViewer"), { ssr: false });
 import MapSourceModal, { BASEMAP_PRESETS, BasemapOption } from "@/components/MapSourceModal";
+import RoleGuard from "@/components/RoleGuard";
 import { API } from "@/lib/api";
 
 interface ParcelSummary {
@@ -563,8 +564,9 @@ export default function PatwariPage() {
   const deltaPercent = originalAreaSqm > 0 ? (deltaArea / originalAreaSqm) * 100 : 0;
 
   return (
-    <div style={{ width: "100vw", height: "100vh", position: "relative", overflow: "hidden" }}>
-      <h1 className="sr-only">Revenue Patwari Geospatial Harmonization Workspace</h1>
+    <RoleGuard requiredRole="patwari">
+      <div style={{ width: "100vw", height: "100vh", position: "relative", overflow: "hidden" }}>
+        <h1 className="sr-only">Revenue Patwari Geospatial Harmonization Workspace</h1>
 
       {/* Fullscreen Map Canvas below 64px Top Navbar */}
       <div style={{ width: "100%", height: "calc(100vh - 64px)", position: "absolute", top: 64, left: 0, zIndex: 10 }}>
@@ -1478,5 +1480,6 @@ export default function PatwariPage() {
         onChangeOldMapStrokeColor={setOldMapStrokeColor}
       />
     </div>
+    </RoleGuard>
   );
 }

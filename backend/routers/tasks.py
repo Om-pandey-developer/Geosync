@@ -27,7 +27,7 @@ import json
 import shutil
 from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -777,13 +777,62 @@ def seed_demo_approvals(db: Session = Depends(get_db)):
     return {"status": "success", "message": "Demo approval dockets seeded successfully."}
 
 
+@router.get("/v1/auth/verify-role", tags=["Governance & Validation"])
+def verify_role_clearance(role: str, x_officer_role: Optional[str] = Header(None)):
+    """
+    Verifies RBAC clearance for statutory role separation between Patwari and Tehsildar.
+    Enforces that field surveyors cannot act as magistrates and magistrates cannot alter raw field vectors.
+    """
+    role_norm = role.strip().lower()
+    if role_norm not in ["patwari", "tehsildar"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid role '{role}'. Permitted statutory roles: 'patwari', 'tehsildar'"
+        )
+
+    if x_officer_role and x_officer_role.strip().lower() != role_norm:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Statutory Access Violation: Active officer header indicates '{x_officer_role}', but requested role is '{role}'."
+        )
+
+    if role_norm == "patwari":
+        return {
+            "authorized": True,
+            "role": "patwari",
+            "name": "Ramesh Kumar Sharma",
+            "officer_id": "PAT-UP-LKO-442",
+            "designation": "Halqa Patwari (Lekhpal)",
+            "jurisdiction": "Halqa Mohanlalganj-12",
+            "statutory_act": "UP Revenue Code 2006, Sec 16 (Lekhpal / Patwari Duties)",
+            "clearance_level": "Level-1 Field Surveyor & Vertex Calibration Authority",
+        }
+    else:
+        return {
+            "authorized": True,
+            "role": "tehsildar",
+            "name": "Smt. Priya Sharma, PCS",
+            "officer_id": "SDM-UP-LKO-081",
+            "designation": "Sub-Divisional Magistrate & Tehsildar",
+            "jurisdiction": "Revenue Court Mohanlalganj, Lucknow",
+            "statutory_act": "UP Revenue Code 2006, Sec 24 & Sec 144 (Judicial Adjudication & Survey Decrees)",
+            "clearance_level": "Level-3 Judicial e-Sign & Form-II Statutory Decree Authority",
+        }
+
+
 @router.post("/approvals/{approval_id}/action", tags=["Approvals"])
 def take_approval_action(
     approval_id: str,
     action_data: ApprovalAction,
+    x_officer_role: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     """Tehsildar approves, rejects, or requests revision on a parcel."""
+    if x_officer_role and x_officer_role.strip().lower() == "patwari":
+        raise HTTPException(
+            status_code=403,
+            detail="Statutory Authority Violation: Field Patwaris are legally prohibited from approving judicial dockets under Section 144 of the Land Revenue Code."
+        )
     try:
         return process_approval_action(
             db=db,

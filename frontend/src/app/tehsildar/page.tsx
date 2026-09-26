@@ -24,6 +24,7 @@ import type { FeatureCollection } from "geojson";
 
 const MapViewer = dynamic(() => import("@/components/MapViewer"), { ssr: false });
 import MapSourceModal, { BASEMAP_PRESETS, BasemapOption } from "@/components/MapSourceModal";
+import RoleGuard from "@/components/RoleGuard";
 import { API } from "@/lib/api";
 import { generateFormIIPdf } from "@/lib/pdfGenerator";
 import { formatAlignmentStatus } from "@/lib/statusHelper";
@@ -279,7 +280,8 @@ export default function TehsildarPage() {
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", paddingTop: 64, overflow: "hidden" }}>
+    <RoleGuard requiredRole="tehsildar">
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh", paddingTop: 64, overflow: "hidden" }}>
       <main style={{ flex: 1, padding: "20px 24px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         
         {/* ───── Header Bar ───── */}
@@ -910,5 +912,6 @@ export default function TehsildarPage() {
         onChangeOldMapStrokeColor={setOldMapStrokeColor}
       />
     </div>
+    </RoleGuard>
   );
 }

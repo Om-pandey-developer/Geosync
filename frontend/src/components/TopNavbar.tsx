@@ -15,13 +15,16 @@ import {
   ChevronRight,
   ArrowRight,
   ExternalLink,
+  LogOut,
 } from "lucide-react";
 import OnboardingTour from "@/components/OnboardingTour";
 import RegistrationModal from "@/components/RegistrationModal";
+import { useAuth } from "@/lib/authContext";
 
 export default function TopNavbar() {
   const router = useRouter();
   const pathname = usePathname();
+  const { role, officer, logout } = useAuth();
   const [tourOpen, setTourOpen] = useState(false);
   const [regModalOpen, setRegModalOpen] = useState(false);
 
@@ -254,44 +257,69 @@ export default function TopNavbar() {
 
           <div style={{ width: 1, height: 26, background: "var(--border-subtle)", margin: "0 4px" }} />
 
-          {/* ═══════════ EXPLICIT ROLE PORTAL SWITCH BUTTON ═══════════ */}
-          {isPatwari && (
-            <button
-              onClick={() => router.push("/tehsildar")}
-              className="btn-judicial"
+          {/* ═══════════ AUTHENTICATED OFFICER CLEARANCE & SIGN OUT ═══════════ */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div
               style={{
-                padding: "7px 14px",
-                fontSize: "0.8125rem",
-                display: "inline-flex",
+                display: "flex",
                 alignItems: "center",
                 gap: 8,
+                padding: "4px 10px",
+                borderRadius: "var(--radius-md)",
+                background: isTehsildar ? "rgba(30, 58, 138, 0.08)" : "rgba(13, 148, 136, 0.08)",
+                border: isTehsildar ? "1px solid rgba(30, 58, 138, 0.25)" : "1px solid rgba(13, 148, 136, 0.25)",
               }}
-              title="Switch to Magistrate Judicial Chamber to adjudicate disputes and sign Form-II"
             >
-              <Scale size={15} style={{ color: "#FCD34D" }} />
-              <span>Enter Magistrate Chamber</span>
-              <ArrowRight size={14} style={{ color: "#FCD34D" }} />
-            </button>
-          )}
+              <div
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: isTehsildar ? "#1E3A8A" : "#0D9488",
+                  boxShadow: `0 0 6px ${isTehsildar ? "#1E3A8A" : "#0D9488"}`,
+                }}
+              />
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+                <span
+                  style={{
+                    fontSize: "0.625rem",
+                    fontWeight: 800,
+                    color: isTehsildar ? "#1E3A8A" : "#0F766E",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {isTehsildar ? "⚖️ Magistrate Clearance" : "🛡️ Patwari Clearance"}
+                </span>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                  {officer?.name || (isTehsildar ? "Smt. Priya Sharma, PCS" : "Ramesh Kumar Sharma")}
+                </span>
+              </div>
+            </div>
 
-          {isTehsildar && (
             <button
-              onClick={() => router.push("/patwari")}
-              className="btn-primary"
+              onClick={() => {
+                logout();
+                router.push("/");
+              }}
+              className="btn-ghost"
               style={{
-                padding: "7px 14px",
+                padding: "6px 10px",
                 fontSize: "0.8125rem",
+                color: "#DC2626",
+                borderColor: "rgba(220, 38, 38, 0.25)",
+                background: "#FEF2F2",
+                fontWeight: 600,
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 8,
+                gap: 6,
               }}
-              title="Switch to Field Surveyor GIS Studio to place GCPs and run GeoSAM AI"
+              title="Terminate officer statutory session and exit to National Gateway"
             >
-              <CompassIcon size={15} />
-              <span>Enter Surveyor GIS Studio</span>
-              <ArrowRight size={14} />
+              <LogOut size={13} style={{ color: "#DC2626" }} />
+              <span>Sign Out</span>
             </button>
-          )}
+          </div>
         </div>
       </header>
 
