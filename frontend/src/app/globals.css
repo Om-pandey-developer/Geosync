@@ -1,57 +1,75 @@
 @import "tailwindcss";
 
-/* ───────────────── Luminous Bright Pastel Design System ───────────────── */
+/* ─────────────────────────────────────────────────────────────────────────
+   GeoSync Professional Cadastral Design System
+   Conforming to: DILRMP 3.0, NAKSHA Pilot & National Land Stack Standards
+   Aesthetic: Authoritative Government GIS • Luminous Glass • High Contrast
+   ───────────────────────────────────────────────────────────────────────── */
+
 :root {
-  /* Clean, Luminous Surfaces (High Legibility over Satellite Imagery) */
-  --bg-primary: #F8FAFC;
-  --bg-secondary: #F1F5F9;
-  --bg-card: rgba(255, 255, 255, 0.95);
+  /* Core Foundation Surfaces */
+  --bg-primary: #F8FAFC;              /* Light Executive Slate Canvas */
+  --bg-secondary: #F1F5F9;            /* Subdued Slate Tint */
+  --bg-tertiary: #E2E8F0;             /* Border/Dividers Tint */
+  --bg-card: rgba(255, 255, 255, 0.96);
   --bg-card-hover: #FFFFFF;
-  --bg-glass: rgba(255, 255, 255, 0.92);
+  --bg-glass: rgba(255, 255, 255, 0.90);
   --bg-glass-strong: rgba(255, 255, 255, 0.98);
+  --bg-dark-header: #0B132B;          /* Imperial Deep Navy for Executive Bars */
+  --bg-dark-card: #1C2541;
 
-  /* Vibrant, Cheerful Pastel Palette (Khile Khile Fresh Colors) */
-  --accent-primary: #0D9488;          /* Vibrant Deep Mint/Teal (AAA Accessible) */
-  --accent-primary-light: #2DD4BF;    /* Radiant Mint Glow */
+  /* Executive Brand Colors */
+  --accent-primary: #0D9488;          /* Precision Mint/Teal (Field GIS & Drone) */
+  --accent-primary-hover: #0F766E;
+  --accent-primary-light: #2DD4BF;
   --accent-primary-bg: #CCFBF1;       /* Soft Bright Mint Background */
-  
-  --accent-sky: #0284C7;              /* Lively Sky Blue */
-  --accent-sky-light: #38BDF8;        /* Fresh Sky Glow */
-  --accent-sky-bg: #E0F2FE;           /* Bright Sky Tint */
 
-  --accent-mint: #059669;             /* Fresh Emerald Mint (Published / Approved) */
-  --accent-mint-bg: #D1FAE5;          /* Bright Spring Green Tint */
+  --accent-gold: #D97706;             /* Heritage Cadastral Gold (Old Cloth Map / Judicial) */
+  --accent-gold-hover: #B45309;
+  --accent-gold-bg: #FEF3C7;          /* Soft Antique Parchment Gold */
 
-  --accent-sun: #D97706;              /* Warm Amber Sunshine (Pending / Warnings) */
-  --accent-sun-bg: #FEF3C7;           /* Bright Sunlight Tint */
+  --accent-judicial: #1E3A8A;         /* Royal Magistrate Navy (Tehsildar Chamber) */
+  --accent-judicial-light: #3B82F6;
+  --accent-judicial-bg: #EFF6FF;
 
-  --accent-coral: #E11D48;            /* Vibrant Coral Rose (Disputes / Rejections) */
-  --accent-coral-bg: #FFE4E6;         /* Soft Bright Rose Tint */
+  --accent-sky: #0284C7;              /* Metric Sky Blue (HITL Drag Handles & Radiometry) */
+  --accent-sky-bg: #E0F2FE;
 
-  --accent-lavender: #7C3AED;        /* Radiant Lavender Purple (GeoSAM AI) */
-  --accent-lavender-bg: #F3E8FF;      /* Bright Violet Tint */
+  --accent-mint: #059669;             /* Emerald Green (Approved / Bhu-Aadhaar Assigned) */
+  --accent-mint-bg: #D1FAE5;
 
-  /* Crystal-Clear Text Hierarchy (WCAG AAA Contrast > 7:1) */
-  --text-primary: #0F172A;            /* Deep Navy Slate (100% Crisp) */
-  --text-secondary: #334155;          /* Crisp Slate Gray */
-  --text-muted: #64748B;              /* Medium Slate */
+  --accent-coral: #E11D48;            /* High-Contrast Crimson (Disputes & Occlusions) */
+  --accent-coral-bg: #FFE4E6;
 
-  /* Clean Crisp Borders & Dividers */
+  --accent-lavender: #7C3AED;         /* Deep Violet (GeoSAM ViT-H Model Inference) */
+  --accent-lavender-bg: #F3E8FF;
+
+  /* Crisp Typography Hierarchy (WCAG AAA Contrast > 7:1) */
+  --text-primary: #0F172A;            /* 100% Crisp Deep Slate */
+  --text-secondary: #334155;          /* Executive Slate */
+  --text-muted: #64748B;              /* Helper & Meta Text */
+  --text-inverse: #FFFFFF;            /* Header White */
+
+  /* Borders & Glass Rings */
   --border-subtle: #E2E8F0;
   --border-glass: #CBD5E1;
-  --border-accent: #2DD4BF;
+  --border-focus: #0D9488;
+  --border-gold: #FCD34D;
 
   /* Ambient Layered Shadows */
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
-  --shadow-elevated: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
+  --shadow-elevated: 0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.06);
+  --shadow-glow-teal: 0 0 20px rgba(13, 148, 136, 0.25);
+  --shadow-glow-gold: 0 0 20px rgba(217, 119, 6, 0.25);
 
-  /* Unified Strict Radii (Exactly 3 System Tokens to resolve consistency) */
-  --radius-sm: 6px;                  /* Badges, micro-tags, small inputs */
-  --radius-md: 10px;                 /* Buttons, inputs, segmented controls */
-  --radius-lg: 16px;                 /* Panels, cards, modals, drawers */
+  /* Unified Strict Radii */
+  --radius-sm: 6px;                  /* Badges, tags, micro-controls */
+  --radius-md: 10px;                 /* Buttons, search inputs, toolbars */
+  --radius-lg: 16px;                 /* Panels, cards, modals, dossiers */
 }
 
-/* ───────────────── Global Reset & Base ───────────────── */
+/* ───────────────── Global Reset & Clean Base ───────────────── */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -63,12 +81,72 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ───────────────── Geospatial Ambient Topographic Mesh & Grid Background ───────────────── */
+.bg-mesh {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: #F8FAFC;
+  background-image:
+    /* Layer 1: High-Precision Topographic Elevation Contours & Geodetic Crosshairs */
+    url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%27800%27%20height%3D%27800%27%20viewBox%3D%270%200%20800%20800%27%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3Cpattern%20id%3D%27cadastral_grid%27%20width%3D%2748%27%20height%3D%2748%27%20patternUnits%3D%27userSpaceOnUse%27%3E%0A%20%20%20%20%20%20%3Cpath%20d%3D%27M%2048%200%20L%200%200%200%2048%27%20fill%3D%27none%27%20stroke%3D%27rgba%2815%2C%2023%2C%2042%2C%200.04%29%27%20stroke-width%3D%271%27/%3E%0A%20%20%20%20%20%20%3Cpath%20d%3D%27M%2024%2021%20L%2024%2027%20M%2021%2024%20L%2027%2024%27%20fill%3D%27none%27%20stroke%3D%27rgba%2813%2C%20148%2C%20136%2C%200.22%29%27%20stroke-width%3D%271.2%27/%3E%0A%20%20%20%20%3C/pattern%3E%0A%20%20%3C/defs%3E%0A%20%20%3Crect%20width%3D%27100%25%27%20height%3D%27100%25%27%20fill%3D%27url%28%23cadastral_grid%29%27/%3E%0A%20%20%3Cpath%20d%3D%27M0%2C120%20Q180%2C60%20380%2C130%20T800%2C110%20M0%2C230%20Q210%2C160%20410%2C240%20T800%2C220%20M0%2C340%20Q170%2C270%20370%2C350%20T800%2C330%20M0%2C450%20Q200%2C380%20420%2C460%20T800%2C440%20M0%2C560%20Q180%2C500%20390%2C580%20T800%2C550%20M0%2C670%20Q210%2C610%20430%2C690%20T800%2C660%20M0%2C780%20Q190%2C730%20400%2C800%20T800%2C770%27%20fill%3D%27none%27%20stroke%3D%27rgba%2813%2C%20148%2C%20136%2C%200.09%29%27%20stroke-width%3D%271.2%27/%3E%0A%20%20%3Cpath%20d%3D%27M0%2C175%20Q240%2C115%20450%2C185%20T800%2C165%20M0%2C285%20Q160%2C215%20360%2C295%20T800%2C275%20M0%2C395%20Q230%2C325%20440%2C405%20T800%2C385%20M0%2C505%20Q170%2C445%20380%2C515%20T800%2C495%20M0%2C615%20Q220%2C555%20420%2C625%20T800%2C605%20M0%2C725%20Q180%2C665%20390%2C735%20T800%2C715%27%20fill%3D%27none%27%20stroke%3D%27rgba%282%2C%20132%2C%20199%2C%200.07%29%27%20stroke-width%3D%271%27%20stroke-dasharray%3D%276%2C4%27/%3E%0A%3C/svg%3E"),
+    /* Layer 2: Radiant Multi-Spectral Radial Orbs with Soft Ambient Elevation */
+    radial-gradient(circle 950px at 5% 5%, rgba(13, 148, 136, 0.14), transparent 70%),
+    radial-gradient(circle 900px at 95% 10%, rgba(2, 132, 199, 0.12), transparent 70%),
+    radial-gradient(circle 800px at 50% 95%, rgba(217, 119, 6, 0.09), transparent 70%),
+    radial-gradient(circle 700px at 85% 85%, rgba(124, 58, 237, 0.07), transparent 70%);
+  background-size: 800px 800px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  animation: topoBreathe 20s ease-in-out infinite alternate;
+}
+
+@keyframes topoBreathe {
+  0% {
+    background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+  }
+  100% {
+    background-position: 20px 20px, 0 0, 0 0, 0 0, 0 0;
+  }
+}
+
+/* Subtle Cadastral Floating Accent */
+@keyframes subtleFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-float {
+  animation: subtleFloat 4s ease-in-out infinite;
+}
+
+.gradient-text-teal {
+  background: linear-gradient(135deg, #0F172A 20%, #0D9488 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-gold {
+  background: linear-gradient(135deg, #0F172A 20%, #D97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-judicial {
+  background: linear-gradient(135deg, #0F172A 20%, #1E3A8A 70%, #D97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Suppress Next.js dev server compilation badge from obstructing UI controls */
@@ -79,14 +157,31 @@ nextjs-portal, #__next-build-watcher {
 /* Refined Leaflet attribution badge to prevent screen overflow */
 .leaflet-control-attribution {
   font-size: 10px !important;
-  background: rgba(255, 255, 255, 0.85) !important;
+  background: rgba(255, 255, 255, 0.90) !important;
   backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
   border-radius: 6px !important;
   padding: 3px 8px !important;
   margin: 6px 8px !important;
   border: 1px solid rgba(226, 232, 240, 0.8) !important;
   color: #64748B !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Custom Scrollbar for GIS panels */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }
 
 /* ───────────────── Glassmorphism & Panel Utilities ───────────────── */
@@ -102,7 +197,7 @@ nextjs-portal, #__next-build-watcher {
 
 .glass-card:hover {
   background: var(--bg-card-hover);
-  border-color: var(--accent-primary-light);
+  border-color: #94A3B8;
   box-shadow: var(--shadow-elevated);
 }
 
@@ -122,38 +217,39 @@ nextjs-portal, #__next-build-watcher {
   box-shadow: var(--shadow-elevated);
 }
 
-/* ───────────────── Unified Button System (Exactly 3 Standard Styles) ───────────────── */
+/* ───────────────── Unified Button System ───────────────── */
 
-/* 1. Primary Action Button */
+/* 1. Primary Action Button (Gradient High-Contrast) */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: var(--accent-primary);
+  background: linear-gradient(135deg, #0D9488 0%, #0F766E 100%);
   color: #FFFFFF !important;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.875rem; /* 14px */
   padding: 8px 16px;
   border-radius: var(--radius-md);
-  border: 1px solid transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
   transition: all 0.15s ease;
-  box-shadow: 0 2px 4px rgba(13, 148, 136, 0.2);
+  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.25);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #0f766e;
+  background: linear-gradient(135deg, #0F766E 0%, #115E59 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.35);
 }
 
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
-/* 2. Secondary Outline / White Button */
+/* 2. Secondary Outline / Crisp White Button */
 .btn-secondary {
   display: inline-flex;
   align-items: center;
@@ -168,16 +264,42 @@ nextjs-portal, #__next-build-watcher {
   border: 1px solid var(--border-glass);
   cursor: pointer;
   transition: all 0.15s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .btn-secondary:hover:not(:disabled) {
   background: var(--bg-secondary);
   border-color: var(--accent-primary);
   color: var(--accent-primary) !important;
+  transform: translateY(-1px);
 }
 
-/* 3. Ghost / Subtle Icon Button */
+/* 3. Judicial Magistrate Button (Gold/Navy Authority) */
+.btn-judicial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%);
+  color: #FFFFFF !important;
+  font-weight: 700;
+  font-size: 0.875rem;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(30, 58, 138, 0.25);
+}
+
+.btn-judicial:hover:not(:disabled) {
+  background: linear-gradient(135deg, #172554 0%, #0B132B 100%);
+  border-color: #F59E0B;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(30, 58, 138, 0.35);
+}
+
+/* 4. Ghost / Subtle Icon Button */
 .btn-ghost {
   display: inline-flex;
   align-items: center;
@@ -186,7 +308,7 @@ nextjs-portal, #__next-build-watcher {
   background: transparent;
   color: var(--text-secondary) !important;
   font-weight: 600;
-  font-size: 0.875rem; /* 14px */
+  font-size: 0.875rem;
   padding: 6px 12px;
   border-radius: var(--radius-md);
   border: 1px solid transparent;
@@ -199,7 +321,99 @@ nextjs-portal, #__next-build-watcher {
   color: var(--text-primary) !important;
 }
 
-/* ───────────────── Cheerful Pastel Badges ───────────────── */
+/* Button Compatibility Aliases */
+.btn-pastel-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #0D9488 0%, #0F766E 100%);
+  color: #FFFFFF !important;
+  font-weight: 700;
+  font-size: 0.875rem;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.25);
+}
+
+.btn-pastel-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0F766E 0%, #115E59 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.35);
+}
+
+.btn-pastel-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #FFFFFF;
+  color: var(--text-primary) !important;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.btn-pastel-secondary:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary) !important;
+  transform: translateY(-1px);
+}
+
+/* ───────────────── Global High-Legibility Input & Form Controls ───────────────── */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="tel"],
+select,
+textarea {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border: 1.5px solid #CBD5E1 !important;
+  border-radius: var(--radius-md) !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+}
+
+input[type="text"]::placeholder,
+input[type="number"]::placeholder,
+input[type="email"]::placeholder,
+input[type="tel"]::placeholder,
+textarea::placeholder {
+  color: #94A3B8 !important;
+  opacity: 1 !important;
+  font-weight: 400 !important;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+input[type="tel"]:focus,
+select:focus,
+textarea:focus {
+  border-color: #0D9488 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18) !important;
+  background-color: #FFFFFF !important;
+}
+
+select option {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  font-weight: 600 !important;
+}
+
+/* ───────────────── Official Institutional Badges ───────────────── */
 .badge-pastel-teal {
   display: inline-flex;
   align-items: center;
@@ -211,6 +425,21 @@ nextjs-portal, #__next-build-watcher {
   border-radius: var(--radius-sm);
   font-size: 0.8125rem; /* 13px */
   font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.badge-pastel-gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-gold-bg);
+  color: var(--accent-gold);
+  border: 1px solid #FDE68A;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .badge-pastel-mint {
@@ -222,7 +451,7 @@ nextjs-portal, #__next-build-watcher {
   border: 1px solid #A7F3D0;
   padding: 4px 10px;
   border-radius: var(--radius-sm);
-  font-size: 0.8125rem; /* 13px */
+  font-size: 0.8125rem;
   font-weight: 700;
 }
 
@@ -230,12 +459,12 @@ nextjs-portal, #__next-build-watcher {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--accent-sun-bg);
-  color: var(--accent-sun);
+  background: var(--accent-sun-bg, #FEF3C7);
+  color: var(--accent-gold);
   border: 1px solid #FDE68A;
   padding: 4px 10px;
   border-radius: var(--radius-sm);
-  font-size: 0.8125rem; /* 13px */
+  font-size: 0.8125rem;
   font-weight: 700;
 }
 
@@ -248,7 +477,20 @@ nextjs-portal, #__next-build-watcher {
   border: 1px solid #FECDD3;
   padding: 4px 10px;
   border-radius: var(--radius-sm);
-  font-size: 0.8125rem; /* 13px */
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.badge-pastel-judicial {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-judicial-bg);
+  color: var(--accent-judicial);
+  border: 1px solid #BFDBFE;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
   font-weight: 700;
 }
 
@@ -265,16 +507,29 @@ nextjs-portal, #__next-build-watcher {
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(13, 148, 136, 0);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s infinite;
 }
 
 /* ───────────────── Leaflet Custom Popups & Stacking ───────────────── */
 .custom-bright-popup .leaflet-popup-content-wrapper {
   background: rgba(255, 255, 255, 0.98) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
   border-radius: var(--radius-md) !important;
-  box-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.22), 0 4px 10px -2px rgba(15, 23, 42, 0.1) !important;
+  box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.25), 0 6px 14px -2px rgba(15, 23, 42, 0.12) !important;
   border: 1px solid var(--border-glass) !important;
   padding: 4px 6px !important;
 }
@@ -286,4 +541,60 @@ nextjs-portal, #__next-build-watcher {
 
 .leaflet-popup {
   z-index: 500 !important;
-}
+}
+
+/* ───────────────── Enhanced GIS Cards & Interactive Utilities ───────────────── */
+.card-elevated-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-elevated-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 35px -5px rgba(15, 23, 42, 0.12), 0 10px 15px -5px rgba(15, 23, 42, 0.06);
+}
+
+.stats-counter-card {
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-glass);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+.stats-counter-card:hover {
+  background: #FFFFFF;
+  border-color: #94A3B8;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.badge-live-pulse {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pulsing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulseGlow 1.8s infinite;
+}
+
+.badge-tech {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--text-secondary);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+}

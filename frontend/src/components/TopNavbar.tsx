@@ -7,6 +7,14 @@ import {
   Compass,
   UserCheck,
   Layers,
+  Scale,
+  Compass as CompassIcon,
+  Shield,
+  FileCheck2,
+  Lock,
+  ChevronRight,
+  ArrowRight,
+  ExternalLink,
 } from "lucide-react";
 import OnboardingTour from "@/components/OnboardingTour";
 import RegistrationModal from "@/components/RegistrationModal";
@@ -22,29 +30,40 @@ export default function TopNavbar() {
   const isPatwari = pathname.includes("patwari");
   const isTehsildar = pathname.includes("tehsildar");
 
+  const handleOpenMapSource = () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("open-map-source-modal"));
+    }
+  };
+
   return (
     <>
       <header
         style={{
-          height: 64,
+          height: 68,
           width: "100%",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 24px",
-          borderBottom: "1px solid var(--border-subtle)",
-          background: "var(--bg-glass-strong)",
+          borderBottom: isTehsildar ? "1.5px solid #1E3A8A30" : "1px solid var(--border-subtle)",
+          background: isTehsildar
+            ? "linear-gradient(90deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 249, 255, 0.96) 100%)"
+            : "var(--bg-glass-strong)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           position: "fixed",
           top: 0,
           left: 0,
           zIndex: 1000,
-          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
+          boxShadow: isTehsildar
+            ? "0 4px 20px -2px rgba(30, 58, 138, 0.08)"
+            : "0 1px 4px 0 rgba(0, 0, 0, 0.05)",
         }}
       >
-        {/* Left: Brand & National Context */}
+        {/* ═══════════ LEFT: IDENTITY & JURISDICTION ═══════════ */}
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          {/* Logo / Home trigger */}
           <button
             onClick={() => router.push("/")}
             style={{
@@ -54,132 +73,225 @@ export default function TopNavbar() {
               cursor: "pointer",
               background: "none",
               border: "none",
+              padding: 0,
             }}
+            title="Return to National Land Governance Gateway"
             aria-label="GeoSync Home"
           >
             <div
               style={{
-                width: 36,
-                height: 36,
+                width: 38,
+                height: 38,
                 borderRadius: "var(--radius-md)",
-                background: "var(--accent-primary-bg)",
-                border: "1px solid var(--accent-primary-light)",
+                background: isTehsildar
+                  ? "linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%)"
+                  : "linear-gradient(135deg, #0D9488 0%, #0F766E 100%)",
+                border: isTehsildar ? "1.5px solid #F59E0B" : "1.5px solid #99F6E4",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "var(--accent-primary)",
+                color: "#FFFFFF",
+                boxShadow: isTehsildar
+                  ? "0 2px 8px rgba(30, 58, 138, 0.3)"
+                  : "0 2px 8px rgba(13, 148, 136, 0.3)",
               }}
             >
-              <Globe2 size={20} />
+              {isTehsildar ? <Scale size={20} /> : <Globe2 size={20} />}
             </div>
-            <span
-              style={{
-                fontSize: "1.25rem",
-                fontWeight: 800,
-                color: "var(--text-primary)",
-                letterSpacing: "-0.02em",
-              }}
-            >
-              GeoSync
-            </span>
+
+            <div style={{ textAlign: "left" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    fontSize: "1.2rem",
+                    fontWeight: 900,
+                    color: "var(--text-primary)",
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  GeoSync
+                </span>
+                <span
+                  style={{
+                    fontSize: "0.6875rem",
+                    fontWeight: 800,
+                    padding: "1px 6px",
+                    borderRadius: 4,
+                    background: isTehsildar ? "#EFF6FF" : "var(--accent-primary-bg)",
+                    color: isTehsildar ? "#1E3A8A" : "var(--accent-primary)",
+                    border: isTehsildar ? "1px solid #BFDBFE" : "1px solid #99F6E4",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {isTehsildar ? "Judicial" : "Field GIS"}
+                </span>
+              </div>
+              <div
+                style={{
+                  fontSize: "0.72rem",
+                  color: "var(--text-muted)",
+                  fontWeight: 600,
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                DILRMP 3.0 • NAKSHA Pilot
+              </div>
+            </div>
           </button>
 
-          <div
-            className="badge-pastel-teal"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "6px 14px",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "0.875rem", /* Fixed Issue 3: 14px body text */
-              fontWeight: 600,
-            }}
-          >
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "var(--accent-primary)",
-                boxShadow: "0 0 8px var(--accent-primary)",
-              }}
-            />
-            <span>DILRMP 3.0 / NAKSHA Pilot &mdash; Ward 12 Lucknow</span>
-          </div>
+          <div style={{ width: 1, height: 28, background: "var(--border-subtle)" }} />
+
+          {/* DEDICATED ROLE TITLE & IDENTITY */}
+          {isPatwari && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--accent-primary-bg)",
+                  border: "1px solid #99F6E4",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: "#0D9488",
+                    animation: "pulseGlow 2s infinite",
+                  }}
+                />
+                <div>
+                  <div style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#0F766E" }}>
+                    Surveyor GIS Studio • Halqa Mohanlalganj-12
+                  </div>
+                  <div style={{ fontSize: "0.6875rem", color: "#0D9488", fontWeight: 600 }}>
+                    Lekhpal: Ramesh Kumar • RTK GPS Locked (±1.4cm)
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isTehsildar && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "linear-gradient(90deg, #FEF3C7 0%, #FFFBEB 100%)",
+                  border: "1px solid #FCD34D",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: "#D97706",
+                    boxShadow: "0 0 6px #F59E0B",
+                  }}
+                />
+                <div>
+                  <div style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#92400E" }}>
+                    Revenue Magistrate Adjudication Chamber
+                  </div>
+                  <div style={{ fontSize: "0.6875rem", color: "#B45309", fontWeight: 600 }}>
+                    Bench: Smt. Priya Sharma, PCS (Assistant Collector) • e-Sign DSC Level-3
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Right: Consolidated Action Cluster */}
+        {/* ═══════════ RIGHT: DEDICATED TOOL CLUSTER & PORTAL SWITCH ═══════════ */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {/* Quick Onboarding Tour Button */}
+          {/* Universal Map Layers Modal Trigger */}
+          <button
+            onClick={handleOpenMapSource}
+            className="btn-secondary"
+            style={{
+              padding: "6px 12px",
+              fontSize: "0.8125rem",
+              fontWeight: 700,
+              background: "#FFFFFF",
+              borderColor: "var(--border-glass)",
+            }}
+            title="Configure or upload Old Map (BhuNaksha/Scans) & New Map (Drone/Satellite)"
+          >
+            <Layers size={15} style={{ color: "var(--accent-primary)" }} />
+            <span>Map Layers (Old & New)</span>
+          </button>
+
+          {/* Quick Onboarding Tour */}
           <button
             onClick={() => setTourOpen(true)}
-            className="btn-secondary"
+            className="btn-ghost"
+            style={{ padding: "6px 10px", fontSize: "0.8125rem" }}
             title="Start Guided System Tour"
           >
-            <Compass size={16} style={{ color: "var(--accent-primary)" }} /> Quick Tour
+            <Compass size={15} style={{ color: "var(--accent-primary)" }} />
+            <span>Tour</span>
           </button>
 
-          {/* Strict Officer KYC / Parcel Registration */}
+          {/* Officer KYC / Parcel Registration */}
           <button
             onClick={() => setRegModalOpen(true)}
-            className="btn-secondary"
+            className="btn-ghost"
+            style={{ padding: "6px 10px", fontSize: "0.8125rem" }}
             title="Verify Officer / Add Parcel"
           >
-            <UserCheck size={16} style={{ color: "var(--accent-primary)" }} /> Verify / Register
+            <UserCheck size={15} style={{ color: "var(--accent-primary)" }} />
+            <span>Verify</span>
           </button>
 
-          <div style={{ width: 1, height: 24, background: "var(--border-subtle)", margin: "0 2px" }} />
+          <div style={{ width: 1, height: 26, background: "var(--border-subtle)", margin: "0 4px" }} />
 
-          {/* Role Segmented Control */}
-          <div
-            role="group"
-            aria-label="Workspace Role Switcher"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              background: "var(--bg-secondary)",
-              borderRadius: "var(--radius-md)",
-              padding: 3,
-              border: "1px solid var(--border-subtle)",
-              gap: 2,
-            }}
-          >
-            <button
-              onClick={() => router.push("/patwari")}
-              style={{
-                padding: "6px 12px",
-                fontSize: "0.8125rem",
-                fontWeight: 600,
-                borderRadius: "var(--radius-sm)",
-                background: isPatwari ? "#FFFFFF" : "transparent",
-                color: isPatwari ? "var(--accent-primary)" : "var(--text-secondary)",
-                border: isPatwari ? "1px solid var(--border-subtle)" : "1px solid transparent",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-                boxShadow: isPatwari ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
-              }}
-            >
-              Patwari (Surveyor)
-            </button>
+          {/* ═══════════ EXPLICIT ROLE PORTAL SWITCH BUTTON ═══════════ */}
+          {isPatwari && (
             <button
               onClick={() => router.push("/tehsildar")}
+              className="btn-judicial"
               style={{
-                padding: "6px 12px",
+                padding: "7px 14px",
                 fontSize: "0.8125rem",
-                fontWeight: 600,
-                borderRadius: "var(--radius-sm)",
-                background: isTehsildar ? "#FFFFFF" : "transparent",
-                color: isTehsildar ? "var(--accent-primary)" : "var(--text-secondary)",
-                border: isTehsildar ? "1px solid var(--border-subtle)" : "1px solid transparent",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-                boxShadow: isTehsildar ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
               }}
+              title="Switch to Magistrate Judicial Chamber to adjudicate disputes and sign Form-II"
             >
-              Tehsildar (Magistrate)
+              <Scale size={15} style={{ color: "#FCD34D" }} />
+              <span>Enter Magistrate Chamber</span>
+              <ArrowRight size={14} style={{ color: "#FCD34D" }} />
             </button>
-          </div>
+          )}
+
+          {isTehsildar && (
+            <button
+              onClick={() => router.push("/patwari")}
+              className="btn-primary"
+              style={{
+                padding: "7px 14px",
+                fontSize: "0.8125rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+              title="Switch to Field Surveyor GIS Studio to place GCPs and run GeoSAM AI"
+            >
+              <CompassIcon size={15} />
+              <span>Enter Surveyor GIS Studio</span>
+              <ArrowRight size={14} />
+            </button>
+          )}
         </div>
       </header>
 

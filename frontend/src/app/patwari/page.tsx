@@ -25,11 +25,15 @@ import {
   Check,
   ArrowRightLeft,
   SplitSquareVertical,
+  Building2,
+  Search,
 } from "lucide-react";
 import type { FeatureCollection } from "geojson";
 import type { GCPPoint, GCPPair } from "@/components/MapViewer";
+import { formatAlignmentStatus } from "@/lib/statusHelper";
 
 const MapViewer = dynamic(() => import("@/components/MapViewer"), { ssr: false });
+import MapSourceModal, { BASEMAP_PRESETS, BasemapOption } from "@/components/MapSourceModal";
 import { API } from "@/lib/api";
 
 interface ParcelSummary {
@@ -71,6 +75,26 @@ export default function PatwariPage() {
   const [loading, setLoading] = useState(false);
   const [activePipelineStep, setActivePipelineStep] = useState<number>(1);
   const [isDossierCollapsed, setIsDossierCollapsed] = useState(false);
+
+  // Halqa Parcel Roster Sidebar State
+  const [isRosterOpen, setIsRosterOpen] = useState(false);
+  const [rosterSearch, setRosterSearch] = useState("");
+  const [rosterFilter, setRosterFilter] = useState("ALL");
+
+  // Old Map & New Map Source Layer Controls
+  const [isMapSourceModalOpen, setIsMapSourceModalOpen] = useState(false);
+  const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(BASEMAP_PRESETS[0]);
+  const [activeOldMapPresetId, setActiveOldMapPresetId] = useState<string>("mohanlalganj-1974");
+  const [customOldMapGeojson, setCustomOldMapGeojson] = useState<FeatureCollection | null>(null);
+  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(null);
+  const [oldMapOpacity, setOldMapOpacity] = useState<number>(80);
+  const [oldMapStrokeColor, setOldMapStrokeColor] = useState<string>("#D97706");
+
+  useEffect(() => {
+    const handleOpenModal = () => setIsMapSourceModalOpen(true);
+    window.addEventListener("open-map-source-modal", handleOpenModal);
+    return () => window.removeEventListener("open-map-source-modal", handleOpenModal);
+  }, []);
 
   // Task 2.4: Paired GCP Landmark State
   const [enableGcpPlacement, setEnableGcpPlacement] = useState(false);
@@ -114,7 +138,99 @@ export default function PatwariPage() {
     isOccluded: boolean;
     reason: string | null;
     inferenceMs: number;
+    shadowRatio?: number;
+    canopyRatio?: number;
+    modelBackbone?: string;
+    deviceAccelerator?: string;
   } | null>(null);
+
+  // Asynchronous Village Batch Alignment
+  const [batchProgress, setBatchProgress] = useState<{
+    isRunning: boolean;
+    batchId: string | null;
+    total: number;
+    completed: number;
+    failed: number;
+    status: string;
+  }>({
+    isRunning: false,
+    batchId: null,
+    total: 0,
+    completed: 0,
+    failed: 0,
+    status: "IDLE",
+  });
+
+  const startBatchAlignment = async () => {
+    setBatchProgress({
+      isRunning: true,
+      batchId: null,
+      total: 0,
+      completed: 0,
+      failed: 0,
+      status: "QUEUED",
+    });
+    const tId = toast.loading("Queuing asynchronous batch alignment for Ward 12 Mohanlalganj...");
+
+    try {
+      const res = await fetch(`${API}/v1/align-batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ village: "Mohanlalganj", max_parcels: 50 }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Batch alignment failed to initialize");
+      }
+      const data = await res.json();
+      const batchId = data.batch_id;
+
+      setBatchProgress({
+        isRunning: true,
+        batchId: batchId,
+        total: data.total_parcels,
+        completed: 0,
+        failed: 0,
+        status: "PROCESSING",
+      });
+
+      toast.success(
+        `Batch job initiated for ${data.total_parcels} parcels! Running in background...`,
+        { id: tId }
+      );
+
+      // Poll progress every 1.2s
+      const pollInterval = setInterval(async () => {
+        try {
+          const pollRes = await fetch(`${API}/v1/align-batch/${batchId}`);
+          if (pollRes.ok) {
+            const pData = await pollRes.json();
+            setBatchProgress((prev) => ({
+              ...prev,
+              total: pData.total,
+              completed: pData.completed,
+              failed: pData.failed,
+              status: pData.status,
+            }));
+
+            if (pData.status === "COMPLETED" || pData.status === "FAILED") {
+              clearInterval(pollInterval);
+              setBatchProgress((prev) => ({ ...prev, isRunning: false }));
+              await fetchData();
+              toast.success(
+                `Batch alignment finished! Processed ${pData.completed}/${pData.total} parcels.`
+              );
+            }
+          }
+        } catch {
+          // ignore transient poll error
+        }
+      }, 1200);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to start batch alignment", { id: tId });
+      setBatchProgress((prev) => ({ ...prev, isRunning: false, status: "ERROR" }));
+    }
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -138,6 +254,24 @@ export default function PatwariPage() {
     () => parcels.find((p) => p.id === selectedId),
     [parcels, selectedId]
   );
+
+  const filteredRosterParcels = useMemo(() => {
+    return parcels.filter((p) => {
+      const q = rosterSearch.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        p.khasra_no.toLowerCase().includes(q) ||
+        p.owner_name.toLowerCase().includes(q) ||
+        (p.ulpin && p.ulpin.toLowerCase().includes(q));
+
+      if (!matchesSearch) return false;
+      if (rosterFilter === "ALL") return true;
+      if (rosterFilter === "DRAFT") return p.alignment_status === "raw" || p.alignment_status === "DRAFT";
+      if (rosterFilter === "ALIGNED") return p.alignment_status.includes("aligned") || p.alignment_status === "ALIGNED_DRAFT";
+      if (rosterFilter === "ULPIN") return Boolean(p.ulpin);
+      return true;
+    });
+  }, [parcels, rosterSearch, rosterFilter]);
 
   // When parcel selection changes, initialize vertex coords
   useEffect(() => {
@@ -254,12 +388,16 @@ export default function PatwariPage() {
         isOccluded: data.is_occluded,
         reason: data.occlusion_reason,
         inferenceMs: data.inference_time_ms,
+        shadowRatio: data.shadow_ratio,
+        canopyRatio: data.canopy_ratio,
+        modelBackbone: data.model_backbone,
+        deviceAccelerator: data.device_accelerator,
       });
 
       if (data.is_occluded) {
         toast(
-          `Occlusion Flagged! Confidence: ${(data.confidence_score * 100).toFixed(0)}%. ${data.occlusion_reason}`,
-          { icon: "⚠️", id: tId, duration: 4000 }
+          `Occlusion Flagged! Shadow: ${(Number(data.shadow_ratio || 0) * 100).toFixed(0)}%, Canopy: ${(Number(data.canopy_ratio || 0) * 100).toFixed(0)}%. ${data.occlusion_reason}`,
+          { icon: "⚠️", id: tId, duration: 4500 }
         );
       } else {
         toast.success(
@@ -299,7 +437,7 @@ export default function PatwariPage() {
     if (!selectedId) return toast("Select a parcel polygon first", { icon: "ℹ️" });
     setLoading(true);
     setActivePipelineStep(3);
-    const tId = toast.loading("GeoSAM ViT-H: Zero-shot boundary segmentation (<10ms)...");
+    const tId = toast.loading("GeoSAM ViT-B: Zero-shot boundary segmentation (<10ms)...");
 
     try {
       const activeFeature = geojson?.features.find((f: any) => f.properties?.id === selectedId);
@@ -322,12 +460,16 @@ export default function PatwariPage() {
         isOccluded: data.is_occluded,
         reason: data.occlusion_reason,
         inferenceMs: data.inference_time_ms,
+        shadowRatio: data.shadow_ratio,
+        canopyRatio: data.canopy_ratio,
+        modelBackbone: data.model_backbone,
+        deviceAccelerator: data.device_accelerator,
       });
 
       if (data.is_occluded) {
         toast(
-          `Occlusion Warning! Confidence: ${(data.confidence_score * 100).toFixed(0)}%. ${data.occlusion_reason}`,
-          { icon: "⚠️", id: tId, duration: 4000 }
+          `Occlusion Warning! Shadow: ${(Number(data.shadow_ratio || 0) * 100).toFixed(0)}%, Canopy: ${(Number(data.canopy_ratio || 0) * 100).toFixed(0)}%. ${data.occlusion_reason}`,
+          { icon: "⚠️", id: tId, duration: 4500 }
         );
       } else {
         toast.success(
@@ -450,6 +592,15 @@ export default function PatwariPage() {
           aiTracedFeature={aiTracedFeature}
           aiTraceConfidence={geosamResult?.confidence}
           isOccluded={geosamResult?.isOccluded}
+          // Old Map & New Map Source Layer Controls
+          basemapUrl={activeBasemap.url}
+          basemapAttribution={activeBasemap.attribution}
+          basemapName={activeBasemap.name}
+          customOldMapGeojson={customOldMapGeojson}
+          scannedMapOverlayUrl={scannedMapOverlayUrl}
+          oldMapOpacity={oldMapOpacity}
+          oldMapStrokeColor={oldMapStrokeColor}
+          onOpenMapSourceModal={() => setIsMapSourceModalOpen(true)}
         />
       </div>
 
@@ -522,6 +673,213 @@ export default function PatwariPage() {
         </div>
       )}
 
+      {/* ───── Top Left: Halqa Mohanlalganj Parcel Roster ───── */}
+      {isRosterOpen ? (
+        <div
+          className="glass-card animate-fade-in-up"
+          style={{
+            position: "absolute",
+            top: 84,
+            left: 24,
+            zIndex: 400,
+            width: 330,
+            maxHeight: "calc(100vh - 190px)",
+            display: "flex",
+            flexDirection: "column",
+            background: "rgba(255, 255, 255, 0.98)",
+            borderRadius: "var(--radius-lg)",
+            boxShadow: "0 10px 30px rgba(15, 23, 42, 0.14)",
+            border: "1.5px solid var(--border-glass)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              padding: "14px 16px",
+              borderBottom: "1px solid var(--border-subtle)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--accent-primary-bg)",
+                  border: "1px solid #99F6E4",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--accent-primary)",
+                }}
+              >
+                <Building2 size={18} />
+              </div>
+              <div>
+                <span style={{ fontSize: "0.9375rem", fontWeight: 800, color: "var(--text-primary)" }}>
+                  Halqa Parcel Roster
+                </span>
+                <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 600 }}>
+                  Ward 12 Mohanlalganj &bull; {parcels.length} parcels
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsRosterOpen(false)}
+              className="btn-ghost"
+              style={{ padding: 4, color: "var(--text-primary)" }}
+              title="Minimize Roster"
+            >
+              <ChevronDown size={18} style={{ transform: "rotate(90deg)" }} />
+            </button>
+          </div>
+
+          {/* Search Box & Filters */}
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border-subtle)", background: "#FFFFFF" }}>
+            <div style={{ position: "relative" }}>
+              <input
+                type="text"
+                value={rosterSearch}
+                onChange={(e) => setRosterSearch(e.target.value)}
+                placeholder="Search Khasra or owner..."
+                style={{
+                  width: "100%",
+                  padding: "7px 10px 7px 32px",
+                  fontSize: "0.8125rem",
+                  borderRadius: "var(--radius-md)",
+                  border: "1.5px solid var(--border-glass)",
+                }}
+              />
+              <Search size={15} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+            </div>
+
+            {/* Filter Pills */}
+            <div style={{ display: "flex", gap: 4, marginTop: 8, overflowX: "auto", paddingBottom: 2 }}>
+              {[
+                { id: "ALL", label: `All (${parcels.length})` },
+                { id: "DRAFT", label: "Draft" },
+                { id: "ALIGNED", label: "Aligned" },
+                { id: "ULPIN", label: "Bhu-Aadhaar" },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setRosterFilter(f.id)}
+                  style={{
+                    padding: "3px 8px",
+                    borderRadius: 999,
+                    fontSize: "0.6875rem",
+                    fontWeight: 700,
+                    border: rosterFilter === f.id ? "1px solid var(--accent-primary)" : "1px solid var(--border-glass)",
+                    background: rosterFilter === f.id ? "var(--accent-primary)" : "#FFFFFF",
+                    color: rosterFilter === f.id ? "#FFFFFF" : "var(--text-secondary)",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Scrollable Parcel List */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "6px" }}>
+            {filteredRosterParcels.map((p) => {
+              const isSelected = selectedId === p.id;
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => {
+                    setSelectedId(p.id);
+                    setGeosamResult(null);
+                    setIsDossierCollapsed(false);
+                  }}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "var(--radius-md)",
+                    marginBottom: 4,
+                    background: isSelected ? "var(--accent-primary-bg)" : "transparent",
+                    border: isSelected ? "1.5px solid #99F6E4" : "1px solid transparent",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) (e.currentTarget as HTMLElement).style.background = "var(--bg-secondary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) (e.currentTarget as HTMLElement).style.background = "transparent";
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <strong style={{ fontSize: "0.875rem", color: "var(--text-primary)" }}>
+                      Khasra {p.khasra_no}
+                    </strong>
+                    <span
+                      style={{
+                        fontSize: "0.6875rem",
+                        fontWeight: 700,
+                        padding: "2px 6px",
+                        borderRadius: "var(--radius-sm)",
+                        background: p.ulpin ? "var(--accent-mint-bg)" : "var(--bg-secondary)",
+                        color: p.ulpin ? "var(--accent-mint)" : "var(--text-secondary)",
+                        border: p.ulpin ? "1px solid #A7F3D0" : "1px solid var(--border-subtle)",
+                      }}
+                    >
+                      {formatAlignmentStatus(p.alignment_status)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: 2, fontWeight: 500 }}>
+                    {p.owner_name}
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: 2 }}>
+                    {p.area_sqm ? `${Number(p.area_sqm).toFixed(1)} m²` : "Area uncalculated"} &bull; {p.village}
+                  </div>
+                </div>
+              );
+            })}
+
+            {filteredRosterParcels.length === 0 && (
+              <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--text-muted)", fontSize: "0.8125rem" }}>
+                No matching parcels in current filter.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setIsRosterOpen(true)}
+          className="glass-card"
+          style={{
+            position: "absolute",
+            top: 84,
+            left: 24,
+            zIndex: 400,
+            padding: "8px 14px",
+            background: "#FFFFFF",
+            borderRadius: "var(--radius-md)",
+            border: "1.5px solid var(--border-glass)",
+            boxShadow: "0 4px 14px rgba(15, 23, 42, 0.08)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            cursor: "pointer",
+            fontWeight: 700,
+            fontSize: "0.8125rem",
+            color: "var(--text-primary)",
+          }}
+          title="Open Halqa Mohanlalganj Parcel Roster"
+        >
+          <Building2 size={16} style={{ color: "var(--accent-primary)" }} />
+          <span>Parcel Roster ({parcels.length})</span>
+        </button>
+      )}
+
       {/* ───── Top Right: Collapsible Parcel Dossier ───── */}
       <div
         className="glass-card animate-fade-in-up"
@@ -592,7 +950,7 @@ export default function PatwariPage() {
                       width: "fit-content",
                     }}
                   >
-                    {selectedParcel.alignment_status}
+                    {formatAlignmentStatus(selectedParcel.alignment_status)}
                   </span>
 
                   <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Parcel Area:</span>
@@ -635,7 +993,7 @@ export default function PatwariPage() {
                   </button>
                 </div>
 
-                {/* Occlusion Warning Banner */}
+                {/* Radiometric Spectral Analysis Card */}
                 {geosamResult && (
                   <div
                     style={{
@@ -648,11 +1006,32 @@ export default function PatwariPage() {
                       color: geosamResult.isOccluded ? "#92400E" : "#065F46",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
-                      {geosamResult.isOccluded ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
-                      <span>GeoSAM Zero-Shot Result ({geosamResult.inferenceMs.toFixed(1)}ms)</span>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
+                        {geosamResult.isOccluded ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
+                        <span>GeoSAM AI Boundary ({geosamResult.inferenceMs.toFixed(1)}ms)</span>
+                      </div>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 700 }}>
+                        {geosamResult.modelBackbone || "Meta-SAM"}
+                      </span>
                     </div>
-                    <div style={{ marginTop: 4 }}>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 6 }}>
+                      <div style={{ background: "rgba(255, 255, 255, 0.7)", padding: "4px 8px", borderRadius: 4 }}>
+                        <div style={{ fontSize: "0.68rem", opacity: 0.8 }}>Ground Shadow</div>
+                        <div style={{ fontSize: "0.82rem", fontWeight: 800 }}>
+                          {((geosamResult.shadowRatio ?? 0) * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                      <div style={{ background: "rgba(255, 255, 255, 0.7)", padding: "4px 8px", borderRadius: 4 }}>
+                        <div style={{ fontSize: "0.68rem", opacity: 0.8 }}>Tree Canopy</div>
+                        <div style={{ fontSize: "0.82rem", fontWeight: 800 }}>
+                          {((geosamResult.canopyRatio ?? 0) * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 6, fontSize: "0.75rem" }}>
                       Confidence: <strong>{(geosamResult.confidence * 100).toFixed(1)}%</strong>
                       {geosamResult.reason && ` • ${geosamResult.reason}`}
                     </div>
@@ -813,6 +1192,28 @@ export default function PatwariPage() {
         {/* TPS Drawer Toggle with Pair count */}
         <button className="btn-secondary" onClick={() => setShowCalibrationDrawer(true)}>
           <Sliders size={15} /> TPS Warping ({pairedGcpMode ? `${gcpPairs.length} pairs` : `${gcpPoints.length} pts`})
+        </button>
+
+        {/* Village Bulk / Batch Alignment Action */}
+        <button
+          className="btn-secondary"
+          onClick={startBatchAlignment}
+          disabled={loading || batchProgress.isRunning}
+          style={{
+            background: batchProgress.isRunning ? "var(--accent-sun-bg)" : "#F0FDFA",
+            borderColor: batchProgress.isRunning ? "#FDE68A" : "#99F6E4",
+            color: batchProgress.isRunning ? "#92400E" : "#0D9488",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontWeight: 700,
+          }}
+          title="Asynchronously align all DRAFT parcels in Mohanlalganj Ward 12 using the new batch pipeline"
+        >
+          <Zap size={15} className={batchProgress.isRunning ? "animate-spin" : ""} />
+          {batchProgress.isRunning
+            ? `Batch: ${batchProgress.completed}/${batchProgress.total} (${batchProgress.status})`
+            : "Batch Align Ward 12"}
         </button>
       </div>
 
@@ -1052,6 +1453,28 @@ export default function PatwariPage() {
           </div>
         </div>
       )}
+
+      {/* Old Map & New Map Source Layer Configuration Modal */}
+      <MapSourceModal
+        isOpen={isMapSourceModalOpen}
+        onClose={() => setIsMapSourceModalOpen(false)}
+        activeBasemapId={activeBasemap.id}
+        onSelectBasemap={(b) => setActiveBasemap(b)}
+        activeOldMapPresetId={activeOldMapPresetId}
+        onSelectOldMapPreset={(presetId) => {
+          setActiveOldMapPresetId(presetId);
+        }}
+        onUploadCustomGeojson={(customData) => {
+          setCustomOldMapGeojson(customData);
+        }}
+        onUploadScannedMap={(imageUrl) => {
+          setScannedMapOverlayUrl(imageUrl);
+        }}
+        oldMapOpacity={oldMapOpacity}
+        onChangeOldMapOpacity={setOldMapOpacity}
+        oldMapStrokeColor={oldMapStrokeColor}
+        onChangeOldMapStrokeColor={setOldMapStrokeColor}
+      />
     </div>
   );
 }

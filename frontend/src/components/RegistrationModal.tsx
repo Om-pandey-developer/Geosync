@@ -12,15 +12,15 @@ import {
   Building,
   CheckCircle2,
   AlertCircle,
+  FilePlus2,
 } from "lucide-react";
+import { API } from "@/lib/api";
 
 interface RegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
 }
-
-import { API } from "@/lib/api";
 
 export default function RegistrationModal({
   isOpen,
@@ -76,7 +76,6 @@ export default function RegistrationModal({
 
   // Strictly block numbers in name fields
   const handleAlphabeticKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // If a digit 0-9 is typed, physically block it
     if (/^[0-9]$/.test(e.key)) {
       e.preventDefault();
       toast.error("Numbers are not permitted in name fields", { id: "name-block", duration: 1500 });
@@ -191,29 +190,56 @@ export default function RegistrationModal({
     }
   };
 
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 14px",
+    borderRadius: "var(--radius-md)",
+    background: "#FFFFFF",
+    border: "1.5px solid #CBD5E1",
+    color: "#0F172A",
+    fontSize: "0.875rem",
+    fontWeight: 600,
+    outline: "none",
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    fontSize: "0.8125rem",
+    fontWeight: 700,
+    color: "#0F172A",
+    marginBottom: "6px",
+  };
+
   return (
     <div
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 9999,
-        background: "rgba(4, 10, 12, 0.72)",
-        backdropFilter: "blur(14px)",
-        WebkitBackdropFilter: "blur(14px)",
+        background: "rgba(15, 23, 42, 0.65)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: "20px",
       }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className="glass-modal animate-fade-in-up"
+        className="animate-fade-in-up"
         style={{
           width: "100%",
           maxWidth: "540px",
           padding: "32px",
           position: "relative",
-          border: "1px solid rgba(121, 199, 197, 0.35)",
+          background: "#FFFFFF",
+          borderRadius: "var(--radius-lg)",
+          boxShadow: "0 25px 50px -12px rgba(15, 23, 42, 0.25)",
+          border: "1px solid var(--border-subtle)",
         }}
       >
         {/* Close Button */}
@@ -223,7 +249,7 @@ export default function RegistrationModal({
             position: "absolute",
             top: "20px",
             right: "20px",
-            background: "rgba(121, 199, 197, 0.1)",
+            background: "var(--bg-secondary)",
             border: "none",
             borderRadius: "50%",
             width: "32px",
@@ -233,33 +259,37 @@ export default function RegistrationModal({
             justifyContent: "center",
             color: "var(--text-secondary)",
             cursor: "pointer",
+            transition: "all 0.15s ease",
           }}
+          aria-label="Close"
         >
           <X size={16} />
         </button>
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "22px" }}>
           <div
             style={{
-              width: "42px",
-              height: "42px",
-              borderRadius: "12px",
-              background: "rgba(121, 199, 197, 0.18)",
+              width: "44px",
+              height: "44px",
+              borderRadius: "var(--radius-md)",
+              background: "var(--accent-primary-bg)",
+              border: "1px solid #99F6E4",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               color: "var(--accent-primary)",
+              flexShrink: 0,
             }}
           >
-            <ShieldCheck size={22} />
+            <ShieldCheck size={24} />
           </div>
           <div>
-            <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--text-primary)" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#0F172A", letterSpacing: "-0.01em" }}>
               Revenue Governance & Record Entry
             </h3>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-              Strict client-side & server-side validation enforced
+            <p style={{ fontSize: "0.8125rem", color: "var(--text-muted)", marginTop: 2 }}>
+              DILRMP 3.0 KYC verification & authoritative parcel intake
             </p>
           </div>
         </div>
@@ -269,26 +299,28 @@ export default function RegistrationModal({
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            gap: "8px",
-            background: "rgba(121, 199, 197, 0.08)",
+            gap: "6px",
+            background: "var(--bg-secondary)",
             padding: "4px",
-            borderRadius: "12px",
+            borderRadius: "var(--radius-md)",
             marginBottom: "24px",
+            border: "1px solid var(--border-subtle)",
           }}
         >
           <button
             type="button"
             onClick={() => setActiveTab("officer")}
             style={{
-              padding: "8px",
-              borderRadius: "8px",
+              padding: "9px 14px",
+              borderRadius: "var(--radius-sm)",
               border: "none",
-              fontSize: "0.85rem",
-              fontWeight: 600,
+              fontSize: "0.875rem",
+              fontWeight: activeTab === "officer" ? 800 : 600,
               cursor: "pointer",
-              transition: "all 0.2s",
-              background: activeTab === "officer" ? "rgba(121, 199, 197, 0.25)" : "transparent",
-              color: activeTab === "officer" ? "var(--text-primary)" : "var(--text-muted)",
+              transition: "all 0.15s ease",
+              background: activeTab === "officer" ? "#FFFFFF" : "transparent",
+              color: activeTab === "officer" ? "var(--accent-primary)" : "var(--text-secondary)",
+              boxShadow: activeTab === "officer" ? "0 2px 4px rgba(0,0,0,0.06)" : "none",
             }}
           >
             Officer Authorization
@@ -297,15 +329,16 @@ export default function RegistrationModal({
             type="button"
             onClick={() => setActiveTab("parcel")}
             style={{
-              padding: "8px",
-              borderRadius: "8px",
+              padding: "9px 14px",
+              borderRadius: "var(--radius-sm)",
               border: "none",
-              fontSize: "0.85rem",
-              fontWeight: 600,
+              fontSize: "0.875rem",
+              fontWeight: activeTab === "parcel" ? 800 : 600,
               cursor: "pointer",
-              transition: "all 0.2s",
-              background: activeTab === "parcel" ? "rgba(121, 199, 197, 0.25)" : "transparent",
-              color: activeTab === "parcel" ? "var(--text-primary)" : "var(--text-muted)",
+              transition: "all 0.15s ease",
+              background: activeTab === "parcel" ? "#FFFFFF" : "transparent",
+              color: activeTab === "parcel" ? "var(--accent-primary)" : "var(--text-secondary)",
+              boxShadow: activeTab === "parcel" ? "0 2px 4px rgba(0,0,0,0.06)" : "none",
             }}
           >
             New Land Parcel
@@ -317,15 +350,7 @@ export default function RegistrationModal({
           <form onSubmit={handleOfficerSubmit}>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "0.8rem",
-                    fontWeight: 600,
-                    color: "var(--text-secondary)",
-                    marginBottom: "6px",
-                  }}
-                >
+                <label style={labelStyle}>
                   Officer Full Name (Alphabetic only)
                 </label>
                 <div style={{ position: "relative" }}>
@@ -336,7 +361,7 @@ export default function RegistrationModal({
                       left: "14px",
                       top: "50%",
                       transform: "translateY(-50%)",
-                      color: "var(--text-muted)",
+                      color: "#64748B",
                     }}
                   />
                   <input
@@ -347,29 +372,15 @@ export default function RegistrationModal({
                     onKeyDown={handleAlphabeticKeyDown}
                     onChange={(e) => setOfficerName(e.target.value.replace(/[0-9]/g, ""))}
                     style={{
-                      width: "100%",
-                      padding: "10px 14px 10px 40px",
-                      borderRadius: "10px",
-                      background: "rgba(12, 22, 25, 0.85)",
-                      border: "1px solid var(--border-glass)",
-                      color: "var(--text-primary)",
-                      fontSize: "0.88rem",
-                      outline: "none",
+                      ...inputStyle,
+                      paddingLeft: "40px",
                     }}
                   />
                 </div>
               </div>
 
               <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "0.8rem",
-                    fontWeight: 600,
-                    color: "var(--text-secondary)",
-                    marginBottom: "6px",
-                  }}
-                >
+                <label style={labelStyle}>
                   Mobile Number (Strictly 10 digits numeric)
                 </label>
                 <div style={{ position: "relative" }}>
@@ -380,7 +391,7 @@ export default function RegistrationModal({
                       left: "14px",
                       top: "50%",
                       transform: "translateY(-50%)",
-                      color: "var(--text-muted)",
+                      color: "#64748B",
                     }}
                   />
                   <input
@@ -393,26 +404,22 @@ export default function RegistrationModal({
                     onPaste={(e) => handlePhonePaste(e, setOfficerPhone)}
                     onChange={(e) => setOfficerPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                     style={{
-                      width: "100%",
-                      padding: "10px 14px 10px 40px",
-                      borderRadius: "10px",
-                      background: "rgba(12, 22, 25, 0.85)",
-                      border: "1px solid var(--border-glass)",
-                      color: "var(--text-primary)",
-                      fontSize: "0.88rem",
+                      ...inputStyle,
+                      paddingLeft: "40px",
                       fontFamily: "monospace",
-                      outline: "none",
+                      letterSpacing: "0.5px",
                     }}
                   />
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
-                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                     Numeric only. Special characters and alphabets blocked.
                   </span>
                   <span
                     style={{
-                      fontSize: "0.72rem",
-                      color: officerPhone.length === 10 ? "#A8E6CF" : "var(--text-muted)",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      color: officerPhone.length === 10 ? "var(--accent-mint)" : "var(--text-muted)",
                     }}
                   >
                     {officerPhone.length}/10 digits
@@ -422,30 +429,13 @@ export default function RegistrationModal({
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      color: "var(--text-secondary)",
-                      marginBottom: "6px",
-                    }}
-                  >
+                  <label style={labelStyle}>
                     Designation
                   </label>
                   <select
                     value={designation}
                     onChange={(e) => setDesignation(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      borderRadius: "10px",
-                      background: "rgba(12, 22, 25, 0.85)",
-                      border: "1px solid var(--border-glass)",
-                      color: "var(--text-primary)",
-                      fontSize: "0.88rem",
-                      outline: "none",
-                    }}
+                    style={inputStyle}
                   >
                     <option value="Patwari">Patwari (Surveyor)</option>
                     <option value="Tehsildar">Tehsildar (Executive)</option>
@@ -455,31 +445,14 @@ export default function RegistrationModal({
                 </div>
 
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      color: "var(--text-secondary)",
-                      marginBottom: "6px",
-                    }}
-                  >
+                  <label style={labelStyle}>
                     Jurisdiction Ward
                   </label>
                   <input
                     type="text"
                     value={ward}
                     onChange={(e) => setWard(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      borderRadius: "10px",
-                      background: "rgba(12, 22, 25, 0.85)",
-                      border: "1px solid var(--border-glass)",
-                      color: "var(--text-primary)",
-                      fontSize: "0.88rem",
-                      outline: "none",
-                    }}
+                    style={inputStyle}
                   />
                 </div>
               </div>
@@ -487,10 +460,11 @@ export default function RegistrationModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-pastel-primary"
-                style={{ marginTop: "12px", width: "100%", padding: "12px" }}
+                className="btn-primary"
+                style={{ marginTop: "8px", width: "100%", padding: "12px 18px", fontSize: "0.9375rem" }}
               >
-                {loading ? "Validating Credentials..." : "Authenticate & Verify Officer"}
+                <UserCheck size={18} />
+                <span>{loading ? "Validating Credentials..." : "Authenticate & Verify Officer"}</span>
               </button>
             </div>
           </form>
@@ -500,15 +474,7 @@ export default function RegistrationModal({
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      color: "var(--text-secondary)",
-                      marginBottom: "6px",
-                    }}
-                  >
+                  <label style={labelStyle}>
                     Khasra Number (e.g. 117 or 117/1)
                   </label>
                   <input
@@ -517,29 +483,12 @@ export default function RegistrationModal({
                     placeholder="117"
                     value={khasraNo}
                     onChange={(e) => setKhasraNo(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      borderRadius: "10px",
-                      background: "rgba(12, 22, 25, 0.85)",
-                      border: "1px solid var(--border-glass)",
-                      color: "var(--text-primary)",
-                      fontSize: "0.88rem",
-                      outline: "none",
-                    }}
+                    style={inputStyle}
                   />
                 </div>
 
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      color: "var(--text-secondary)",
-                      marginBottom: "6px",
-                    }}
-                  >
+                  <label style={labelStyle}>
                     Owner Mobile (10 Digits)
                   </label>
                   <input
@@ -552,30 +501,16 @@ export default function RegistrationModal({
                     onPaste={(e) => handlePhonePaste(e, setOwnerPhone)}
                     onChange={(e) => setOwnerPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                     style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      borderRadius: "10px",
-                      background: "rgba(12, 22, 25, 0.85)",
-                      border: "1px solid var(--border-glass)",
-                      color: "var(--text-primary)",
-                      fontSize: "0.88rem",
+                      ...inputStyle,
                       fontFamily: "monospace",
-                      outline: "none",
+                      letterSpacing: "0.5px",
                     }}
                   />
                 </div>
               </div>
 
               <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "0.8rem",
-                    fontWeight: 600,
-                    color: "var(--text-secondary)",
-                    marginBottom: "6px",
-                  }}
-                >
+                <label style={labelStyle}>
                   Owner Full Name (Alphabetic only)
                 </label>
                 <input
@@ -585,75 +520,32 @@ export default function RegistrationModal({
                   value={ownerName}
                   onKeyDown={handleAlphabeticKeyDown}
                   onChange={(e) => setOwnerName(e.target.value.replace(/[0-9]/g, ""))}
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    background: "rgba(12, 22, 25, 0.85)",
-                    border: "1px solid var(--border-glass)",
-                    color: "var(--text-primary)",
-                    fontSize: "0.88rem",
-                    outline: "none",
-                  }}
+                  style={inputStyle}
                 />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      color: "var(--text-secondary)",
-                      marginBottom: "6px",
-                    }}
-                  >
+                  <label style={labelStyle}>
                     Village
                   </label>
                   <input
                     type="text"
                     value={village}
                     onChange={(e) => setVillage(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      borderRadius: "10px",
-                      background: "rgba(12, 22, 25, 0.85)",
-                      border: "1px solid var(--border-glass)",
-                      color: "var(--text-primary)",
-                      fontSize: "0.88rem",
-                      outline: "none",
-                    }}
+                    style={inputStyle}
                   />
                 </div>
 
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      color: "var(--text-secondary)",
-                      marginBottom: "6px",
-                    }}
-                  >
+                  <label style={labelStyle}>
                     Tehsil
                   </label>
                   <input
                     type="text"
                     value={tehsil}
                     onChange={(e) => setTehsil(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      borderRadius: "10px",
-                      background: "rgba(12, 22, 25, 0.85)",
-                      border: "1px solid var(--border-glass)",
-                      color: "var(--text-primary)",
-                      fontSize: "0.88rem",
-                      outline: "none",
-                    }}
+                    style={inputStyle}
                   />
                 </div>
               </div>
@@ -661,10 +553,11 @@ export default function RegistrationModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-pastel-primary"
-                style={{ marginTop: "12px", width: "100%", padding: "12px" }}
+                className="btn-primary"
+                style={{ marginTop: "8px", width: "100%", padding: "12px 18px", fontSize: "0.9375rem" }}
               >
-                {loading ? "Registering Parcel..." : "Create Cadastral Record"}
+                <FilePlus2 size={18} />
+                <span>{loading ? "Registering Parcel..." : "Create Cadastral Record"}</span>
               </button>
             </div>
           </form>

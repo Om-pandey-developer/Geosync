@@ -14,6 +14,7 @@ import {
   Rectangle,
   Polygon as LeafletPolygon,
   Polyline,
+  ImageOverlay,
 } from "react-leaflet";
 import L from "leaflet";
 import type { Feature, FeatureCollection } from "geojson";
@@ -106,15 +107,8 @@ const VertexHandleIcon = L.divIcon({
   iconAnchor: [14, 14],
 });
 
-// Vibrant Cheerful Pastel parcel colors with high-contrast outlines
-const STATUS_COLORS: Record<string, { fill: string; stroke: string }> = {
-  raw: { fill: "#E2E8F0", stroke: "#475569" },
-  aligned: { fill: "#CCFBF1", stroke: "#0D9488" },
-  cleaned: { fill: "#E0F2FE", stroke: "#0284C7" },
-  ulpin_assigned: { fill: "#D1FAE5", stroke: "#059669" },
-  occluded: { fill: "#FEF3C7", stroke: "#D97706" },
-  published: { fill: "#F3E8FF", stroke: "#7C3AED" },
-};
+import { STATUS_COLORS, formatAlignmentStatus } from "@/lib/statusHelper";
+export { STATUS_COLORS, formatAlignmentStatus };
 
 export interface GCPPoint {
   id: number;
@@ -162,6 +156,17 @@ interface MapViewerProps {
   pairedGcpMode?: boolean;
   gcpPairs?: GCPPair[];
   onAddGcpPair?: (pair: GCPPair) => void;
+
+  // Old Map & New Map Custom Sources & Overlays
+  basemapUrl?: string;
+  basemapAttribution?: string;
+  basemapName?: string;
+  customOldMapGeojson?: FeatureCollection | null;
+  scannedMapOverlayUrl?: string | null;
+  scannedMapBounds?: [[number, number], [number, number]];
+  oldMapOpacity?: number;
+  oldMapStrokeColor?: string;
+  onOpenMapSourceModal?: () => void;
 }
 
 function FitBounds({ geojsonData }: { geojsonData: FeatureCollection }) {
@@ -330,6 +335,18 @@ export default function MapViewer({
   pairedGcpMode = false,
   gcpPairs = [],
   onAddGcpPair,
+  basemapUrl,
+  basemapAttribution,
+  basemapName,
+  customOldMapGeojson,
+  scannedMapOverlayUrl,
+  scannedMapBounds = [
+    [26.758, 80.898],
+    [26.764, 80.905],
+  ],
+  oldMapOpacity = 80,
+  oldMapStrokeColor = "#D97706",
+  onOpenMapSourceModal,
 }: MapViewerProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [baseLayer, setBaseLayer] = useState<"drone" | "minimal">("drone");
@@ -474,12 +491,14 @@ export default function MapViewer({
 
   const styleFeature = (feature: Feature | undefined) => {
     if (!feature) return {};
-    const status = feature.properties?.alignment_status || "raw";
+    const rawStatus = feature.properties?.alignment_status || "DRAFT";
+    const statusKey = String(rawStatus).toLowerCase();
     const confidence = feature.properties?.alignment_confidence ?? 1.0;
     const occluded = showOcclusionAlerts && confidence < 0.8;
     const isSelected = feature.properties?.id === selectedParcelId;
 
-    const palette = occluded ? STATUS_COLORS.occluded : STATUS_COLORS[status] || STATUS_COLORS.raw;
+    const palette = occluded ? STATUS_COLORS.occluded : STATUS_COLORS[statusKey] || STATUS_COLORS.draft;
+    const isDraft = statusKey === "raw" || statusKey === "draft";
 
     return {
       color: isSelected ? "#0F172A" : palette.stroke,
@@ -487,7 +506,7 @@ export default function MapViewer({
       opacity: opacityRatio,
       fillColor: isSelected ? "#38BDF8" : palette.fill,
       fillOpacity: (isSelected ? 0.65 : 0.4) * opacityRatio,
-      dashArray: occluded ? "5, 5" : status === "raw" ? "6, 6" : undefined,
+      dashArray: occluded ? "5, 5" : isDraft ? "6, 6" : undefined,
     };
   };
 
@@ -500,6 +519,8 @@ export default function MapViewer({
     });
 
     const occluded = showOcclusionAlerts && (props.alignment_confidence ?? 1.0) < 0.8;
+    const statusKey = String(props.alignment_status || "DRAFT").toLowerCase();
+    const palette = occluded ? STATUS_COLORS.occluded : STATUS_COLORS[statusKey] || STATUS_COLORS.draft;
 
     const popupContent = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 230px; padding: 4px; color: #0F172A;">
@@ -508,16 +529,16 @@ export default function MapViewer({
             Khasra ${props.khasra_no}
           </span>
           <span style="
-            background: #CCFBF1;
-            color: #0D9488;
-            border: 1px solid #99F6E4;
+            background: ${palette.fill};
+            color: ${palette.stroke};
+            border: 1px solid ${palette.stroke}40;
             font-size: 0.72rem;
             font-weight: 700;
             padding: 2px 8px;
             border-radius: 6px;
             text-transform: uppercase;
           ">
-            ${props.alignment_status || "raw"}
+            ${formatAlignmentStatus(props.alignment_status)}
           </span>
         </div>
 
@@ -599,12 +620,39 @@ export default function MapViewer({
         scrollWheelZoom={true}
         zoomControl={false}
       >
-        {/* Base Layer: 5cm Drone Orthomosaic */}
+        {/* Base Layer: Dynamic 5cm Drone Orthomosaic / User Selected Basemap */}
         <TileLayer
-          url={tileUrls.drone}
-          attribution="&copy; NAKSHA Drone Survey &copy; Esri &copy; DoLR"
-          maxZoom={19}
+          key={basemapUrl || baseLayer}
+          url={basemapUrl || (baseLayer === "minimal" && !isSwipeActive ? tileUrls.minimal : tileUrls.drone)}
+          attribution={basemapAttribution || "&copy; NAKSHA Drone Survey &copy; Esri &copy; DoLR"}
+          maxZoom={20}
         />
+
+        {/* Scanned Historical Cadastral Paper Map Overlay */}
+        {scannedMapOverlayUrl && (
+          <ImageOverlay
+            url={scannedMapOverlayUrl}
+            bounds={scannedMapBounds}
+            opacity={(oldMapOpacity / 100) * 0.85}
+            zIndex={320}
+          />
+        )}
+
+        {/* Custom Old Map GeoJSON Vector Overlay */}
+        {customOldMapGeojson && customOldMapGeojson.features && customOldMapGeojson.features.length > 0 && (
+          <GeoJSON
+            key={`custom-old-${customOldMapGeojson.features.length}-${oldMapStrokeColor}-${oldMapOpacity}`}
+            data={customOldMapGeojson}
+            style={() => ({
+              color: oldMapStrokeColor || "#D97706",
+              weight: 2.5,
+              opacity: oldMapOpacity / 100,
+              fillColor: oldMapStrokeColor || "#D97706",
+              fillOpacity: (oldMapOpacity / 100) * 0.25,
+              dashArray: "4, 4",
+            })}
+          />
+        )}
 
         {/* Task 2.1: Split-screen Curtain Swipe Pane (BhuNaksha Legacy Map on Left) */}
         {isSwipeActive && (
@@ -624,7 +672,7 @@ export default function MapViewer({
         )}
 
         {/* Normal Minimal layer if selected and swipe is disabled */}
-        {!isSwipeActive && baseLayer === "minimal" && (
+        {!isSwipeActive && baseLayer === "minimal" && !basemapUrl && (
           <TileLayer
             url={tileUrls.minimal}
             attribution="&copy; OpenStreetMap &copy; Carto"
@@ -878,6 +926,31 @@ export default function MapViewer({
           <Layers size={16} style={{ color: "var(--accent-primary)" }} />
           <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>Map View:</span>
         </div>
+
+        {/* Old & New Map Layer & Source Manager Trigger */}
+        {onOpenMapSourceModal && (
+          <button
+            onClick={onOpenMapSourceModal}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "5px 12px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--accent-primary-light)",
+              background: "#F0FDFA",
+              color: "var(--accent-primary)",
+              fontSize: "0.8125rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            title="Configure or upload Old Map (BhuNaksha/Scans) & New Map (Drone/Satellite)"
+          >
+            <Layers size={14} style={{ color: "var(--accent-primary)" }} />
+            <span>Map Layers (Old & New)</span>
+          </button>
+        )}
 
         {/* Base Layer Switchers */}
         <div style={{ display: "flex", gap: 6, background: "var(--bg-secondary)", padding: 3, borderRadius: "var(--radius-sm)" }}>

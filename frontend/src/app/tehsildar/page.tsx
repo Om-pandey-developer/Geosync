@@ -15,12 +15,18 @@ import {
   ShieldCheck,
   Stamp,
   Info,
+  History,
+  Copy,
+  Lock,
+  X,
 } from "lucide-react";
 import type { FeatureCollection } from "geojson";
 
 const MapViewer = dynamic(() => import("@/components/MapViewer"), { ssr: false });
+import MapSourceModal, { BASEMAP_PRESETS, BasemapOption } from "@/components/MapSourceModal";
 import { API } from "@/lib/api";
 import { generateFormIIPdf } from "@/lib/pdfGenerator";
+import { formatAlignmentStatus } from "@/lib/statusHelper";
 
 interface DashboardStats {
   total_parcels: number;
@@ -28,6 +34,7 @@ interface DashboardStats {
   aligned_count: number;
   cleaned_count: number;
   ulpin_assigned_count: number;
+  published_count?: number;
   pending_approvals: number;
   approved_count: number;
   rejected_count: number;
@@ -57,6 +64,36 @@ export default function TehsildarPage() {
   const [selectedApproval, setSelectedApproval] = useState<PendingApproval | null>(null);
   const [remarks, setRemarks] = useState("");
   const [loading, setLoading] = useState(false);
+  const [committedSignatures, setCommittedSignatures] = useState<Record<string, string>>({});
+  const [docketFilter, setDocketFilter] = useState<"ALL" | "PENDING" | "OCCLUDED">("ALL");
+
+  // Old Map & New Map Source Layer Controls
+  const [isMapSourceModalOpen, setIsMapSourceModalOpen] = useState(false);
+  const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(BASEMAP_PRESETS[0]);
+  const [activeOldMapPresetId, setActiveOldMapPresetId] = useState<string>("mohanlalganj-1974");
+  const [customOldMapGeojson, setCustomOldMapGeojson] = useState<FeatureCollection | null>(null);
+  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(null);
+  const [oldMapOpacity, setOldMapOpacity] = useState<number>(80);
+  const [oldMapStrokeColor, setOldMapStrokeColor] = useState<string>("#D97706");
+
+  useEffect(() => {
+    const handleOpenModal = () => setIsMapSourceModalOpen(true);
+    window.addEventListener("open-map-source-modal", handleOpenModal);
+    return () => window.removeEventListener("open-map-source-modal", handleOpenModal);
+  }, []);
+  const [auditLogsModal, setAuditLogsModal] = useState<{
+    isOpen: boolean;
+    parcelId: string;
+    khasraNo: string;
+    logs: any[];
+    loading: boolean;
+  }>({
+    isOpen: false,
+    parcelId: "",
+    khasraNo: "",
+    logs: [],
+    loading: false,
+  });
 
   const fetchData = useCallback(async () => {
     try {
@@ -90,6 +127,24 @@ export default function TehsildarPage() {
     fetchData();
   }, [fetchData]);
 
+  // Open Audit Log Modal
+  const openAuditLogs = async (parcelId: string, khasraNo: string) => {
+    setAuditLogsModal({ isOpen: true, parcelId, khasraNo, logs: [], loading: true });
+    try {
+      const res = await fetch(`${API}/v1/parcels/${parcelId}/audit-logs`);
+      if (res.ok) {
+        const logs = await res.json();
+        setAuditLogsModal({ isOpen: true, parcelId, khasraNo, logs, loading: false });
+      } else {
+        setAuditLogsModal((prev) => ({ ...prev, loading: false }));
+        toast.error("No audit logs found for this parcel");
+      }
+    } catch {
+      setAuditLogsModal((prev) => ({ ...prev, loading: false }));
+      toast.error("Failed to load audit logs");
+    }
+  };
+
   // Legal HITL Approval and Database Commit
   const handleApproveAndCommit = async () => {
     if (!selectedApproval) return;
@@ -97,8 +152,8 @@ export default function TehsildarPage() {
     const tId = toast.loading(`Executing legal HITL validation for Khasra ${selectedApproval.khasra_no}...`);
 
     try {
-      // 1. Legal Database Commit
-      await fetch(`${API}/v1/commit-parcel`, {
+      // 1. Legal Database Commit with SHA-256 signature
+      const commitRes = await fetch(`${API}/v1/commit-parcel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -108,6 +163,18 @@ export default function TehsildarPage() {
           audit_notes: remarks || "Statutory approval under DILRMP 3.0 National Land Stack guidelines.",
         }),
       });
+
+      let signature = "";
+      if (commitRes.ok) {
+        const commitData = await commitRes.json();
+        signature = commitData.digital_signature || "";
+        if (signature) {
+          setCommittedSignatures((prev) => ({
+            ...prev,
+            [selectedApproval.parcel_id]: signature,
+          }));
+        }
+      }
 
       // Step 2: Update workflow approval docket
       if (!selectedApproval.approval_id.startsWith("preview-")) {
@@ -122,7 +189,10 @@ export default function TehsildarPage() {
         });
       }
 
-      toast.success(`Khasra ${selectedApproval.khasra_no} approved & published to Land Stack!`, { id: tId });
+      toast.success(
+        `Khasra ${selectedApproval.khasra_no} approved & published! SHA-256 seal: ${signature ? signature.slice(0, 12) + "…" : "Generated"}`,
+        { id: tId, duration: 4000 }
+      );
       setSelectedApproval(null);
       setRemarks("");
       await fetchData();
@@ -170,38 +240,41 @@ export default function TehsildarPage() {
     setLoading(false);
   };
 
+  const filteredApprovals = pendingApprovals.filter((a) => {
+    if (docketFilter === "ALL") return true;
+    if (docketFilter === "PENDING") return a.status === "pending";
+    if (docketFilter === "OCCLUDED") return (a.alignment_confidence ?? 1.0) < 0.8;
+    return true;
+  });
+
   const statCards = [
     {
-      label: "Total Ward Parcels", /* Fix Issue 5: Normal sentence case */
+      label: "Total Ward Parcels",
       value: stats?.total_parcels ?? 18,
       icon: <Layers size={20} />,
-      bg: "var(--accent-primary-bg)",
-      border: "#99F6E4",
-      color: "var(--accent-primary)",
+      accent: "var(--accent-primary)",
+      sub: "Ward 12 Mohanlalganj",
     },
     {
       label: "Bhu-Aadhaar Assigned",
       value: stats?.ulpin_assigned_count ?? 12,
       icon: <Fingerprint size={20} />,
-      bg: "var(--accent-mint-bg)",
-      border: "#A7F3D0",
-      color: "var(--accent-mint)",
+      accent: "var(--accent-mint)",
+      sub: "14-digit DoLR ULPIN",
     },
     {
-      label: "Pending HITL Reviews",
+      label: "Pending Adjudications",
       value: pendingApprovals.length,
       icon: <Clock size={20} />,
-      bg: "var(--accent-sun-bg)",
-      border: "#FDE68A",
-      color: "var(--accent-sun)",
+      accent: "var(--accent-gold)",
+      sub: "Active Bench Docket",
     },
     {
       label: "Legally Committed",
-      value: stats?.approved_count ?? 5,
+      value: stats?.published_count ?? stats?.approved_count ?? 5,
       icon: <CheckCircle2 size={20} />,
-      bg: "var(--accent-lavender-bg)",
-      border: "#DDD6FE",
-      color: "var(--accent-lavender)",
+      accent: "var(--accent-judicial)",
+      sub: "SHA-256 e-Sign Form-II",
     },
   ];
 
@@ -209,26 +282,24 @@ export default function TehsildarPage() {
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", paddingTop: 64, overflow: "hidden" }}>
       <main style={{ flex: 1, padding: "20px 24px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         
-        {/* ───── Header Bar (Fix for Issue 6 & 7: Perfect vertical flex alignment) ───── */}
+        {/* ───── Header Bar ───── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <h1 style={{ fontSize: "1.45rem", fontWeight: 800, color: "var(--text-primary)" }}>
                 Revenue Magistrate HITL Adjudication Chamber
               </h1>
-              {/* Fix Issue 4 & 6: 13px badge vertically centered */}
               <span className="badge-pastel-teal">
                 DILRMP 3.0 / NAKSHA Pilot
               </span>
             </div>
-            {/* Fix Issue 3: 14px body text */}
             <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginTop: 3 }}>
               Mohanlalganj Tehsil, Lucknow District &mdash; Human-in-the-Loop Legal Validation Engine
             </p>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button className="btn-pastel-secondary" onClick={handleResetDemo} style={{ padding: "8px 14px", fontSize: "0.82rem", display: "flex", alignItems: "center", gap: 6 }}>
+            <button className="btn-secondary" onClick={handleResetDemo} style={{ padding: "8px 14px", fontSize: "0.82rem", display: "flex", alignItems: "center", gap: 6 }}>
               <RefreshCw size={14} /> Reset Demo Dockets
             </button>
             <button className="btn-ghost" onClick={fetchData} style={{ padding: "8px 14px", fontSize: "0.82rem" }}>
@@ -237,31 +308,25 @@ export default function TehsildarPage() {
           </div>
         </div>
 
-        {/* ───── Stat Cards Bar (Fix Issue 1: Standardized --radius-lg) ───── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 16 }}>
+        {/* ───── Stat Cards Bar ───── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 16 }}>
           {statCards.map((card, i) => (
             <div
               key={i}
-              className="glass-card"
-              style={{
-                padding: "16px 20px",
-                background: card.bg,
-                border: `1px solid ${card.border}`,
-                borderRadius: "var(--radius-lg)",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-              }}
+              className="stats-counter-card"
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                {/* Fix Issue 5: Sentence case, no all-caps, 13px */}
-                <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: card.color }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: card.accent }} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)" }}>
                   {card.label}
                 </span>
-                <span style={{ color: card.color }}>{card.icon}</span>
+                <span style={{ color: card.accent }}>{card.icon}</span>
               </div>
-              <div style={{ fontSize: "1.85rem", fontWeight: 800, color: card.color }}>
+              <div style={{ fontSize: "1.85rem", fontWeight: 900, color: card.accent }}>
                 {card.value}
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 2, fontWeight: 500 }}>
+                {card.sub}
               </div>
             </div>
           ))}
@@ -274,13 +339,14 @@ export default function TehsildarPage() {
           <div
             className="glass-card"
             style={{
-              width: 310,
+              width: 320,
               display: "flex",
               flexDirection: "column",
               padding: 0,
               overflow: "hidden",
               background: "#FFFFFF",
               borderRadius: "var(--radius-lg)",
+              border: "1.5px solid var(--border-glass)",
             }}
           >
             <div
@@ -290,17 +356,51 @@ export default function TehsildarPage() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                background: "var(--bg-secondary)",
+                background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
               }}
             >
-              <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--text-primary)" }}>
-                Magistrate Queue ({pendingApprovals.length})
-              </span>
-              <Clock size={16} style={{ color: "var(--accent-sun)" }} />
+              <div>
+                <span style={{ fontSize: "0.9375rem", fontWeight: 800, color: "var(--text-primary)" }}>
+                  Magistrate Docket
+                </span>
+                <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 600 }}>
+                  {pendingApprovals.length} cases awaiting decree
+                </div>
+              </div>
+              <Clock size={18} style={{ color: "var(--accent-gold)" }} />
             </div>
 
-            <div style={{ flex: 1, overflowY: "auto" }}>
-              {pendingApprovals.map((a) => {
+            {/* Filter tabs */}
+            <div style={{ display: "flex", gap: 4, padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-secondary)" }}>
+              {[
+                { id: "ALL", label: `All (${pendingApprovals.length})` },
+                { id: "PENDING", label: `Pending (${pendingApprovals.filter(a => a.status === 'pending').length})` },
+                { id: "OCCLUDED", label: `Occluded (${pendingApprovals.filter(a => (a.alignment_confidence ?? 1.0) < 0.8).length})` },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setDocketFilter(tab.id as any)}
+                  style={{
+                    flex: 1,
+                    padding: "4px 6px",
+                    borderRadius: "var(--radius-sm)",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    border: docketFilter === tab.id ? "1px solid var(--accent-judicial)" : "1px solid var(--border-glass)",
+                    background: docketFilter === tab.id ? "var(--accent-judicial)" : "#FFFFFF",
+                    color: docketFilter === tab.id ? "#FFFFFF" : "var(--text-secondary)",
+                    cursor: "pointer",
+                    textAlign: "center",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", padding: "6px" }}>
+              {filteredApprovals.map((a) => {
                 const isSelected = selectedApproval?.approval_id === a.approval_id;
                 const isLowConf = (a.alignment_confidence ?? 1.0) < 0.8;
 
@@ -313,10 +413,11 @@ export default function TehsildarPage() {
                       display: "flex",
                       alignItems: "flex-start",
                       gap: 12,
-                      padding: "14px 16px",
-                      background: isSelected ? "var(--accent-primary-bg)" : "transparent",
-                      border: "none",
-                      borderBottom: "1px solid var(--border-subtle)",
+                      padding: "12px 14px",
+                      borderRadius: "var(--radius-md)",
+                      marginBottom: 4,
+                      background: isSelected ? "var(--accent-judicial-bg)" : "transparent",
+                      border: isSelected ? "1.5px solid #93C5FD" : "1px solid transparent",
                       cursor: "pointer",
                       textAlign: "left",
                       transition: "background 0.15s ease",
@@ -325,36 +426,36 @@ export default function TehsildarPage() {
                     <FileCheck
                       size={18}
                       style={{
-                        color: isSelected ? "var(--accent-primary)" : "var(--text-muted)",
+                        color: isSelected ? "var(--accent-judicial)" : "var(--text-muted)",
                         flexShrink: 0,
                         marginTop: 2,
                       }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <strong style={{ fontSize: "0.9375rem", color: "var(--text-primary)" }}>
+                        <strong style={{ fontSize: "0.875rem", color: "var(--text-primary)" }}>
                           Khasra {a.khasra_no}
                         </strong>
                         {isLowConf && (
                           <span
                             style={{
                               fontSize: "0.6875rem",
-                              fontWeight: 700,
-                              background: "var(--accent-sun-bg)",
-                              color: "var(--accent-sun)",
+                              fontWeight: 800,
+                              background: "var(--accent-gold-bg)",
+                              color: "#92400E",
                               padding: "2px 6px",
                               borderRadius: "var(--radius-sm)",
                               border: "1px solid #FDE68A",
                             }}
                           >
-                            Occlusion
+                            Occluded
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: 2 }}>
+                      <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: 2, fontWeight: 500 }}>
                         {a.owner_name} &bull; {a.village}
                       </div>
-                      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 2 }}>
+                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: 2 }}>
                         Submitted by: {a.requested_by}
                       </div>
                     </div>
@@ -362,7 +463,7 @@ export default function TehsildarPage() {
                 );
               })}
 
-              {pendingApprovals.length === 0 && (
+              {filteredApprovals.length === 0 && (
                 <div style={{ padding: 36, textAlign: "center", color: "var(--text-muted)" }}>
                   <CheckCircle2 size={32} style={{ margin: "0 auto 10px", color: "var(--accent-primary)", opacity: 0.8 }} />
                   <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-primary)" }}>All Wards Reconciled</p>
@@ -407,6 +508,15 @@ export default function TehsildarPage() {
                 }
               }}
               showOcclusionAlerts={true}
+              // Old Map & New Map Source Layer Controls
+              basemapUrl={activeBasemap.url}
+              basemapAttribution={activeBasemap.attribution}
+              basemapName={activeBasemap.name}
+              customOldMapGeojson={customOldMapGeojson}
+              scannedMapOverlayUrl={scannedMapOverlayUrl}
+              oldMapOpacity={oldMapOpacity}
+              oldMapStrokeColor={oldMapStrokeColor}
+              onOpenMapSourceModal={() => setIsMapSourceModalOpen(true)}
             />
           </div>
 
@@ -513,6 +623,36 @@ export default function TehsildarPage() {
                   />
                 </div>
 
+                {/* Cryptographic SHA-256 Seal Banner if committed */}
+                {committedSignatures[selectedApproval.parcel_id] && (
+                  <div
+                    style={{
+                      background: "#F0FDF4",
+                      border: "1px solid #86EFAC",
+                      borderRadius: "var(--radius-md)",
+                      padding: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#15803D", display: "flex", alignItems: "center", gap: 5 }}>
+                        <Lock size={13} /> Authoritative SHA-256 Seal
+                      </span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(committedSignatures[selectedApproval.parcel_id]);
+                          toast.success("SHA-256 signature copied!");
+                        }}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#15803D", display: "flex", alignItems: "center", gap: 3, fontSize: "0.7rem", fontWeight: 700 }}
+                      >
+                        <Copy size={12} /> Copy
+                      </button>
+                    </div>
+                    <div style={{ fontFamily: "monospace", fontSize: "0.72rem", color: "#166534", wordBreak: "break-all", background: "#DCFCE7", padding: "4px 8px", borderRadius: 4 }}>
+                      {committedSignatures[selectedApproval.parcel_id]}
+                    </div>
+                  </div>
+                )}
+
                 {/* Action Buttons */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <button
@@ -541,6 +681,7 @@ export default function TehsildarPage() {
                         approvalDate: new Date().toLocaleDateString("en-IN"),
                         endorsementNote: remarks || "Statutory survey adjudication verified under DILRMP 3.0 protocol.",
                         isOccluded: (selectedApproval.alignment_confidence ?? 1) < 0.8,
+                        digitalSignature: committedSignatures[selectedApproval.parcel_id],
                       });
                       toast.success(`Form-II Certificate for Khasra ${selectedApproval.khasra_no} generated!`);
                     }}
@@ -558,6 +699,23 @@ export default function TehsildarPage() {
                     }}
                   >
                     <FileCheck size={16} /> Download Form-II Survey Certificate (PDF)
+                  </button>
+
+                  <button
+                    className="btn-secondary"
+                    onClick={() => openAuditLogs(selectedApproval.parcel_id, selectedApproval.khasra_no)}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      padding: "9px 16px",
+                      fontSize: "0.8125rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <History size={15} /> View Cadastral Audit Trail
                   </button>
 
                   <button
@@ -586,6 +744,171 @@ export default function TehsildarPage() {
           </div>
         </div>
       </main>
+
+      {/* Cadastral Audit Log Modal */}
+      {auditLogsModal.isOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 20,
+          }}
+        >
+          <div
+            className="glass-card animate-fade-in-up"
+            style={{
+              width: "100%",
+              maxWidth: 620,
+              background: "#FFFFFF",
+              borderRadius: "var(--radius-lg)",
+              padding: 24,
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: "var(--radius-md)", background: "var(--accent-primary-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent-primary)" }}>
+                  <History size={18} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--text-primary)" }}>
+                    Khasra {auditLogsModal.khasraNo} — Cadastral Audit Trail
+                  </h3>
+                  <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                    Authoritative DILRMP 3.0 immutable legal ledger with SHA-256 cryptographic proofs
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAuditLogsModal((prev) => ({ ...prev, isOpen: false }))}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ overflowY: "auto", flex: 1, paddingRight: 4 }}>
+              {auditLogsModal.loading ? (
+                <div style={{ textAlign: "center", padding: "30px 0", color: "var(--text-muted)" }}>
+                  <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px" }} />
+                  <p style={{ fontSize: "0.875rem" }}>Verifying cryptographic signatures in audit ledger…</p>
+                </div>
+              ) : auditLogsModal.logs.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "30px 16px", color: "var(--text-muted)", background: "var(--bg-glass-subtle)", borderRadius: "var(--radius-md)" }}>
+                  <Lock size={28} style={{ margin: "0 auto 8px", color: "var(--accent-primary)" }} />
+                  <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-primary)" }}>No Audit Records Yet</p>
+                  <p style={{ fontSize: "0.75rem", marginTop: 4 }}>
+                    Audit entries with SHA-256 digital signatures are recorded whenever a parcel is committed or undergoes statutory adjudication.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {auditLogsModal.logs.map((log: any, idx: number) => (
+                    <div
+                      key={log.id || idx}
+                      style={{
+                        padding: 14,
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--border-glass)",
+                        background: "#F8FAFC",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <span
+                          style={{
+                            fontSize: "0.7rem",
+                            fontWeight: 800,
+                            padding: "2px 8px",
+                            borderRadius: 4,
+                            background: log.action === "COMMITTED" ? "#DCFCE7" : "var(--accent-primary-bg)",
+                            color: log.action === "COMMITTED" ? "#15803D" : "var(--accent-primary)",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {log.action}
+                        </span>
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                          {new Date(log.timestamp).toLocaleString("en-IN")}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: 8 }}>
+                        Officer: <strong style={{ color: "var(--text-primary)" }}>{log.officer_id}</strong> ({log.officer_role})
+                      </div>
+
+                      {/* Cryptographic SHA-256 Box */}
+                      <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 4, padding: "6px 8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+                          <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>
+                            SHA-256 Signature Hash
+                          </span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(log.digital_signature);
+                              toast.success("Signature hash copied!");
+                            }}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent-primary)", fontSize: "0.7rem", fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}
+                          >
+                            <Copy size={11} /> Copy
+                          </button>
+                        </div>
+                        <div style={{ fontFamily: "monospace", fontSize: "0.7rem", color: "#0F172A", wordBreak: "break-all" }}>
+                          {log.digital_signature}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+              <button
+                className="btn-primary"
+                onClick={() => setAuditLogsModal((prev) => ({ ...prev, isOpen: false }))}
+                style={{ padding: "8px 18px", fontSize: "0.875rem" }}
+              >
+                Close Audit View
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Old Map & New Map Source Layer Configuration Modal */}
+      <MapSourceModal
+        isOpen={isMapSourceModalOpen}
+        onClose={() => setIsMapSourceModalOpen(false)}
+        activeBasemapId={activeBasemap.id}
+        onSelectBasemap={(b) => setActiveBasemap(b)}
+        activeOldMapPresetId={activeOldMapPresetId}
+        onSelectOldMapPreset={(presetId) => {
+          setActiveOldMapPresetId(presetId);
+        }}
+        onUploadCustomGeojson={(customData) => {
+          setCustomOldMapGeojson(customData);
+        }}
+        onUploadScannedMap={(imageUrl) => {
+          setScannedMapOverlayUrl(imageUrl);
+        }}
+        oldMapOpacity={oldMapOpacity}
+        onChangeOldMapOpacity={setOldMapOpacity}
+        oldMapStrokeColor={oldMapStrokeColor}
+        onChangeOldMapStrokeColor={setOldMapStrokeColor}
+      />
     </div>
   );
 }
