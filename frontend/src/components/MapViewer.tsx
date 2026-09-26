@@ -167,6 +167,10 @@ interface MapViewerProps {
   oldMapOpacity?: number;
   oldMapStrokeColor?: string;
   onOpenMapSourceModal?: () => void;
+
+  // Integrated Top Control Bar Slots to eliminate floating collisions
+  leftSlot?: React.ReactNode;
+  toolbarOffsetLeft?: number | string;
 }
 
 function FitBounds({ geojsonData }: { geojsonData: FeatureCollection }) {
@@ -347,6 +351,8 @@ export default function MapViewer({
   oldMapOpacity = 80,
   oldMapStrokeColor = "#D97706",
   onOpenMapSourceModal,
+  leftSlot,
+  toolbarOffsetLeft,
 }: MapViewerProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [baseLayer, setBaseLayer] = useState<"drone" | "minimal">("drone");
@@ -910,18 +916,29 @@ export default function MapViewer({
         style={{
           position: "absolute",
           top: 16,
-          left: 16,
+          left: toolbarOffsetLeft ?? 16,
           zIndex: 420,
           padding: "6px 14px",
           display: "flex",
           alignItems: "center",
           flexWrap: "wrap",
-          gap: 10,
+          gap: 8,
           background: "rgba(255, 255, 255, 0.98)",
           borderRadius: "var(--radius-md)",
-          boxShadow: "0 4px 14px rgba(15, 23, 42, 0.12)",
+          boxShadow: "0 4px 16px rgba(15, 23, 42, 0.12)",
+          border: "1.5px solid var(--border-glass)",
+          transition: "left 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+          maxWidth: "calc(100% - 32px)",
         }}
       >
+        {/* Leading Slot (e.g. Halqa Parcel Roster trigger button) */}
+        {leftSlot && (
+          <>
+            {leftSlot}
+            <div style={{ width: 1, height: 20, background: "var(--border-subtle)" }} />
+          </>
+        )}
+
         <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)" }}>
           <Layers size={16} style={{ color: "var(--accent-primary)" }} />
           <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>Map View:</span>

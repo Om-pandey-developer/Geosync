@@ -27,6 +27,7 @@ import {
   SplitSquareVertical,
   Building2,
   Search,
+  X,
 } from "lucide-react";
 import type { FeatureCollection } from "geojson";
 import type { GCPPoint, GCPPair } from "@/components/MapViewer";
@@ -601,6 +602,31 @@ export default function PatwariPage() {
           oldMapOpacity={oldMapOpacity}
           oldMapStrokeColor={oldMapStrokeColor}
           onOpenMapSourceModal={() => setIsMapSourceModalOpen(true)}
+          toolbarOffsetLeft={isRosterOpen ? 356 : 16}
+          leftSlot={
+            <button
+              onClick={() => setIsRosterOpen(!isRosterOpen)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "5px 12px",
+                borderRadius: "var(--radius-sm)",
+                border: isRosterOpen ? "1px solid var(--border-glass)" : "1.5px solid var(--accent-primary-light)",
+                background: isRosterOpen ? "var(--bg-secondary)" : "#F0FDFA",
+                color: isRosterOpen ? "var(--text-secondary)" : "var(--accent-primary)",
+                fontSize: "0.8125rem",
+                fontWeight: 800,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                whiteSpace: "nowrap",
+              }}
+              title={isRosterOpen ? "Hide Halqa Mohanlalganj Parcel Roster" : "Open Halqa Mohanlalganj Parcel Roster"}
+            >
+              {isRosterOpen ? <X size={14} /> : <Building2 size={15} style={{ color: "var(--accent-primary)" }} />}
+              <span>{isRosterOpen ? "Hide Roster" : `Parcel Roster (${parcels.length})`}</span>
+            </button>
+          }
         />
       </div>
 
@@ -610,19 +636,20 @@ export default function PatwariPage() {
           className="glass-card animate-fade-in-up"
           style={{
             position: "absolute",
-            top: 84,
+            bottom: 90,
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 450,
             padding: "10px 18px",
-            background: "rgba(15, 23, 42, 0.94)",
+            background: "rgba(15, 23, 42, 0.95)",
             color: "#FFFFFF",
             borderRadius: "var(--radius-lg)",
             display: "flex",
             alignItems: "center",
             gap: 16,
-            boxShadow: "0 8px 30px rgba(0, 0, 0, 0.35)",
-            border: "1px solid rgba(56, 189, 248, 0.4)",
+            boxShadow: "0 10px 35px rgba(0, 0, 0, 0.4)",
+            border: "1.5px solid rgba(56, 189, 248, 0.5)",
+            whiteSpace: "nowrap",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -674,16 +701,16 @@ export default function PatwariPage() {
       )}
 
       {/* ───── Top Left: Halqa Mohanlalganj Parcel Roster ───── */}
-      {isRosterOpen ? (
+      {isRosterOpen && (
         <div
           className="glass-card animate-fade-in-up"
           style={{
             position: "absolute",
-            top: 84,
-            left: 24,
-            zIndex: 400,
-            width: 330,
-            maxHeight: "calc(100vh - 190px)",
+            top: 80,
+            left: 16,
+            zIndex: 430,
+            width: 326,
+            maxHeight: "calc(100vh - 180px)",
             display: "flex",
             flexDirection: "column",
             background: "rgba(255, 255, 255, 0.98)",
@@ -734,9 +761,10 @@ export default function PatwariPage() {
               onClick={() => setIsRosterOpen(false)}
               className="btn-ghost"
               style={{ padding: 4, color: "var(--text-primary)" }}
-              title="Minimize Roster"
+              title="Close Roster"
+              aria-label="Close Roster"
             >
-              <ChevronDown size={18} style={{ transform: "rotate(90deg)" }} />
+              <X size={18} />
             </button>
           </div>
 
@@ -851,33 +879,6 @@ export default function PatwariPage() {
             )}
           </div>
         </div>
-      ) : (
-        <button
-          onClick={() => setIsRosterOpen(true)}
-          className="glass-card"
-          style={{
-            position: "absolute",
-            top: 84,
-            left: 24,
-            zIndex: 400,
-            padding: "8px 14px",
-            background: "#FFFFFF",
-            borderRadius: "var(--radius-md)",
-            border: "1.5px solid var(--border-glass)",
-            boxShadow: "0 4px 14px rgba(15, 23, 42, 0.08)",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: "pointer",
-            fontWeight: 700,
-            fontSize: "0.8125rem",
-            color: "var(--text-primary)",
-          }}
-          title="Open Halqa Mohanlalganj Parcel Roster"
-        >
-          <Building2 size={16} style={{ color: "var(--accent-primary)" }} />
-          <span>Parcel Roster ({parcels.length})</span>
-        </button>
       )}
 
       {/* ───── Top Right: Collapsible Parcel Dossier ───── */}
@@ -885,8 +886,8 @@ export default function PatwariPage() {
         className="glass-card animate-fade-in-up"
         style={{
           position: "absolute",
-          top: 84,
-          right: 24,
+          top: 80,
+          right: 20,
           zIndex: 400,
           width: 350,
           padding: isDossierCollapsed ? "12px 18px" : "18px 20px",
