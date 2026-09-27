@@ -1,0 +1,161 @@
+================================================================================
+  GEOSYNC COMPREHENSIVE TEST REPORT (v2)
+  Generated: 2026-09-27T20:05:59.934902
+================================================================================
+
+  TOTAL TESTS: 56
+  ✅ PASSED:   54
+  ❌ FAILED:   0
+  ⚠️  WARNINGS: 2
+
+━━━ API Health ━━━
+  ✅ Root endpoint reachable
+     → Status 200
+  ✅ Swagger /docs available
+     → OpenAPI docs accessible
+
+━━━ Parcels ━━━
+  ✅ GET /parcels
+     → Returned 18 parcels
+  ✅ Parcel schema completeness
+     → All required fields present: ['id', 'khasra_no', 'owner_name', 'village', 'alignment_status', 'ulpin', 'area_sqm']
+  ✅ GET /parcels/{id} detail
+     → Parcel detail returned. Has geometry: True
+  ✅ GET /parcels/geojson FeatureCollection
+     → 18 features with type=FeatureCollection
+  ✅ GeoJSON geometry completeness
+     → All parcels have non-empty geometries
+
+━━━ Dashboard ━━━
+  ✅ GET /dashboard/stats
+     → Stats: {"total_parcels": 18, "raw_count": 0, "aligned_count": 13, "cleaned_count": 0, "ulpin_assigned_count": 5, "published_count": 0, "pending_approvals": 3, "approved_count": 5, "rejected_count": 0}
+  ✅ total_parcels matches parcel count
+     → Both report 18 parcels — stats are computed from real DB
+  ✅ Status breakdown sums to total
+     → raw=0 + aligned=13 + cleaned=0 + ulpin=5 + published=0 = 18
+
+━━━ Spatial ━━━
+  ✅ ULPIN generation (26.8467, 80.9462)
+     → ULPIN = 9Y3397AA2ZDCZ4 (len=14)
+  ✅ ULPIN is exactly 14 characters
+     → '9Y3397AA2ZDCZ4'
+  ✅ ULPIN is deterministic (same coords → same ULPIN)
+     → 9Y3397AA2ZDCZ4 == 9Y3397AA2ZDCZ4
+  ✅ Different coords → different ULPIN
+     → Lucknow=9Y3397AA2ZDCZ4, Delhi=9322BBZAZZ7ZB5
+  ✅ Topology cleanup endpoint
+     → Cleaned area = 2027.78 sqm
+  ✅ Area is positive (non-zero)
+     → 2027.8 sqm
+  ✅ Cleaned geometry is valid GeoJSON
+     → Type=MultiPolygon, rings=2
+
+━━━ Alignment ━━━
+  ✅ WGS84→Web Mercator projection
+     → (80.9462, 26.8467) → (9010889.77, 3104331.96) EPSG:3857 meters
+  ✅ Web Mercator→WGS84 roundtrip
+     → Roundtrip: (80.946200, 26.846700) ≈ original
+  ✅ Confidence score computation
+     → 150 inliers / 200 matches / 5px RMSE → 81.55%
+  ✅ Confidence in valid range [0,100]
+     → 81.55%
+  ✅ Zero-match confidence = 0
+     → 0.0
+  ✅ ORB detector instantiation
+     → nFeatures=5000, nLevels=8
+  ✅ GeoJSON → contour rasterization
+     → Image shape: (2048, 2048), non-zero pixels: 22328
+  ✅ Full pipeline via POST /align/{id}
+     → Status=ALIGNED_DRAFT, Confidence=0.0, Keypoints=0, Msg=ORB-RANSAC aligned with 0 inliers. Confidence: 0.0%
+
+━━━ GeoSAM ━━━
+  ✅ Boundary extraction endpoint
+     → Confidence=67.38%, Occluded=True, Shadow=0.4089, Canopy=0.1515, Device=cpu, Time=19876.8ms
+  ✅ Extracted geometry is valid
+     → Type=Polygon, coordinates present
+  ✅ Model backbone metadata
+     → Backbone: Meta-SAM-ViT-B
+  ✅ Shadow ratio valid
+     → Shadow=0.4089 (computed from pixel data)
+  ✅ Canopy ratio valid
+     → Canopy=0.1515 (computed from pixel data)
+  ✅ ViT-B embedding dimension
+     → dim=768
+  ✅ HITL review flag present
+     → hitl_review_required=True
+  ⚠️ Real GeoTIFF raster used
+     → Using SYNTHETIC fallback patch — no GeoTIFF uploaded. Values are still computed on synthetic data (not hardcoded).
+
+━━━ Workflow ━━━
+  ✅ Found eligible parcel
+     → Parcel 5845c3bb... status=ULPIN_ASSIGNED
+  ✅ POST /approvals (submit for approval)
+     → Approval ID: 51d40e37-de88-4534-bf85-6e72139d2827, message: An approval request is already pending for this parcel.
+  ✅ GET /approvals/pending
+     → 3 pending approvals
+  ✅ Pending approval includes parcel details
+     → Fields: ['approval_id', 'parcel_id', 'requested_by', 'status', 'requested_at', 'khasra_no', 'owner_name', 'village', 'tehsil', 'district']
+
+━━━ ULPIN API ━━━
+  ✅ POST /v1/generate-ulpin
+     → ULPIN=9YYD56AA2Z9Y3A, lat=26.76099767979002, lon=80.90151367979001
+  ✅ ULPIN length = 14
+     → '9YYD56AA2Z9Y3A'
+
+━━━ Officer ━━━
+  ✅ Valid officer validation
+     → valid=True, officer_id=REV-TEH-3210, msg=Officer credential verified for Tehsildar Vikram K Sharma
+  ⚠️ Invalid officer rejected (422)
+     → No response
+
+━━━ Frontend Audit ━━━
+  ✅ Finding #1
+     → getParcels() returns real backend data (backendParcels) when API succeeds, falls back to localParcels only on error (2 fallback paths)
+  ✅ Finding #2
+     → getDashboardStats() fetches from real /dashboard/stats endpoint
+  ✅ Finding #3
+     → API calls use 3000ms timeout (reasonable for LAN)
+  ✅ Finding #4
+     → Patwari page fetches directly from backend API (not via apiClient mock)
+  ✅ Finding #5
+     → Patwari page calls GeoSAM boundary extraction via real API
+  ✅ Finding #6
+     → Patwari page triggers real alignment pipeline via API
+  ✅ Finding #7
+     → Tehsildar page fetches dashboard stats from real backend
+  ✅ Finding #8
+     → Tehsildar page fetches pending approvals from real backend
+  ✅ Finding #9
+     → Tehsildar page calls real commit-parcel endpoint
+
+━━━ Registration ━━━
+  ✅ POST /v1/register-parcel
+     → Registered: parcel_id=f0542173-61e0-4521-be65-912b32f54040, khasra=999
+  ✅ Newly registered parcel retrievable
+     → khasra_no=999, status=DRAFT
+
+━━━ Audit ━━━
+  ✅ Commit and audit services importable
+     → commit_parcel_to_db and generate_ulpin are available
+  ✅ SHA-256 signature generation
+     → Signature length = 64 hex chars (correct)
+
+━━━ Bhuvan WMS ━━━
+  ✅ Infrastructure overlap check
+     → Result: {"verified_via": "ISRO Bhuvan OGC WMS Live", "layer": "lulc:UP_LULC50K_1112", "endpoint": "https://bhuvan-vec2.nrsc.gov.in/bhuvan/wms", "bbox": [80.901, 26.7605, 80.9022, 26.7615], "has_infrastructure
+
+━━━ Cleanup ━━━
+  ✅ Deleted test parcel
+     → Removed f0542173...
+
+================================================================================
+  CRITICAL FINDINGS SUMMARY
+================================================================================
+
+  ✅ No critical failures detected!
+
+  ⚠️  2 WARNINGS:
+    • [GeoSAM] Real GeoTIFF raster used: Using SYNTHETIC fallback patch — no GeoTIFF uploaded. Values are still computed on synthetic data (n
+    • [Officer] Invalid officer rejected (422): No response
+
+================================================================================

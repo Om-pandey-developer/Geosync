@@ -40,6 +40,14 @@ def _migrate_existing_db_enums():
         "ulpin_assigned": "ULPIN_ASSIGNED",
     }
     try:
+        if not IS_SQLITE:
+            with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                for val in ["DRAFT", "ALIGNED_DRAFT", "TOPOLOGY_CLEANED", "ULPIN_ASSIGNED", "PUBLISHED"]:
+                    try:
+                        conn.execute(text(f"ALTER TYPE alignment_status_enum ADD VALUE IF NOT EXISTS '{val}'"))
+                    except Exception as enum_err:
+                        logger.debug("Enum value '%s' add check: %s", val, enum_err)
+
         with engine.begin() as conn:
             for old_val, new_val in status_map.items():
                 conn.execute(
@@ -49,6 +57,7 @@ def _migrate_existing_db_enums():
         logger.info("✅ Database enum status migration verified.")
     except Exception as e:
         logger.warning("Enum migration check skipped or completed: %s", e)
+
 
 
 @asynccontextmanager

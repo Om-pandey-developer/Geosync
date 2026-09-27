@@ -26,23 +26,47 @@ let localParcels: BoundaryParcel[] = [...INITIAL_PARCELS];
 
 /**
  * Clean API Client layer for Project GeoSync.
- * Swappable with real FastAPI endpoints.
+ * Attempts real backend first, falls back to mock data only on failure.
  */
 export const apiClient = {
-  // 1. Fetch all parcels
+  // 1. Fetch all parcels — uses real backend data when available
   async getParcels(): Promise<BoundaryParcel[]> {
     try {
-      const res = await fetch(`${getApiUrl()}/parcels`, { signal: AbortSignal.timeout(1500) });
+      const res = await fetch(`${getApiUrl()}/parcels`, { signal: AbortSignal.timeout(3000) });
       if (res.ok) {
         const data = await res.json();
-        // If backend returns data, map it; otherwise fall back to localParcels
         if (Array.isArray(data) && data.length > 0) {
-          // Merge with local approved state
-          return localParcels;
+          // Map backend data to BoundaryParcel format and merge with local approval state
+          const backendParcels = data.map((p: any) => {
+            // Check if we have local approval state for this parcel
+            const localMatch = localParcels.find((lp) => lp.khasra_no === p.khasra_no);
+            return {
+              id: p.id,
+              khasra_no: p.khasra_no,
+              owner_name: p.owner_name,
+              village: p.village,
+              tehsil: p.tehsil || localMatch?.tehsil || "",
+              district: p.district || localMatch?.district || "",
+              state: p.state || localMatch?.state || "Uttar Pradesh",
+              area_sqm: p.area_sqm || localMatch?.area_sqm || 0,
+              legacy_area_sqm: localMatch?.legacy_area_sqm || p.area_sqm || 0,
+              ulpin: p.ulpin || localMatch?.ulpin || "",
+              status: localMatch?.status || (p.alignment_status === "PUBLISHED" ? "approved" : "pending"),
+              confidence: p.alignment_confidence || localMatch?.confidence || 0,
+              last_updated_by: localMatch?.last_updated_by || "AI GeoSAM Pipeline (v2.4)",
+              last_updated_at: localMatch?.last_updated_at || new Date().toISOString(),
+              approval_timestamp: localMatch?.approval_timestamp,
+              approving_officer: localMatch?.approving_officer,
+              coordinates: localMatch?.coordinates || [],
+              legacy_coordinates: localMatch?.legacy_coordinates || [],
+              reason: localMatch?.reason || "",
+            } as BoundaryParcel;
+          });
+          return backendParcels;
         }
       }
     } catch {
-      // Graceful fallback to client mock
+      // Graceful fallback to client mock on connection error
     }
     return localParcels;
   },
@@ -65,7 +89,7 @@ export const apiClient = {
           requested_by: officerName,
           status: "approved",
         }),
-        signal: AbortSignal.timeout(1500),
+        signal: AbortSignal.timeout(3000),
       });
     } catch {
       // Mock fallback
@@ -96,9 +120,37 @@ export const apiClient = {
     return localParcels;
   },
 
-  // 5. Fetch Dashboard Stats
+  // 5. Fetch Dashboard Stats — uses real backend data when available
   async getDashboardStats(): Promise<DashboardStats> {
-    // Dynamically calculate based on local parcels state
+    try {
+      const res = await fetch(`${getApiUrl()}/dashboard/stats`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const backendStats = await res.json();
+        // Map real backend stats into DashboardStats format
+        const totalParcels = backendStats.total_parcels || 0;
+        const approvedCount = backendStats.published_count || 0;
+        const pendingCount = backendStats.pending_approvals || 0;
+        const alignedCount = backendStats.aligned_count || 0;
+
+        return {
+          propertiesProcessed: totalParcels,
+          averageAccuracyPercent: MOCK_STATS.averageAccuracyPercent, // Not tracked by backend yet
+          pendingApprovalsCount: pendingCount,
+          estimatedTaxImpactCrores: MOCK_STATS.estimatedTaxImpactCrores, // Not tracked by backend yet
+          disputeReductionPercent: MOCK_STATS.disputeReductionPercent, // Not tracked by backend yet
+          statusBreakdown: [
+            { name: "Approved / Published", value: approvedCount, color: "#16A34A" },
+            { name: "AI-Drafted / Pending", value: alignedCount + pendingCount, color: "#DC2626" },
+            { name: "Flagged (GCP Required)", value: backendStats.raw_count || 0, color: "#D97706" },
+          ],
+          processingTimeline: MOCK_STATS.processingTimeline, // Historical timeline not tracked by backend
+        };
+      }
+    } catch {
+      // Fallback to mock
+    }
+
+    // Fallback: dynamically calculate based on local parcels state
     const approvedCount = localParcels.filter((p) => p.status === "approved").length;
     const pendingCount = localParcels.filter((p) => p.status === "pending").length;
     const flaggedCount = localParcels.filter((p) => p.status === "flagged").length;
@@ -107,9 +159,9 @@ export const apiClient = {
       ...MOCK_STATS,
       pendingApprovalsCount: pendingCount,
       statusBreakdown: [
-        { name: "Approved / Published", value: 1120 + approvedCount, color: "#16A34A" }, // Green
-        { name: "AI-Drafted / Pending", value: 94 + pendingCount, color: "#DC2626" },   // Red
-        { name: "Flagged (GCP Required)", value: 34 + flaggedCount, color: "#D97706" }, // Amber
+        { name: "Approved / Published", value: approvedCount, color: "#16A34A" },
+        { name: "AI-Drafted / Pending", value: pendingCount, color: "#DC2626" },
+        { name: "Flagged (GCP Required)", value: flaggedCount, color: "#D97706" },
       ],
     };
   },
