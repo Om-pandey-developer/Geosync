@@ -69,6 +69,16 @@ from shapely.geometry import shape, mapping
 router = APIRouter()
 
 
+def _resolve_parcel_id(parcel_id) -> uuid.UUID:
+    """Safely converts string or UUID object to uuid.UUID."""
+    if isinstance(parcel_id, uuid.UUID):
+        return parcel_id
+    try:
+        return uuid.UUID(str(parcel_id))
+    except Exception:
+        return parcel_id
+
+
 def _get_geojson_dict(parcel: Parcel) -> dict:
     """Helper to convert parcel geometry to GeoJSON dict."""
     try:
@@ -131,7 +141,7 @@ def get_parcels_geojson(db: Session = Depends(get_db)):
 @router.get("/parcels/{parcel_id}", tags=["Parcels"])
 def get_parcel(parcel_id: str, db: Session = Depends(get_db)):
     """Returns full details of a single parcel with GeoJSON geometry."""
-    p = db.query(Parcel).filter(Parcel.id == parcel_id).first()
+    p = db.query(Parcel).filter(Parcel.id == _resolve_parcel_id(parcel_id)).first()
     if not p:
         raise HTTPException(status_code=404, detail="Parcel not found")
 
@@ -249,7 +259,7 @@ def align_parcel(parcel_id: str, db: Session = Depends(get_db)):
     Triggers the OpenCV alignment pipeline (ORB → RANSAC → TPS) on a parcel.
     Updates the parcel status to 'aligned' with confidence score and caches draft in Redis.
     """
-    parcel = db.query(Parcel).filter(Parcel.id == parcel_id).first()
+    parcel = db.query(Parcel).filter(Parcel.id == _resolve_parcel_id(parcel_id)).first()
     if not parcel:
         raise HTTPException(status_code=404, detail="Parcel not found")
 
@@ -330,7 +340,7 @@ def discard_aligned_draft(parcel_id: str, db: Session = Depends(get_db)):
     DELETE /api/v1/aligned-draft/{parcel_id}
     Discards uncommitted aligned boundary draft from Redis and reverts parcel status to DRAFT.
     """
-    parcel = db.query(Parcel).filter(Parcel.id == parcel_id).first()
+    parcel = db.query(Parcel).filter(Parcel.id == _resolve_parcel_id(parcel_id)).first()
     if not parcel:
         raise HTTPException(status_code=404, detail="Parcel not found")
 
@@ -355,7 +365,7 @@ def _execute_batch_alignment_task(batch_id: str, parcel_ids: List[str]):
     try:
         for pid in parcel_ids:
             try:
-                parcel = db.query(Parcel).filter(Parcel.id == pid).first()
+                parcel = db.query(Parcel).filter(Parcel.id == _resolve_parcel_id(pid)).first()
                 if not parcel:
                     update_batch_progress(batch_id, success=False, error_msg=f"Parcel {pid} not found")
                     continue
@@ -570,6 +580,7 @@ def api_commit_parcel(
             ulpin=result["ulpin"],
             committed_at=result["committed_at"],
             officer_id=result["officer_id"],
+            digital_signature=result["digital_signature"],
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -723,7 +734,7 @@ def get_parcel_audit_logs(parcel_id: str, db: Session = Depends(get_db)):
     GET /api/v1/parcels/{parcel_id}/audit-logs
     Retrieves the immutable audit trail for a parcel with SHA-256 digital signatures.
     """
-    pid_uuid = uuid.UUID(parcel_id) if not isinstance(parcel_id, uuid.UUID) else parcel_id
+    pid_uuid = _resolve_parcel_id(parcel_id)
     logs = db.query(CadastralAuditLog).filter(CadastralAuditLog.parcel_id == pid_uuid).order_by(CadastralAuditLog.timestamp.desc()).all()
     return logs
 

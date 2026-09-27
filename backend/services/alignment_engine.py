@@ -109,41 +109,46 @@ except Exception:
     redis_client = None
     HAS_REDIS = False
 
+_memory_draft_cache = {}
+
 def cache_aligned_draft(parcel_id: str, alignment_data: dict, ttl_seconds: int = 86400) -> bool:
-    """Caches aligned GeoJSON and metadata with status ALIGNED_DRAFT in Redis."""
-    global HAS_REDIS, redis_client
+    """Caches aligned GeoJSON and metadata with status ALIGNED_DRAFT in Redis or in-memory fallback."""
+    global HAS_REDIS, redis_client, _memory_draft_cache
+    payload = {
+        "status": "ALIGNED_DRAFT",
+        "cached_at": time.time(),
+        **alignment_data
+    }
+    _memory_draft_cache[str(parcel_id)] = payload
     if not HAS_REDIS or not redis_client:
-        return False
+        return True
     try:
         key = f"geosync:alignment:{parcel_id}"
-        payload = {
-            "status": "ALIGNED_DRAFT",
-            "cached_at": time.time(),
-            **alignment_data
-        }
         redis_client.setex(key, ttl_seconds, json.dumps(payload))
         logger.info("Cached ALIGNED_DRAFT for parcel %s in Redis (TTL: %ds)", parcel_id, ttl_seconds)
         return True
     except Exception as e:
         logger.warning("Redis cache error: %s", e)
-        return False
+        return True
 
 def get_cached_aligned_draft(parcel_id: str) -> Optional[dict]:
-    """Retrieves cached ALIGNED_DRAFT for parcel_id from Redis."""
-    global HAS_REDIS, redis_client
-    if not HAS_REDIS or not redis_client:
-        return None
-    try:
-        key = f"geosync:alignment:{parcel_id}"
-        val = redis_client.get(key)
-        return json.loads(val) if val else None
-    except Exception:
-        return None
+    """Retrieves cached ALIGNED_DRAFT for parcel_id from Redis or in-memory fallback."""
+    global HAS_REDIS, redis_client, _memory_draft_cache
+    if HAS_REDIS and redis_client:
+        try:
+            key = f"geosync:alignment:{parcel_id}"
+            val = redis_client.get(key)
+            if val:
+                return json.loads(val)
+        except Exception:
+            pass
+    return _memory_draft_cache.get(str(parcel_id))
 
 
 def discard_cached_aligned_draft(parcel_id: str) -> bool:
-    """Removes cached ALIGNED_DRAFT for parcel_id from Redis."""
-    global HAS_REDIS, redis_client
+    """Removes cached ALIGNED_DRAFT for parcel_id from Redis and in-memory fallback."""
+    global HAS_REDIS, redis_client, _memory_draft_cache
+    _memory_draft_cache.pop(str(parcel_id), None)
     if not HAS_REDIS or not redis_client:
         return True
     try:

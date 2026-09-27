@@ -1047,7 +1047,7 @@ export default function LandingPage() {
                   marginBottom: 20,
                 }}
               >
-                The field engineer's command center: Import historical BhuNaksha GeoJSON or scanned cloth maps, drop Ground Control Points (GCPs), execute Thin-Plate Spline rubber-sheeting, drag polygon corner vertices (HITL calibration), and extract boundaries using zero-shot GeoSAM ViT-H AI.
+                The field engineer&apos;s command center: Import historical BhuNaksha GeoJSON or scanned cloth maps, drop Ground Control Points (GCPs), execute Thin-Plate Spline rubber-sheeting, drag polygon corner vertices (HITL calibration), and extract boundaries using zero-shot GeoSAM ViT-H AI.
               </p>
 
               {/* Key Features */}
@@ -1210,7 +1210,7 @@ export default function LandingPage() {
                   marginBottom: 20,
                 }}
               >
-                The revenue magistrate's judicial bench: Adjudicate contested boundary disputes, review split-screen curtain swipe evidence between historical and drone cadastre, verify AI confidence, stamp cryptographic SHA-256 seals, and issue statutory Form-II Survey Certificates.
+                The revenue magistrate&apos;s judicial bench: Adjudicate contested boundary disputes, review split-screen curtain swipe evidence between historical and drone cadastre, verify AI confidence, stamp cryptographic SHA-256 seals, and issue statutory Form-II Survey Certificates.
               </p>
 
               {/* Key Features */}

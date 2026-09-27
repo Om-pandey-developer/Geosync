@@ -234,7 +234,7 @@ export default function PatwariPage() {
     }
   };
 
-  const fetchData = useCallback(async () => {
+  const fetchData = async () => {
     try {
       const [parcelsRes, geojsonRes] = await Promise.all([
         fetch(`${API}/parcels`),
@@ -246,11 +246,12 @@ export default function PatwariPage() {
     } catch {
       toast.error("Connecting to local offline fallback database...", { duration: 2500 });
     }
-  }, []);
+  };
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedParcel = useMemo(
     () => parcels.find((p) => p.id === selectedId),

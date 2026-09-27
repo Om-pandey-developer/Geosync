@@ -35,7 +35,15 @@ def create_approval_request(db: Session, parcel_id: str, requested_by: str = "pa
     if parcel is None:
         raise ValueError(f"Parcel {parcel_id} not found")
 
-    if parcel.alignment_status not in ("ulpin_assigned", "cleaned", "aligned"):
+    curr_status = parcel.alignment_status.value if hasattr(parcel.alignment_status, "value") else str(parcel.alignment_status)
+    valid_statuses = {
+        AlignmentStatusEnum.ALIGNED_DRAFT.value,
+        AlignmentStatusEnum.TOPOLOGY_CLEANED.value,
+        AlignmentStatusEnum.ULPIN_ASSIGNED.value,
+        AlignmentStatusEnum.PUBLISHED.value,
+        "aligned", "cleaned", "ulpin_assigned", "published", "PUBLISHED"
+    }
+    if curr_status not in valid_statuses:
         raise ValueError(
             f"Parcel must be at least aligned before submitting for approval. Current: {parcel.alignment_status}"
         )
