@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
   CheckCircle2,
@@ -19,6 +20,12 @@ import {
   Copy,
   Lock,
   X,
+  ChevronDown,
+  ChevronUp,
+  Scale,
+  Search,
+  LogOut,
+  ChevronRight,
 } from "lucide-react";
 import type { FeatureCollection } from "geojson";
 
@@ -28,6 +35,7 @@ import RoleGuard from "@/components/RoleGuard";
 import { API } from "@/lib/api";
 import { generateFormIIPdf } from "@/lib/pdfGenerator";
 import { formatAlignmentStatus } from "@/lib/statusHelper";
+import { useAuth } from "@/lib/authContext";
 
 interface DashboardStats {
   total_parcels: number;
@@ -59,6 +67,8 @@ interface PendingApproval {
 }
 
 export default function TehsildarPage() {
+  const router = useRouter();
+  const { officer, logout } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [geojson, setGeojson] = useState<FeatureCollection | null>(null);
@@ -67,6 +77,9 @@ export default function TehsildarPage() {
   const [loading, setLoading] = useState(false);
   const [committedSignatures, setCommittedSignatures] = useState<Record<string, string>>({});
   const [docketFilter, setDocketFilter] = useState<"ALL" | "PENDING" | "OCCLUDED">("ALL");
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isDossierCollapsed, setIsDossierCollapsed] = useState(false);
+  const [docketSearch, setDocketSearch] = useState("");
 
   // Old Map & New Map Source Layer Controls
   const [isMapSourceModalOpen, setIsMapSourceModalOpen] = useState(false);
@@ -82,6 +95,23 @@ export default function TehsildarPage() {
     window.addEventListener("open-map-source-modal", handleOpenModal);
     return () => window.removeEventListener("open-map-source-modal", handleOpenModal);
   }, []);
+
+  // Smooth click-outside dismiss for profile dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("#tehsildar-profile-menu-container")) {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+    if (isProfileDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isProfileDropdownOpen]);
+
   const [auditLogsModal, setAuditLogsModal] = useState<{
     isOpen: boolean;
     parcelId: string;
@@ -98,51 +128,60 @@ export default function TehsildarPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [statsRes, pendingRes, geojsonRes] = await Promise.all([
-        fetch(`${API}/dashboard/stats`),
-        fetch(`${API}/approvals/pending`),
-        fetch(`${API}/parcels/geojson`),
+      const [statsRes, approvalsRes, geojsonRes] = await Promise.all([
+        fetch(`${API}/dashboard/stats`).catch(() => null),
+        fetch(`${API}/approvals/pending`).catch(() => null),
+        fetch(`${API}/parcels/geojson`).catch(() => null),
       ]);
-      if (!statsRes.ok || !pendingRes.ok || !geojsonRes.ok) throw new Error("Data error");
-      const statsData = await statsRes.json();
-      const pendingData = await pendingRes.json();
-      const geojsonData = await geojsonRes.json();
 
-      setStats(statsData);
-      setPendingApprovals(pendingData);
-      setGeojson(geojsonData);
-
-      // Auto-select first docket if none selected
-      setSelectedApproval((prev) => {
-        if (prev && pendingData.some((a: PendingApproval) => a.approval_id === prev.approval_id)) {
-          return prev;
+      if (statsRes && statsRes.ok) {
+        setStats(await statsRes.json());
+      }
+      if (approvalsRes && approvalsRes.ok) {
+        const raw = await approvalsRes.json();
+        const mapped: PendingApproval[] = raw.map((item: any) => ({
+          approval_id: item.id,
+          parcel_id: item.parcel_id,
+          requested_by: item.requested_by,
+          status: item.status,
+          requested_at: item.created_at,
+          khasra_no: item.parcel?.khasra_no || "N/A",
+          owner_name: item.parcel?.owner_name || "Unknown",
+          village: item.parcel?.village || "Mohanlalganj",
+          tehsil: item.parcel?.tehsil || "Mohanlalganj",
+          district: item.parcel?.district || "Lucknow",
+          ulpin: item.parcel?.ulpin || null,
+          area_sqm: item.parcel?.area_sqm || null,
+          alignment_status: item.parcel?.alignment_status || "aligned",
+          alignment_confidence: item.parcel?.alignment_confidence ?? 0.92,
+        }));
+        setPendingApprovals(mapped);
+        if (mapped.length > 0 && !selectedApproval) {
+          setSelectedApproval(mapped[0]);
         }
-        return pendingData.length > 0 ? pendingData[0] : null;
-      });
+      }
+      if (geojsonRes && geojsonRes.ok) {
+        setGeojson(await geojsonRes.json());
+      }
     } catch {
-      toast.error("Using offline local proxy database...");
+      toast.error("Connecting to local offline fallback database...", { duration: 2500 });
     }
-  }, []);
+  }, [selectedApproval]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Open Audit Log Modal
-  const openAuditLogs = async (parcelId: string, khasraNo: string) => {
-    setAuditLogsModal({ isOpen: true, parcelId, khasraNo, logs: [], loading: true });
+  const handleResetDemo = async () => {
+    const tId = toast.loading("Resetting Tehsildar queue with 4 test dockets...");
     try {
-      const res = await fetch(`${API}/v1/parcels/${parcelId}/audit-logs`);
-      if (res.ok) {
-        const logs = await res.json();
-        setAuditLogsModal({ isOpen: true, parcelId, khasraNo, logs, loading: false });
-      } else {
-        setAuditLogsModal((prev) => ({ ...prev, loading: false }));
-        toast.error("No audit logs found for this parcel");
-      }
+      const res = await fetch(`${API}/v1/reset-demo`, { method: "POST" });
+      if (!res.ok) throw new Error("Reset endpoint failed");
+      toast.success("Demo Dockets Reset: 4 parcels queued for adjudication!", { id: tId });
+      setSelectedApproval(null);
+      await fetchData();
     } catch {
-      setAuditLogsModal((prev) => ({ ...prev, loading: false }));
-      toast.error("Failed to load audit logs");
+      toast.error("Failed to reset demo state on backend", { id: tId });
     }
   };
 
@@ -153,71 +192,85 @@ export default function TehsildarPage() {
     const tId = toast.loading(`Executing legal HITL validation for Khasra ${selectedApproval.khasra_no}...`);
 
     try {
-      // 1. Legal Database Commit with SHA-256 signature
       const commitRes = await fetch(`${API}/v1/commit-parcel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           parcel_id: selectedApproval.parcel_id,
           ulpin: selectedApproval.ulpin,
-          officer_id: "TEHSILDAR-LKO-01",
-          audit_notes: remarks || "Statutory approval under DILRMP 3.0 National Land Stack guidelines.",
+          officer_id: officer?.officerId || "REV-TEH-3210 (Priya Sharma, PCS)",
+          audit_notes: remarks || "Statutory revenue adjudication verified under DILRMP 3.0 protocol.",
         }),
       });
 
-      let signature = "";
-      if (commitRes.ok) {
-        const commitData = await commitRes.json();
-        signature = commitData.digital_signature || "";
-        if (signature) {
-          setCommittedSignatures((prev) => ({
-            ...prev,
-            [selectedApproval.parcel_id]: signature,
-          }));
-        }
+      if (!commitRes.ok) {
+        const err = await commitRes.json();
+        throw new Error(err.detail || "Commit rejected by state machine");
       }
 
-      // Step 2: Update workflow approval docket
+      const commitData = await commitRes.json();
+      const shaSig = commitData.sha256_hash;
+
+      setCommittedSignatures((prev) => ({
+        ...prev,
+        [selectedApproval.parcel_id]: shaSig,
+      }));
+
       if (!selectedApproval.approval_id.startsWith("preview-")) {
         await fetch(`${API}/approvals/${selectedApproval.approval_id}/action`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            reviewed_by: "tehsildar_mohanlalganj",
+            reviewed_by: officer?.officerId || "REV-TEH-3210 (Priya Sharma, PCS)",
             action: "approved",
-            remarks: remarks || "Verified boundary conforms to NAKSHA 5cm drone survey.",
+            remarks: remarks || "Boundary endorsed and officially committed.",
           }),
         });
       }
 
       toast.success(
-        `Khasra ${selectedApproval.khasra_no} approved & published! SHA-256 seal: ${signature ? signature.slice(0, 12) + "…" : "Generated"}`,
+        `Khasra ${selectedApproval.khasra_no} committed as 'PUBLISHED'! SHA-256 seal generated.`,
         { id: tId, duration: 4000 }
       );
-      setSelectedApproval(null);
+
       setRemarks("");
       await fetchData();
-    } catch {
-      toast.error("Error committing parcel to registry", { id: tId });
+    } catch (err: any) {
+      toast.error(err.message || "Approval execution error", { id: tId });
     }
     setLoading(false);
   };
 
-  const handleResetDemo = async () => {
+  const openAuditLogs = async (parcelId: string, khasraNo: string) => {
+    setAuditLogsModal({
+      isOpen: true,
+      parcelId,
+      khasraNo,
+      logs: [],
+      loading: true,
+    });
+
     try {
-      const tId = toast.loading("Restoring demo dockets...");
-      await fetch(`${API}/approvals/seed-demo`, { method: "POST" });
-      await fetchData();
-      toast.success("Loaded 4 demo approval dockets!", { id: tId });
+      const res = await fetch(`${API}/v1/audit-trail/${parcelId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLogsModal((prev) => ({
+          ...prev,
+          logs: data.trail || [],
+          loading: false,
+        }));
+      } else {
+        setAuditLogsModal((prev) => ({ ...prev, loading: false }));
+      }
     } catch {
-      toast.error("Failed to seed demo dockets");
+      setAuditLogsModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
   const handleReject = async () => {
     if (!selectedApproval) return;
     setLoading(true);
-    const tId = toast.loading(`Returning Khasra ${selectedApproval.khasra_no} for re-survey...`);
+    const tId = toast.loading(`Rejecting alignment for Khasra ${selectedApproval.khasra_no}...`);
 
     try {
       if (!selectedApproval.approval_id.startsWith("preview-")) {
@@ -225,7 +278,7 @@ export default function TehsildarPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            reviewed_by: "tehsildar_mohanlalganj",
+            reviewed_by: officer?.officerId || "REV-TEH-3210 (Priya Sharma, PCS)",
             action: "rejected",
             remarks: remarks || "Boundary discrepancy detected against 5cm drone raster.",
           }),
@@ -242,244 +295,600 @@ export default function TehsildarPage() {
   };
 
   const filteredApprovals = pendingApprovals.filter((a) => {
+    const q = docketSearch.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      a.khasra_no.toLowerCase().includes(q) ||
+      a.owner_name.toLowerCase().includes(q) ||
+      (a.ulpin && a.ulpin.toLowerCase().includes(q));
+
+    if (!matchesSearch) return false;
     if (docketFilter === "ALL") return true;
     if (docketFilter === "PENDING") return a.status === "pending";
     if (docketFilter === "OCCLUDED") return (a.alignment_confidence ?? 1.0) < 0.8;
     return true;
   });
 
-  const statCards = [
-    {
-      label: "Total Ward Parcels",
-      value: stats?.total_parcels ?? 18,
-      icon: <Layers size={20} />,
-      accent: "var(--accent-primary)",
-      sub: "Ward 12 Mohanlalganj",
-    },
-    {
-      label: "Bhu-Aadhaar Assigned",
-      value: stats?.ulpin_assigned_count ?? 12,
-      icon: <Fingerprint size={20} />,
-      accent: "var(--accent-mint)",
-      sub: "14-digit DoLR ULPIN",
-    },
-    {
-      label: "Pending Adjudications",
-      value: pendingApprovals.length,
-      icon: <Clock size={20} />,
-      accent: "var(--accent-gold)",
-      sub: "Active Bench Docket",
-    },
-    {
-      label: "Legally Committed",
-      value: stats?.published_count ?? stats?.approved_count ?? 5,
-      icon: <CheckCircle2 size={20} />,
-      accent: "var(--accent-judicial)",
-      sub: "SHA-256 e-Sign Form-II",
-    },
-  ];
-
   return (
     <RoleGuard requiredRole="tehsildar">
-      <div style={{ display: "flex", flexDirection: "column", height: "100vh", paddingTop: 64, overflow: "hidden" }}>
-      <main style={{ flex: 1, padding: "20px 24px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        
-        {/* ───── Header Bar ───── */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <h1 style={{ fontSize: "1.45rem", fontWeight: 800, color: "var(--text-primary)" }}>
-                Revenue Magistrate HITL Adjudication Chamber
-              </h1>
-              <span className="badge-pastel-teal">
-                DILRMP 3.0 / NAKSHA Pilot
-              </span>
-            </div>
-            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginTop: 3 }}>
-              Mohanlalganj Tehsil, Lucknow District &mdash; Human-in-the-Loop Legal Validation Engine
-            </p>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button className="btn-secondary" onClick={handleResetDemo} style={{ padding: "8px 14px", fontSize: "0.82rem", display: "flex", alignItems: "center", gap: 6 }}>
-              <RefreshCw size={14} /> Reset Demo Dockets
-            </button>
-            <button className="btn-ghost" onClick={fetchData} style={{ padding: "8px 14px", fontSize: "0.82rem" }}>
-              <RefreshCw size={14} /> Refresh Records
-            </button>
-          </div>
-        </div>
-
-        {/* ───── Stat Cards Bar ───── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 16 }}>
-          {statCards.map((card, i) => (
-            <div
-              key={i}
-              className="stats-counter-card"
-            >
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: card.accent }} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)" }}>
-                  {card.label}
-                </span>
-                <span style={{ color: card.accent }}>{card.icon}</span>
-              </div>
-              <div style={{ fontSize: "1.85rem", fontWeight: 900, color: card.accent }}>
-                {card.value}
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 2, fontWeight: 500 }}>
-                {card.sub}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ───── Split View: Left List + Center Map + Right Dossier ───── */}
-        <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh", paddingTop: 68, overflow: "hidden", background: "var(--bg-primary)" }}>
+        <main style={{ flex: 1, padding: "12px 20px", display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
           
-          {/* Left Panel: Pending Approvals Queue */}
+          {/* ───── Sleek Top Control Bar: Tehsildar Profile Button (Left) & Compact KPI Chips (Right) ───── */}
           <div
-            className="glass-card"
+            id="tehsildar-profile-menu-container"
             style={{
-              width: 320,
               display: "flex",
-              flexDirection: "column",
-              padding: 0,
-              overflow: "hidden",
-              background: "#FFFFFF",
-              borderRadius: "var(--radius-lg)",
-              border: "1.5px solid var(--border-glass)",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 10,
+              flexShrink: 0,
+              position: "relative",
+              zIndex: 600,
             }}
           >
-            <div
-              style={{
-                padding: "14px 16px",
-                borderBottom: "1px solid var(--border-subtle)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
-              }}
-            >
-              <div>
-                <span style={{ fontSize: "0.9375rem", fontWeight: 800, color: "var(--text-primary)" }}>
-                  Magistrate Docket
-                </span>
-                <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 600 }}>
-                  {pendingApprovals.length} cases awaiting decree
-                </div>
-              </div>
-              <Clock size={18} style={{ color: "var(--accent-gold)" }} />
-            </div>
-
-            {/* Filter tabs */}
-            <div style={{ display: "flex", gap: 4, padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-secondary)" }}>
-              {[
-                { id: "ALL", label: `All (${pendingApprovals.length})` },
-                { id: "PENDING", label: `Pending (${pendingApprovals.filter(a => a.status === 'pending').length})` },
-                { id: "OCCLUDED", label: `Occluded (${pendingApprovals.filter(a => (a.alignment_confidence ?? 1.0) < 0.8).length})` },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setDocketFilter(tab.id as any)}
+            {/* LEFT: Tehsildar Profile Button (Matching Patwari layout) with Dropdown */}
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setIsProfileDropdownOpen((prev) => !prev)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 14px",
+                  borderRadius: "var(--radius-sm)",
+                  background: isProfileDropdownOpen ? "#DBEAFE" : "#EFF6FF",
+                  border: isProfileDropdownOpen ? "1.5px solid #1E3A8A" : "1.5px solid #93C5FD",
+                  cursor: "pointer",
+                  transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                  whiteSpace: "nowrap",
+                  boxShadow: isProfileDropdownOpen
+                    ? "0 4px 14px rgba(30, 58, 138, 0.18)"
+                    : "0 1px 3px rgba(30, 58, 138, 0.08)",
+                }}
+                title={isProfileDropdownOpen ? "Close Profile Menu" : "Open Profile Menu & Magistrate Actions"}
+                aria-expanded={isProfileDropdownOpen}
+              >
+                {/* Avatar Badge */}
+                <div
                   style={{
-                    flex: 1,
-                    padding: "4px 6px",
-                    borderRadius: "var(--radius-sm)",
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)",
+                    color: "#FFFFFF",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     fontSize: "0.72rem",
-                    fontWeight: 700,
-                    border: docketFilter === tab.id ? "1px solid var(--accent-judicial)" : "1px solid var(--border-glass)",
-                    background: docketFilter === tab.id ? "var(--accent-judicial)" : "#FFFFFF",
-                    color: docketFilter === tab.id ? "#FFFFFF" : "var(--text-secondary)",
-                    cursor: "pointer",
-                    textAlign: "center",
-                    whiteSpace: "nowrap",
+                    fontWeight: 900,
+                    border: "1px solid #93C5FD",
+                    flexShrink: 0,
                   }}
                 >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+                  PS
+                </div>
 
-            <div style={{ flex: 1, overflowY: "auto", padding: "6px" }}>
-              {filteredApprovals.map((a) => {
-                const isSelected = selectedApproval?.approval_id === a.approval_id;
-                const isLowConf = (a.alignment_confidence ?? 1.0) < 0.8;
+                {/* Name & TEHSILDAR Role Badge (Matching Patwari style) */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#1E3A8A" }}>
+                    {officer?.name || "Smt. Priya Sharma, PCS"}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "0.625rem",
+                      fontWeight: 800,
+                      padding: "1px 6px",
+                      borderRadius: 4,
+                      background: "#1E3A8A",
+                      color: "#FFFFFF",
+                      letterSpacing: "0.02em",
+                    }}
+                  >
+                    TEHSILDAR
+                  </span>
+                </div>
 
-                return (
+                {/* Animated Chevron */}
+                <ChevronDown
+                  size={15}
+                  style={{
+                    color: "#1E3A8A",
+                    transform: isProfileDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                  }}
+                />
+              </button>
+
+              {/* ═══════════ PROFILE DROPDOWN MENU WITH DIRECT MAGISTRATE DOCKET (IN FRONT) ═══════════ */}
+              {isProfileDropdownOpen && (
+                <div
+                  className="glass-card animate-fade-in-up"
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    left: 0,
+                    zIndex: 700,
+                    width: 360,
+                    maxHeight: "calc(100vh - 120px)",
+                    background: "rgba(255, 255, 255, 0.98)",
+                    borderRadius: "var(--radius-lg)",
+                    boxShadow: "0 14px 40px rgba(15, 23, 42, 0.20), 0 4px 12px rgba(15, 23, 42, 0.08)",
+                    border: "1.5px solid var(--border-glass)",
+                    overflowY: "auto",
+                    padding: "10px",
+                    display: "flex",
+                    flexDirection: "column",
+                    transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                  }}
+                >
+                  {/* Officer Information Header */}
+                  <div
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "var(--radius-md)",
+                      background: "linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 100%)",
+                      border: "1px solid #DBEAFE",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          background: "linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)",
+                          color: "#FFFFFF",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "0.75rem",
+                          fontWeight: 900,
+                          border: "1.5px solid #F59E0B",
+                          flexShrink: 0,
+                        }}
+                      >
+                        PS
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "#1E3A8A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {officer?.name || "Smt. Priya Sharma, PCS"}
+                        </div>
+                        <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: 600 }}>
+                          Assistant Collector & Revenue Magistrate
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px dashed #BFDBFE", fontSize: "0.6875rem", color: "#1E3A8A", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span>Mohanlalganj Judicial Bench</span>
+                      <span style={{ color: "#16A34A", fontWeight: 700 }}>● e-Sign DSC-3</span>
+                    </div>
+                  </div>
+
+                  {/* DIRECT MAGISTRATE DOCKET (IN FRONT - NO SECONDARY MENU NEEDED) */}
+                  <div
+                    style={{
+                      background: "#F8FAFC",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--border-subtle)",
+                      padding: "8px",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {/* Docket Section Title & Pending Badge */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginBottom: 8,
+                        padding: "2px 4px",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: 4,
+                            background: "var(--accent-judicial)",
+                            color: "#FFFFFF",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Scale size={13} />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--text-primary)" }}>
+                            Magistrate Docket
+                          </span>
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "0.6875rem",
+                          fontWeight: 800,
+                          padding: "2px 7px",
+                          borderRadius: 12,
+                          background: "var(--accent-gold-bg)",
+                          color: "#92400E",
+                          border: "1px solid #FDE68A",
+                        }}
+                      >
+                        {pendingApprovals.length} Pending
+                      </span>
+                    </div>
+
+                    {/* Search Bar */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "5px 8px",
+                        borderRadius: "var(--radius-sm)",
+                        background: "#FFFFFF",
+                        border: "1px solid var(--border-glass)",
+                        marginBottom: 6,
+                      }}
+                    >
+                      <Search size={13} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+                      <input
+                        type="text"
+                        value={docketSearch}
+                        onChange={(e) => setDocketSearch(e.target.value)}
+                        placeholder="Search Khasra or Owner..."
+                        style={{
+                          width: "100%",
+                          border: "none",
+                          background: "transparent",
+                          fontSize: "0.75rem",
+                          outline: "none",
+                          color: "var(--text-primary)",
+                        }}
+                      />
+                      {docketSearch && (
+                        <button
+                          onClick={() => setDocketSearch("")}
+                          style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                          title="Clear search"
+                        >
+                          <X size={12} style={{ color: "var(--text-muted)" }} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filter Tabs */}
+                    <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                      {[
+                        { id: "ALL", label: `All (${pendingApprovals.length})` },
+                        { id: "PENDING", label: `Pending (${pendingApprovals.filter(a => a.status === 'pending').length})` },
+                        { id: "OCCLUDED", label: `Occluded (${pendingApprovals.filter(a => (a.alignment_confidence ?? 1.0) < 0.8).length})` },
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setDocketFilter(tab.id as any)}
+                          style={{
+                            flex: 1,
+                            padding: "3px 4px",
+                            borderRadius: "var(--radius-sm)",
+                            fontSize: "0.6875rem",
+                            fontWeight: 700,
+                            border: docketFilter === tab.id ? "1px solid var(--accent-judicial)" : "1px solid var(--border-subtle)",
+                            background: docketFilter === tab.id ? "var(--accent-judicial)" : "#FFFFFF",
+                            color: docketFilter === tab.id ? "#FFFFFF" : "var(--text-secondary)",
+                            cursor: "pointer",
+                            textAlign: "center",
+                            whiteSpace: "nowrap",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Scrollable Docket Case Cards List */}
+                    <div
+                      style={{
+                        maxHeight: "220px",
+                        overflowY: "auto",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                        paddingRight: 2,
+                      }}
+                    >
+                      {filteredApprovals.map((a) => {
+                        const isSelected = selectedApproval?.approval_id === a.approval_id;
+                        const isLowConf = (a.alignment_confidence ?? 1.0) < 0.8;
+
+                        return (
+                          <button
+                            key={a.approval_id}
+                            onClick={() => {
+                              setSelectedApproval(a);
+                              setIsDossierCollapsed(false);
+                              setIsProfileDropdownOpen(false);
+                              toast.success(`Loaded Khasra ${a.khasra_no} for Adjudication`, { icon: "⚖️" });
+                            }}
+                            style={{
+                              width: "100%",
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: 8,
+                              padding: "7px 10px",
+                              borderRadius: "var(--radius-sm)",
+                              background: isSelected ? "var(--accent-judicial-bg)" : "#FFFFFF",
+                              border: isSelected ? "1.5px solid #93C5FD" : "1px solid var(--border-subtle)",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              transition: "all 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = "#F1F5F9";
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = "#FFFFFF";
+                            }}
+                            title={`Select Khasra ${a.khasra_no} for Statutory Adjudication`}
+                          >
+                            <FileCheck
+                              size={14}
+                              style={{
+                                color: isSelected ? "var(--accent-judicial)" : "var(--text-muted)",
+                                flexShrink: 0,
+                                marginTop: 2,
+                              }}
+                            />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                <strong style={{ fontSize: "0.78rem", color: "var(--text-primary)" }}>
+                                  Khasra {a.khasra_no}
+                                </strong>
+                                {isLowConf && (
+                                  <span
+                                    style={{
+                                      fontSize: "0.625rem",
+                                      fontWeight: 800,
+                                      background: "var(--accent-gold-bg)",
+                                      color: "#92400E",
+                                      padding: "1px 5px",
+                                      borderRadius: "var(--radius-sm)",
+                                      border: "1px solid #FDE68A",
+                                    }}
+                                  >
+                                    Occluded
+                                  </span>
+                                )}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "0.7rem",
+                                  color: "var(--text-secondary)",
+                                  marginTop: 2,
+                                  fontWeight: 500,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                {a.owner_name} &bull; {a.village}
+                              </div>
+                              <div style={{ fontSize: "0.65rem", color: "var(--text-muted)", marginTop: 1 }}>
+                                Submitter: {a.requested_by}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+
+                      {filteredApprovals.length === 0 && (
+                        <div style={{ padding: "16px 8px", textAlign: "center", color: "var(--text-muted)" }}>
+                          <CheckCircle2 size={20} style={{ margin: "0 auto 6px", color: "var(--accent-primary)", opacity: 0.8 }} />
+                          <p style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-primary)" }}>No Cases Found</p>
+                          <p style={{ fontSize: "0.6875rem", marginTop: 2 }}>No matching items in current filter.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Secondary Quick Actions */}
+                  <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                    <button
+                      onClick={() => {
+                        handleResetDemo();
+                        setIsProfileDropdownOpen(false);
+                      }}
+                      className="btn-ghost"
+                      style={{
+                        flex: 1,
+                        padding: "7px 8px",
+                        fontSize: "0.72rem",
+                        borderRadius: "var(--radius-sm)",
+                        border: "1px solid var(--border-subtle)",
+                        background: "#FFFFFF",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 5,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <RefreshCw size={12} /> Reset Dockets
+                    </button>
+                    <button
+                      onClick={() => {
+                        fetchData();
+                        setIsProfileDropdownOpen(false);
+                      }}
+                      className="btn-ghost"
+                      style={{
+                        flex: 1,
+                        padding: "7px 8px",
+                        fontSize: "0.72rem",
+                        borderRadius: "var(--radius-sm)",
+                        border: "1px solid var(--border-subtle)",
+                        background: "#FFFFFF",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 5,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <RefreshCw size={12} /> Refresh Data
+                    </button>
+                  </div>
+
+                  <div style={{ height: 1, background: "var(--border-subtle)", margin: "6px 0" }} />
+
+                  {/* SIGN OUT BUTTON (Inside Dropdown with smooth hover & clear warning style) */}
                   <button
-                    key={a.approval_id}
-                    onClick={() => setSelectedApproval(a)}
+                    onClick={() => {
+                      setIsProfileDropdownOpen(false);
+                      logout();
+                      router.push("/");
+                      toast.success("Signed out of Revenue Magistrate Session");
+                    }}
                     style={{
                       width: "100%",
                       display: "flex",
-                      alignItems: "flex-start",
-                      gap: 12,
-                      padding: "12px 14px",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      padding: "9px 12px",
                       borderRadius: "var(--radius-md)",
-                      marginBottom: 4,
-                      background: isSelected ? "var(--accent-judicial-bg)" : "transparent",
-                      border: isSelected ? "1.5px solid #93C5FD" : "1px solid transparent",
+                      background: "#FEF2F2",
+                      border: "1px solid rgba(220, 38, 38, 0.25)",
+                      color: "#DC2626",
+                      fontWeight: 700,
+                      fontSize: "0.8rem",
                       cursor: "pointer",
-                      textAlign: "left",
-                      transition: "background 0.15s ease",
+                      transition: "all 0.15s ease",
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#FEE2E2";
+                      e.currentTarget.style.borderColor = "#DC2626";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#FEF2F2";
+                      e.currentTarget.style.borderColor = "rgba(220, 38, 38, 0.25)";
+                    }}
+                    title="Terminate officer statutory session and return to National Gateway"
                   >
-                    <FileCheck
-                      size={18}
-                      style={{
-                        color: isSelected ? "var(--accent-judicial)" : "var(--text-muted)",
-                        flexShrink: 0,
-                        marginTop: 2,
-                      }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <strong style={{ fontSize: "0.875rem", color: "var(--text-primary)" }}>
-                          Khasra {a.khasra_no}
-                        </strong>
-                        {isLowConf && (
-                          <span
-                            style={{
-                              fontSize: "0.6875rem",
-                              fontWeight: 800,
-                              background: "var(--accent-gold-bg)",
-                              color: "#92400E",
-                              padding: "2px 6px",
-                              borderRadius: "var(--radius-sm)",
-                              border: "1px solid #FDE68A",
-                            }}
-                          >
-                            Occluded
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: 2, fontWeight: 500 }}>
-                        {a.owner_name} &bull; {a.village}
-                      </div>
-                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: 2 }}>
-                        Submitted by: {a.requested_by}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-
-              {filteredApprovals.length === 0 && (
-                <div style={{ padding: 36, textAlign: "center", color: "var(--text-muted)" }}>
-                  <CheckCircle2 size={32} style={{ margin: "0 auto 10px", color: "var(--accent-primary)", opacity: 0.8 }} />
-                  <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-primary)" }}>All Wards Reconciled</p>
-                  <p style={{ fontSize: "0.8125rem", marginTop: 4, marginBottom: 12 }}>No pending cadastral disputes in current docket.</p>
-                  <button onClick={handleResetDemo} className="btn-primary" style={{ padding: "6px 14px", fontSize: "0.78rem" }}>
-                    Load Demo Dockets
+                    <LogOut size={14} style={{ color: "#DC2626" }} />
+                    <span>Sign Out</span>
                   </button>
                 </div>
               )}
             </div>
+
+            {/* RIGHT: Compact KPI Chips */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "#FFFFFF",
+                  border: "1px solid var(--border-glass)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: "0.75rem",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                }}
+                title="Total Ward Parcels in Mohanlalganj"
+              >
+                <Layers size={14} style={{ color: "var(--accent-primary)" }} />
+                <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Total:</span>
+                <strong style={{ color: "var(--accent-primary)", fontSize: "0.85rem" }}>
+                  {stats?.total_parcels ?? 18}
+                </strong>
+              </div>
+
+              <div
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "#FFFFFF",
+                  border: "1px solid var(--border-glass)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: "0.75rem",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                }}
+                title="Bhu-Aadhaar ULPIN Assigned"
+              >
+                <Fingerprint size={14} style={{ color: "var(--accent-mint)" }} />
+                <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Bhu-Aadhaar:</span>
+                <strong style={{ color: "var(--accent-mint)", fontSize: "0.85rem" }}>
+                  {stats?.ulpin_assigned_count ?? 12}
+                </strong>
+              </div>
+
+              <div
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "#FFFFFF",
+                  border: "1px solid var(--border-glass)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: "0.75rem",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                }}
+                title="Pending Adjudications in Queue"
+              >
+                <Clock size={14} style={{ color: "var(--accent-gold)" }} />
+                <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Pending:</span>
+                <strong style={{ color: "var(--accent-gold)", fontSize: "0.85rem" }}>
+                  {pendingApprovals.length}
+                </strong>
+              </div>
+
+              <div
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "#FFFFFF",
+                  border: "1px solid var(--border-glass)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: "0.75rem",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                }}
+                title="Legally Committed & Published"
+              >
+                <CheckCircle2 size={14} style={{ color: "var(--accent-judicial)" }} />
+                <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Committed:</span>
+                <strong style={{ color: "var(--accent-judicial)", fontSize: "0.85rem" }}>
+                  {stats?.published_count ?? stats?.approved_count ?? 5}
+                </strong>
+              </div>
+            </div>
           </div>
 
-          {/* Center Panel: Map Canvas */}
-          <div className="glass-card" style={{ flex: 1, padding: 0, overflow: "hidden", position: "relative", borderRadius: "var(--radius-lg)" }}>
+          {/* ───── Full Map Canvas Container (Clean Toolbar, No Magistrate Docket on Map Box) ───── */}
+          <div
+            className="glass-card"
+            style={{
+              flex: 1,
+              padding: 0,
+              overflow: "hidden",
+              position: "relative",
+              borderRadius: "var(--radius-lg)",
+              minHeight: 0,
+              border: "1.5px solid var(--border-glass)",
+              boxShadow: "0 4px 20px -2px rgba(15, 23, 42, 0.08)",
+            }}
+          >
             <MapViewer
               geojsonData={geojson}
               selectedParcelId={selectedApproval?.parcel_id || null}
@@ -487,6 +896,7 @@ export default function TehsildarPage() {
                 const match = pendingApprovals.find((a) => a.parcel_id === id);
                 if (match) {
                   setSelectedApproval(match);
+                  setIsDossierCollapsed(false);
                 } else if (geojson) {
                   const feat = geojson.features.find((f: any) => f.properties?.id === id);
                   if (feat?.properties) {
@@ -506,6 +916,7 @@ export default function TehsildarPage() {
                       alignment_status: feat.properties.alignment_status || "aligned",
                       alignment_confidence: feat.properties.alignment_confidence ?? 0.94,
                     });
+                    setIsDossierCollapsed(false);
                   }
                 }
               }}
@@ -520,398 +931,402 @@ export default function TehsildarPage() {
               oldMapStrokeColor={oldMapStrokeColor}
               onOpenMapSourceModal={() => setIsMapSourceModalOpen(true)}
             />
-          </div>
 
-          {/* Right Panel: Dossier (Fix Issue 9: Heading and icon prominent, matching visual hierarchy) */}
-          <div
-            className="glass-card"
-            style={{
-              width: 360,
-              padding: "20px",
-              display: "flex",
-              flexDirection: "column",
-              background: "#FFFFFF",
-              borderRadius: "var(--radius-lg)",
-              overflowY: "auto",
-            }}
-          >
-            {/* Fix Issue 9: Prominent, high-contrast heading matching left panel */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 34, height: 34, borderRadius: "var(--radius-sm)", background: "var(--accent-primary-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent-primary)" }}>
-                <ShieldCheck size={20} />
-              </div>
-              <h2 style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--text-primary)" }}>
-                Statutory Approval Dossier
-              </h2>
-            </div>
 
-            {selectedApproval ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ background: "var(--bg-secondary)", padding: 14, borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "95px 1fr", gap: "8px 10px", fontSize: "0.875rem" }}>
-                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Khasra No:</span>
-                    <strong style={{ color: "var(--text-primary)" }}>{selectedApproval.khasra_no}</strong>
 
-                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Landholder:</span>
-                    <strong style={{ color: "var(--text-primary)" }}>{selectedApproval.owner_name}</strong>
+            {/* ───── Right Floating Collapsible Statutory Dossier ───── */}
+            <div
+              className="glass-card animate-fade-in-up"
+              style={{
+                position: "absolute",
+                top: 14,
+                right: 14,
+                zIndex: 400,
+                width: 360,
+                maxHeight: "calc(100vh - 180px)",
+                overflowY: "auto",
+                padding: isDossierCollapsed ? "12px 18px" : "18px 20px",
+                background: "rgba(255, 255, 255, 0.98)",
+                borderRadius: "var(--radius-lg)",
+                boxShadow: "0 8px 30px rgba(15, 23, 42, 0.14)",
+                border: "1.5px solid var(--border-glass)",
+                transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+              }}
+            >
+              {/* Header with Title and Collapse Button */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <h2 style={{ fontSize: "1.05rem", fontWeight: 800, display: "flex", alignItems: "center", gap: 8, color: "var(--text-primary)", margin: 0 }}>
+                  <ShieldCheck size={18} style={{ color: "var(--accent-judicial)" }} /> Statutory Dossier
+                </h2>
 
-                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Location:</span>
-                    <span style={{ color: "var(--text-secondary)" }}>{selectedApproval.village}, {selectedApproval.tehsil}</span>
-
-                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Area:</span>
-                    <span style={{ color: "var(--text-secondary)" }}>{selectedApproval.area_sqm ? `${Number(selectedApproval.area_sqm).toFixed(1)} m²` : "Calculated"}</span>
-
-                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Confidence:</span>
-                    <span style={{ fontWeight: 800, color: (selectedApproval.alignment_confidence ?? 1) >= 0.8 ? "var(--accent-mint)" : "var(--accent-sun)" }}>
-                      {((selectedApproval.alignment_confidence ?? 0.88) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Occlusion Warning Alert */}
-                {(selectedApproval.alignment_confidence ?? 1) < 0.8 && (
-                  <div
-                    style={{
-                      background: "var(--accent-sun-bg)",
-                      border: "1px solid #FDE68A",
-                      borderRadius: "var(--radius-md)",
-                      padding: "10px 12px",
-                      fontSize: "0.8125rem",
-                      color: "#92400E",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, marginBottom: 2 }}>
-                      <AlertTriangle size={15} /> Tree Canopy Occlusion Flagged
-                    </div>
-                    AI feature extraction detected partial shadow obstruction. Ensure physical survey stone verification before signing.
-                  </div>
-                )}
-
-                {/* Bhu-Aadhaar Box */}
-                {selectedApproval.ulpin && (
-                  <div style={{ background: "var(--accent-mint-bg)", border: "1px solid #A7F3D0", borderRadius: "var(--radius-md)", padding: 12 }}>
-                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--accent-mint)", textTransform: "uppercase" }}>
-                      Assigned Bhu-Aadhaar (ULPIN)
-                    </div>
-                    <div style={{ fontFamily: "monospace", fontSize: "1.15rem", fontWeight: 800, color: "var(--accent-mint)", marginTop: 4, letterSpacing: "1.5px" }}>
-                      {selectedApproval.ulpin}
-                    </div>
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: 4 }}>
-                      Compliant with DoLR / ECCMA / OGC standards
-                    </div>
-                  </div>
-                )}
-
-                {/* Endorsement textarea */}
-                <div>
-                  <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>
-                    Magistrate Legal Endorsement / Audit Note:
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="Enter formal sanction notes or physical ground verification details..."
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      borderRadius: "var(--radius-md)",
-                      border: "1px solid var(--border-glass)",
-                      fontSize: "0.875rem",
-                      fontFamily: "inherit",
-                      background: "#FFFFFF",
-                      color: "var(--text-primary)",
-                    }}
-                  />
-                </div>
-
-                {/* Cryptographic SHA-256 Seal Banner if committed */}
-                {committedSignatures[selectedApproval.parcel_id] && (
-                  <div
-                    style={{
-                      background: "#F0FDF4",
-                      border: "1px solid #86EFAC",
-                      borderRadius: "var(--radius-md)",
-                      padding: 12,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#15803D", display: "flex", alignItems: "center", gap: 5 }}>
-                        <Lock size={13} /> Authoritative SHA-256 Seal
-                      </span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(committedSignatures[selectedApproval.parcel_id]);
-                          toast.success("SHA-256 signature copied!");
-                        }}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#15803D", display: "flex", alignItems: "center", gap: 3, fontSize: "0.7rem", fontWeight: 700 }}
-                      >
-                        <Copy size={12} /> Copy
-                      </button>
-                    </div>
-                    <div style={{ fontFamily: "monospace", fontSize: "0.72rem", color: "#166534", wordBreak: "break-all", background: "#DCFCE7", padding: "4px 8px", borderRadius: 4 }}>
-                      {committedSignatures[selectedApproval.parcel_id]}
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <button
-                    className="btn-primary"
-                    onClick={handleApproveAndCommit}
-                    disabled={loading}
-                    style={{ width: "100%", padding: "11px 16px" }}
+                    onClick={() => setIsDossierCollapsed(!isDossierCollapsed)}
+                    className="btn-ghost"
+                    style={{ padding: 6, color: "var(--text-primary)" }}
+                    title={isDossierCollapsed ? "Expand Dossier" : "Minimize Dossier"}
                   >
-                    <Stamp size={16} /> Sanction & Publish to Land Stack
-                  </button>
-
-                  {/* Task 2.6: Form-II Survey Certificate PDF Export */}
-                  <button
-                    className="btn-secondary"
-                    onClick={() => {
-                      generateFormIIPdf({
-                        khasraNo: selectedApproval.khasra_no,
-                        ownerName: selectedApproval.owner_name,
-                        village: selectedApproval.village,
-                        tehsil: selectedApproval.tehsil,
-                        district: selectedApproval.district,
-                        ulpin: selectedApproval.ulpin || "9YYD56AA2Z9Y3A",
-                        areaSqm: selectedApproval.area_sqm || 5714.41,
-                        alignmentConfidence: selectedApproval.alignment_confidence ?? 0.96,
-                        officerId: "REV-TEH-3210 (Mohanlalganj)",
-                        approvalDate: new Date().toLocaleDateString("en-IN"),
-                        endorsementNote: remarks || "Statutory survey adjudication verified under DILRMP 3.0 protocol.",
-                        isOccluded: (selectedApproval.alignment_confidence ?? 1) < 0.8,
-                        digitalSignature: committedSignatures[selectedApproval.parcel_id],
-                      });
-                      toast.success(`Form-II Certificate for Khasra ${selectedApproval.khasra_no} generated!`);
-                    }}
-                    style={{
-                      width: "100%",
-                      background: "#F0FDFA",
-                      borderColor: "#99F6E4",
-                      color: "#0D9488",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      padding: "10px 16px",
-                      fontWeight: 700,
-                    }}
-                  >
-                    <FileCheck size={16} /> Download Form-II Survey Certificate (PDF)
-                  </button>
-
-                  <button
-                    className="btn-secondary"
-                    onClick={() => openAuditLogs(selectedApproval.parcel_id, selectedApproval.khasra_no)}
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      padding: "9px 16px",
-                      fontSize: "0.8125rem",
-                      fontWeight: 600,
-                    }}
-                  >
-                    <History size={15} /> View Cadastral Audit Trail
-                  </button>
-
-                  <button
-                    className="btn-secondary"
-                    onClick={handleReject}
-                    disabled={loading}
-                    style={{
-                      width: "100%",
-                      color: "var(--accent-coral) !important",
-                      borderColor: "#FECDD3",
-                    }}
-                  >
-                    <XCircle size={16} style={{ color: "var(--accent-coral)" }} /> Return for Re-survey
+                    {isDossierCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
                   </button>
                 </div>
               </div>
-            ) : (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "var(--text-muted)", padding: 20 }}>
-                <Info size={32} style={{ color: "var(--accent-primary)", marginBottom: 12, opacity: 0.7 }} />
-                <p style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text-primary)" }}>Select a Pending Docket</p>
-                <p style={{ fontSize: "0.8125rem", marginTop: 4, color: "var(--text-secondary)" }}>
-                  Choose a parcel from the queue to inspect boundaries, check occlusion indices, and execute statutory sign-off.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
 
-      {/* Cadastral Audit Log Modal */}
-      {auditLogsModal.isOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.6)",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-            padding: 20,
-          }}
-        >
-          <div
-            className="glass-card animate-fade-in-up"
-            style={{
-              width: "100%",
-              maxWidth: 620,
-              background: "#FFFFFF",
-              borderRadius: "var(--radius-lg)",
-              padding: 24,
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
-              maxHeight: "85vh",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            {/* Modal Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: "var(--radius-md)", background: "var(--accent-primary-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent-primary)" }}>
-                  <History size={18} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--text-primary)" }}>
-                    Khasra {auditLogsModal.khasraNo} — Cadastral Audit Trail
-                  </h3>
-                  <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                    Authoritative DILRMP 3.0 immutable legal ledger with SHA-256 cryptographic proofs
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setAuditLogsModal((prev) => ({ ...prev, isOpen: false }))}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4 }}
-              >
-                <X size={20} />
-              </button>
-            </div>
+              {!isDossierCollapsed && (
+                <div style={{ marginTop: 14 }}>
+                  {selectedApproval ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      <div style={{ background: "var(--bg-secondary)", padding: 12, borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "95px 1fr", gap: "6px 10px", fontSize: "0.85rem" }}>
+                          <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Khasra No:</span>
+                          <strong style={{ color: "var(--text-primary)" }}>{selectedApproval.khasra_no}</strong>
 
-            {/* Modal Content */}
-            <div style={{ overflowY: "auto", flex: 1, paddingRight: 4 }}>
-              {auditLogsModal.loading ? (
-                <div style={{ textAlign: "center", padding: "30px 0", color: "var(--text-muted)" }}>
-                  <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px" }} />
-                  <p style={{ fontSize: "0.875rem" }}>Verifying cryptographic signatures in audit ledger…</p>
-                </div>
-              ) : auditLogsModal.logs.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "30px 16px", color: "var(--text-muted)", background: "var(--bg-glass-subtle)", borderRadius: "var(--radius-md)" }}>
-                  <Lock size={28} style={{ margin: "0 auto 8px", color: "var(--accent-primary)" }} />
-                  <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-primary)" }}>No Audit Records Yet</p>
-                  <p style={{ fontSize: "0.75rem", marginTop: 4 }}>
-                    Audit entries with SHA-256 digital signatures are recorded whenever a parcel is committed or undergoes statutory adjudication.
-                  </p>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {auditLogsModal.logs.map((log: any, idx: number) => (
-                    <div
-                      key={log.id || idx}
-                      style={{
-                        padding: 14,
-                        borderRadius: "var(--radius-md)",
-                        border: "1px solid var(--border-glass)",
-                        background: "#F8FAFC",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                        <span
+                          <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Landholder:</span>
+                          <strong style={{ color: "var(--text-primary)" }}>{selectedApproval.owner_name}</strong>
+
+                          <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Location:</span>
+                          <span style={{ color: "var(--text-secondary)" }}>{selectedApproval.village}, {selectedApproval.tehsil}</span>
+
+                          <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Area:</span>
+                          <span style={{ color: "var(--text-secondary)" }}>{selectedApproval.area_sqm ? `${Number(selectedApproval.area_sqm).toFixed(1)} m²` : "Calculated"}</span>
+
+                          <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Confidence:</span>
+                          <span style={{ fontWeight: 800, color: (selectedApproval.alignment_confidence ?? 1) >= 0.8 ? "var(--accent-mint)" : "var(--accent-gold)" }}>
+                            {((selectedApproval.alignment_confidence ?? 0.88) * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Occlusion Warning Alert */}
+                      {(selectedApproval.alignment_confidence ?? 1) < 0.8 && (
+                        <div
                           style={{
-                            fontSize: "0.7rem",
-                            fontWeight: 800,
-                            padding: "2px 8px",
-                            borderRadius: 4,
-                            background: log.action === "COMMITTED" ? "#DCFCE7" : "var(--accent-primary-bg)",
-                            color: log.action === "COMMITTED" ? "#15803D" : "var(--accent-primary)",
-                            textTransform: "uppercase",
+                            background: "var(--accent-gold-bg)",
+                            border: "1px solid #FDE68A",
+                            borderRadius: "var(--radius-md)",
+                            padding: "10px 12px",
+                            fontSize: "0.8125rem",
+                            color: "#92400E",
                           }}
                         >
-                          {log.action}
-                        </span>
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                          {new Date(log.timestamp).toLocaleString("en-IN")}
-                        </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, marginBottom: 2 }}>
+                            <AlertTriangle size={15} /> Tree Canopy Occlusion Flagged
+                          </div>
+                          AI feature extraction detected partial shadow obstruction. Ensure physical survey stone verification before signing.
+                        </div>
+                      )}
+
+                      {/* Bhu-Aadhaar Box */}
+                      {selectedApproval.ulpin && (
+                        <div style={{ background: "var(--accent-mint-bg)", border: "1px solid #A7F3D0", borderRadius: "var(--radius-md)", padding: 12 }}>
+                          <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--accent-mint)", textTransform: "uppercase" }}>
+                            Assigned Bhu-Aadhaar (ULPIN)
+                          </div>
+                          <div style={{ fontFamily: "monospace", fontSize: "1.1rem", fontWeight: 800, color: "var(--accent-mint)", marginTop: 4, letterSpacing: "1.5px" }}>
+                            {selectedApproval.ulpin}
+                          </div>
+                          <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", marginTop: 4 }}>
+                            Compliant with DoLR / ECCMA / OGC standards
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Endorsement textarea */}
+                      <div>
+                        <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>
+                          Magistrate Legal Endorsement / Audit Note:
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={remarks}
+                          onChange={(e) => setRemarks(e.target.value)}
+                          placeholder="Enter formal sanction notes or physical ground verification details..."
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            borderRadius: "var(--radius-md)",
+                            border: "1px solid var(--border-glass)",
+                            fontSize: "0.85rem",
+                            fontFamily: "inherit",
+                            background: "#FFFFFF",
+                            color: "var(--text-primary)",
+                          }}
+                        />
                       </div>
 
-                      <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: 8 }}>
-                        Officer: <strong style={{ color: "var(--text-primary)" }}>{log.officer_id}</strong> ({log.officer_role})
-                      </div>
+                      {/* Cryptographic SHA-256 Seal Banner if committed */}
+                      {committedSignatures[selectedApproval.parcel_id] && (
+                        <div
+                          style={{
+                            background: "#F0FDF4",
+                            border: "1px solid #86EFAC",
+                            borderRadius: "var(--radius-md)",
+                            padding: 12,
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#15803D", display: "flex", alignItems: "center", gap: 5 }}>
+                              <Lock size={13} /> Authoritative SHA-256 Seal
+                            </span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(committedSignatures[selectedApproval.parcel_id]);
+                                toast.success("SHA-256 signature copied!");
+                              }}
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "#15803D", display: "flex", alignItems: "center", gap: 3, fontSize: "0.7rem", fontWeight: 700 }}
+                            >
+                              <Copy size={12} /> Copy
+                            </button>
+                          </div>
+                          <div style={{ fontFamily: "monospace", fontSize: "0.7rem", wordBreak: "break-all", color: "#166534" }}>
+                            {committedSignatures[selectedApproval.parcel_id]}
+                          </div>
+                        </div>
+                      )}
 
-                      {/* Cryptographic SHA-256 Box */}
-                      <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 4, padding: "6px 8px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
-                          <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "#64748B", textTransform: "uppercase" }}>
-                            SHA-256 Signature Hash
-                          </span>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(log.digital_signature);
-                              toast.success("Signature hash copied!");
-                            }}
-                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent-primary)", fontSize: "0.7rem", fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}
-                          >
-                            <Copy size={11} /> Copy
-                          </button>
-                        </div>
-                        <div style={{ fontFamily: "monospace", fontSize: "0.7rem", color: "#0F172A", wordBreak: "break-all" }}>
-                          {log.digital_signature}
-                        </div>
+                      {/* Action buttons stack */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <button
+                          className="btn-primary"
+                          onClick={handleApproveAndCommit}
+                          disabled={loading}
+                          style={{
+                            width: "100%",
+                            padding: "10px 16px",
+                            background: "linear-gradient(135deg, #1E3A8A 0%, #172554 100%)",
+                            borderColor: "#1E3A8A",
+                            color: "#FFFFFF",
+                            fontWeight: 700,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <Stamp size={16} /> Sanction & Publish to Land Stack
+                        </button>
+
+                        {/* Task 2.6: Form-II Survey Certificate PDF Export */}
+                        <button
+                          className="btn-secondary"
+                          onClick={() => {
+                            generateFormIIPdf({
+                              khasraNo: selectedApproval.khasra_no,
+                              ownerName: selectedApproval.owner_name,
+                              village: selectedApproval.village,
+                              tehsil: selectedApproval.tehsil,
+                              district: selectedApproval.district,
+                              ulpin: selectedApproval.ulpin || "9YYD56AA2Z9Y3A",
+                              areaSqm: selectedApproval.area_sqm || 5714.41,
+                              alignmentConfidence: selectedApproval.alignment_confidence ?? 0.96,
+                              officerId: "REV-TEH-3210 (Mohanlalganj)",
+                              approvalDate: new Date().toLocaleDateString("en-IN"),
+                              endorsementNote: remarks || "Statutory survey adjudication verified under DILRMP 3.0 protocol.",
+                              isOccluded: (selectedApproval.alignment_confidence ?? 1) < 0.8,
+                              digitalSignature: committedSignatures[selectedApproval.parcel_id],
+                            });
+                            toast.success(`Form-II Certificate for Khasra ${selectedApproval.khasra_no} generated!`);
+                          }}
+                          style={{
+                            width: "100%",
+                            background: "#F0FDFA",
+                            borderColor: "#99F6E4",
+                            color: "#0D9488",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 8,
+                            padding: "9px 16px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          <FileCheck size={16} /> Download Form-II Survey Certificate (PDF)
+                        </button>
+
+                        <button
+                          className="btn-secondary"
+                          onClick={() => openAuditLogs(selectedApproval.parcel_id, selectedApproval.khasra_no)}
+                          style={{
+                            width: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 8,
+                            padding: "8px 16px",
+                            fontSize: "0.8125rem",
+                            fontWeight: 600,
+                          }}
+                        >
+                          <History size={15} /> View Cadastral Audit Trail
+                        </button>
+
+                        <button
+                          className="btn-secondary"
+                          onClick={handleReject}
+                          disabled={loading}
+                          style={{
+                            width: "100%",
+                            color: "var(--accent-coral) !important",
+                            borderColor: "#FECDD3",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 8,
+                            padding: "8px 16px",
+                          }}
+                        >
+                          <XCircle size={16} style={{ color: "var(--accent-coral)" }} /> Return for Re-survey
+                        </button>
                       </div>
                     </div>
-                  ))}
+                  ) : (
+                    <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)", display: "flex", gap: 10, alignItems: "center", background: "var(--bg-secondary)", padding: 14, borderRadius: "var(--radius-md)" }}>
+                      <Info size={22} style={{ color: "var(--accent-judicial)", flexShrink: 0 }} />
+                      <span>Click any parcel on the map or select from Magistrate Docket to review boundaries and execute statutory sign-off.</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
+          </div>
+        </main>
 
-            {/* Modal Footer */}
-            <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
-              <button
-                className="btn-primary"
-                onClick={() => setAuditLogsModal((prev) => ({ ...prev, isOpen: false }))}
-                style={{ padding: "8px 18px", fontSize: "0.875rem" }}
-              >
-                Close Audit View
-              </button>
+        {/* Cadastral Audit Log Modal */}
+        {auditLogsModal.isOpen && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(15, 23, 42, 0.6)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999,
+              padding: 20,
+            }}
+          >
+            <div
+              className="glass-card animate-fade-in-up"
+              style={{
+                width: "100%",
+                maxWidth: 620,
+                background: "#FFFFFF",
+                borderRadius: "var(--radius-lg)",
+                padding: 24,
+                boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+                maxHeight: "85vh",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              {/* Modal Header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "var(--radius-md)", background: "var(--accent-primary-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent-primary)" }}>
+                    <History size={18} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>
+                      Khasra {auditLogsModal.khasraNo} — Cadastral Audit Trail
+                    </h3>
+                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 2, marginBottom: 0 }}>
+                      Authoritative DILRMP 3.0 immutable legal ledger with SHA-256 cryptographic proofs
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setAuditLogsModal((prev) => ({ ...prev, isOpen: false }))}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4 }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div style={{ overflowY: "auto", flex: 1, paddingRight: 4 }}>
+                {auditLogsModal.loading ? (
+                  <div style={{ textAlign: "center", padding: "30px 0", color: "var(--text-muted)" }}>
+                    <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px" }} />
+                    <p style={{ fontSize: "0.875rem" }}>Verifying cryptographic signatures in audit ledger…</p>
+                  </div>
+                ) : auditLogsModal.logs.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "30px 16px", color: "var(--text-muted)", background: "var(--bg-glass-subtle)", borderRadius: "var(--radius-md)" }}>
+                    <Lock size={28} style={{ margin: "0 auto 8px", color: "var(--accent-primary)" }} />
+                    <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-primary)" }}>No Audit Records Yet</p>
+                    <p style={{ fontSize: "0.75rem", marginTop: 4 }}>
+                      Audit entries with SHA-256 digital signatures are recorded whenever a parcel is committed or undergoes statutory adjudication.
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {auditLogsModal.logs.map((log: any, idx: number) => (
+                      <div
+                        key={idx}
+                        style={{
+                          border: "1px solid var(--border-subtle)",
+                          borderRadius: "var(--radius-md)",
+                          padding: 14,
+                          background: "var(--bg-secondary)",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                          <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                            Action: {log.action_type || "Commit / Adjudication"}
+                          </span>
+                          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                            {log.timestamp ? new Date(log.timestamp).toLocaleString("en-IN") : "Just now"}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: 6 }}>
+                          Officer: <strong>{log.officer_id || "REV-TEH-3210"}</strong>
+                        </div>
+                        {log.notes && (
+                          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontStyle: "italic", marginBottom: 6 }}>
+                            &ldquo;{log.notes}&rdquo;
+                          </div>
+                        )}
+                        {log.sha256_hash && (
+                          <div style={{ background: "#FFFFFF", padding: "6px 8px", borderRadius: 4, border: "1px dashed var(--border-glass)", fontSize: "0.6875rem", fontFamily: "monospace", color: "var(--text-muted)", wordBreak: "break-all" }}>
+                            Hash: {log.sha256_hash}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  className="btn-secondary"
+                  onClick={() => setAuditLogsModal((prev) => ({ ...prev, isOpen: false }))}
+                  style={{ padding: "6px 14px", fontSize: "0.8125rem" }}
+                >
+                  Close Audit Log
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Old Map & New Map Source Layer Configuration Modal */}
-      <MapSourceModal
-        isOpen={isMapSourceModalOpen}
-        onClose={() => setIsMapSourceModalOpen(false)}
-        activeBasemapId={activeBasemap.id}
-        onSelectBasemap={(b) => setActiveBasemap(b)}
-        activeOldMapPresetId={activeOldMapPresetId}
-        onSelectOldMapPreset={(presetId) => {
-          setActiveOldMapPresetId(presetId);
-        }}
-        onUploadCustomGeojson={(customData) => {
-          setCustomOldMapGeojson(customData);
-        }}
-        onUploadScannedMap={(imageUrl) => {
-          setScannedMapOverlayUrl(imageUrl);
-        }}
-        oldMapOpacity={oldMapOpacity}
-        onChangeOldMapOpacity={setOldMapOpacity}
-        oldMapStrokeColor={oldMapStrokeColor}
-        onChangeOldMapStrokeColor={setOldMapStrokeColor}
-      />
-    </div>
+        {/* Map Source Layer Modal */}
+        <MapSourceModal
+          isOpen={isMapSourceModalOpen}
+          onClose={() => setIsMapSourceModalOpen(false)}
+          activeBasemapId={activeBasemap.id}
+          onSelectBasemap={setActiveBasemap}
+          activeOldMapPresetId={activeOldMapPresetId}
+          onSelectOldMapPreset={setActiveOldMapPresetId}
+          onUploadCustomGeojson={(geojson) => setCustomOldMapGeojson(geojson)}
+          onUploadScannedMap={(url) => setScannedMapOverlayUrl(url)}
+          oldMapOpacity={oldMapOpacity}
+          onChangeOldMapOpacity={setOldMapOpacity}
+          oldMapStrokeColor={oldMapStrokeColor}
+          onChangeOldMapStrokeColor={setOldMapStrokeColor}
+        />
+      </div>
     </RoleGuard>
   );
 }
