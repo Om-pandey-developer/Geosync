@@ -115,8 +115,8 @@ interface MapSourceModalProps {
   // Styling Controls
   oldMapOpacity: number;
   onChangeOldMapOpacity: (opacity: number) => void;
-  oldMapStrokeColor: string;
-  onChangeOldMapStrokeColor: (color: string) => void;
+  oldMapStrokeColor?: string;
+  onChangeOldMapStrokeColor?: (color: string) => void;
 }
 
 export default function MapSourceModal({
@@ -130,8 +130,6 @@ export default function MapSourceModal({
   onUploadScannedMap,
   oldMapOpacity,
   onChangeOldMapOpacity,
-  oldMapStrokeColor,
-  onChangeOldMapStrokeColor,
 }: MapSourceModalProps) {
   const [activeTab, setActiveTab] = useState<"old" | "new">("old");
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
@@ -185,14 +183,6 @@ export default function MapSourceModal({
     reader.readAsDataURL(file);
   };
 
-  const STROKE_COLORS = [
-    { label: "Vintage Amber", hex: "#D97706" },
-    { label: "Radiant Teal", hex: "#0D9488" },
-    { label: "Sky Blue", hex: "#0284C7" },
-    { label: "Cadastral Gold", hex: "#F59E0B" },
-    { label: "High-Contrast Coral", hex: "#E11D48" },
-    { label: "Pure White", hex: "#FFFFFF" },
-  ];
 
   return (
     <div
@@ -415,7 +405,7 @@ export default function MapSourceModal({
                   Old Map Vector Styling:
                 </label>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div style={{ maxWidth: 360 }}>
                   {/* Opacity Slider */}
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", marginBottom: 4 }}>
@@ -430,32 +420,6 @@ export default function MapSourceModal({
                       onChange={(e) => onChangeOldMapOpacity(Number(e.target.value))}
                       style={{ width: "100%", accentColor: "var(--accent-primary)" }}
                     />
-                  </div>
-
-                  {/* Stroke Color Palette */}
-                  <div>
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: 600, display: "block", marginBottom: 6 }}>
-                      Boundary Outline Color
-                    </span>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {STROKE_COLORS.map((c) => (
-                        <div
-                          key={c.hex}
-                          onClick={() => onChangeOldMapStrokeColor(c.hex)}
-                          title={c.label}
-                          style={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: "50%",
-                            background: c.hex,
-                            border: oldMapStrokeColor === c.hex ? "3px solid #0F172A" : "1.5px solid #CBD5E1",
-                            cursor: "pointer",
-                            transition: "all 0.1s ease",
-                            transform: oldMapStrokeColor === c.hex ? "scale(1.15)" : "scale(1)",
-                          }}
-                        />
-                      ))}
-                    </div>
                   </div>
                 </div>
               </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
   ScanLine,
@@ -28,10 +29,17 @@ import {
   Building2,
   Search,
   X,
+  UploadCloud,
+  FolderUp,
+  LogOut,
+  Shield,
+  ChevronRight,
+  Eye,
 } from "lucide-react";
 import type { FeatureCollection } from "geojson";
 import type { GCPPoint, GCPPair } from "@/components/MapViewer";
 import { formatAlignmentStatus } from "@/lib/statusHelper";
+import { useAuth } from "@/lib/authContext";
 
 const MapViewer = dynamic(() => import("@/components/MapViewer"), { ssr: false });
 import MapSourceModal, { BASEMAP_PRESETS, BasemapOption } from "@/components/MapSourceModal";
@@ -71,6 +79,59 @@ function computePolygonAreaSqm(coords: [number, number][]): number {
 }
 
 export default function PatwariPage() {
+  const { officer, logout } = useAuth();
+  const router = useRouter();
+  const [isCurtainSwipeActive, setIsCurtainSwipeActive] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRosterOpen, setIsRosterOpen] = useState(false);
+  const [rosterSearch, setRosterSearch] = useState("");
+  const [rosterFilter, setRosterFilter] = useState("ALL");
+
+  const closeSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("patwari-sidebar-state-changed", { detail: { isOpen: false } }));
+    }
+  }, []);
+
+  const openSidebar = useCallback(() => {
+    setIsSidebarOpen(true);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("patwari-sidebar-state-changed", { detail: { isOpen: true } }));
+    }
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setIsRosterOpen(false);
+    setIsSidebarOpen((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("patwari-sidebar-state-changed", { detail: { isOpen: next } }));
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleToggle = () => toggleSidebar();
+    const handleOpen = () => openSidebar();
+    const handleClose = () => closeSidebar();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeSidebar();
+    };
+
+    window.addEventListener("toggle-patwari-sidebar", handleToggle);
+    window.addEventListener("open-patwari-sidebar", handleOpen);
+    window.addEventListener("close-patwari-sidebar", handleClose);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("toggle-patwari-sidebar", handleToggle);
+      window.removeEventListener("open-patwari-sidebar", handleOpen);
+      window.removeEventListener("close-patwari-sidebar", handleClose);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [toggleSidebar, openSidebar, closeSidebar]);
+
   const [parcels, setParcels] = useState<ParcelSummary[]>([]);
   const [geojson, setGeojson] = useState<FeatureCollection | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -78,10 +139,6 @@ export default function PatwariPage() {
   const [activePipelineStep, setActivePipelineStep] = useState<number>(1);
   const [isDossierCollapsed, setIsDossierCollapsed] = useState(false);
 
-  // Halqa Parcel Roster Sidebar State
-  const [isRosterOpen, setIsRosterOpen] = useState(false);
-  const [rosterSearch, setRosterSearch] = useState("");
-  const [rosterFilter, setRosterFilter] = useState("ALL");
 
   // Old Map & New Map Source Layer Controls
   const [isMapSourceModalOpen, setIsMapSourceModalOpen] = useState(false);
@@ -400,7 +457,7 @@ export default function PatwariPage() {
       if (data.is_occluded) {
         toast(
           `Occlusion Flagged! Shadow: ${(Number(data.shadow_ratio || 0) * 100).toFixed(0)}%, Canopy: ${(Number(data.canopy_ratio || 0) * 100).toFixed(0)}%. ${data.occlusion_reason}`,
-          { icon: "⚠️", id: tId, duration: 4500 }
+          { icon: "⚠️", id: tId, duration: 2200 }
         );
       } else {
         toast.success(
@@ -472,7 +529,7 @@ export default function PatwariPage() {
       if (data.is_occluded) {
         toast(
           `Occlusion Warning! Shadow: ${(Number(data.shadow_ratio || 0) * 100).toFixed(0)}%, Canopy: ${(Number(data.canopy_ratio || 0) * 100).toFixed(0)}%. ${data.occlusion_reason}`,
-          { icon: "⚠️", id: tId, duration: 4500 }
+          { icon: "⚠️", id: tId, duration: 2200 }
         );
       } else {
         toast.success(
@@ -569,8 +626,330 @@ export default function PatwariPage() {
       <div style={{ width: "100vw", height: "100vh", position: "relative", overflow: "hidden" }}>
         <h1 className="sr-only">Revenue Patwari Geospatial Harmonization Workspace</h1>
 
-      {/* Fullscreen Map Canvas below 64px Top Navbar */}
-      <div style={{ width: "100%", height: "calc(100vh - 64px)", position: "absolute", top: 64, left: 0, zIndex: 10 }}>
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* ────────────── CADASTRAL TOOLS DROPDOWN MENU (OPENS ON ARROW CLICK) ────────────── */}
+      {isSidebarOpen && (
+        <>
+          {/* Transparent Backdrop to dismiss dropdown on outside click */}
+          <div
+            onClick={closeSidebar}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1040,
+              background: "transparent",
+              cursor: "default",
+            }}
+          />
+
+          <div
+            className="animate-dropdown"
+            style={{
+              position: "fixed",
+              top: 118,
+              left: 14,
+              width: 310,
+              maxHeight: "calc(100vh - 136px)",
+              background: "#FFFFFF",
+              border: "1.5px solid var(--border-glass)",
+              borderRadius: "var(--radius-lg)",
+              zIndex: 1050,
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 16px 40px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(15, 23, 42, 0.08)",
+              overflowY: "auto",
+            }}
+          >
+        {/* 1. Header: Tools Suite Title + Close Button */}
+        <div
+          style={{
+            padding: "14px 16px",
+            borderBottom: "1px solid var(--border-subtle)",
+            background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                background: "var(--accent-primary-bg)",
+                border: "1px solid #99F6E4",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--accent-primary)",
+                boxShadow: "0 1px 4px rgba(13, 148, 136, 0.15)",
+              }}
+            >
+              <Zap size={16} />
+            </div>
+            <div>
+              <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
+                Cadastral Tools Menu
+              </div>
+              <div style={{ fontSize: "0.6875rem", color: "var(--text-muted)", fontWeight: 500 }}>
+                Select an action to apply on map
+              </div>
+            </div>
+          </div>
+
+          {/* Close Button to dismiss sidebar */}
+          <button
+            onClick={closeSidebar}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 30,
+              height: 30,
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--border-subtle)",
+              background: "#F1F5F9",
+              color: "var(--text-secondary)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              flexShrink: 0,
+            }}
+            title="Close Sidebar (✕)"
+            aria-label="Close Sidebar"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* 2. Step 1: Uploading the Maps (Distorted Old Map & New Map) */}
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-subtle)" }}>
+          <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+            <FolderUp size={13} style={{ color: "var(--accent-primary)" }} />
+            <span>Step 1: Map Uploads</span>
+          </div>
+
+          <button
+            onClick={() => {
+              setIsMapSourceModalOpen(true);
+              closeSidebar();
+            }}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "9px 12px",
+              borderRadius: "var(--radius-md)",
+              background: "#F0FDFA",
+              border: "1.5px solid #99F6E4",
+              color: "#0F766E",
+              fontWeight: 700,
+              fontSize: "0.8125rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            title="Upload Distorted Old Map (BhuNaksha Scan / GeoJSON) & New Map (Drone Orthomosaic)"
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <UploadCloud size={16} style={{ color: "#0D9488" }} />
+              <div style={{ textAlign: "left" }}>
+                <div>Upload Maps</div>
+                <div style={{ fontSize: "0.6875rem", color: "#0D9488", fontWeight: 500 }}>
+                  Distorted Old & New Map
+                </div>
+              </div>
+            </div>
+            <ChevronRight size={15} style={{ color: "#0D9488" }} />
+          </button>
+        </div>
+
+
+        {/* 4. Core Processing Tools (In Exact Order) */}
+        <div style={{ padding: "14px 16px", flex: 1 }}>
+          <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+            <Zap size={13} style={{ color: "var(--accent-primary)" }} />
+            <span>Step 2: Processing Tools</span>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {/* 1. Align (ORB) */}
+            <button
+              className="sidebar-tool-btn"
+              onClick={() => {
+                runAlign();
+                closeSidebar();
+              }}
+              disabled={loading || !selectedId}
+              title="1. Automated ORB feature detection & RANSAC homography"
+            >
+              <ScanLine size={15} style={{ color: "var(--accent-primary)" }} />
+              <span>Align (ORB)</span>
+            </button>
+
+            {/* 2. Drop GCP */}
+            <button
+              className={`sidebar-tool-btn ${enableGcpPlacement ? "active" : ""}`}
+              onClick={() => {
+                const next = !enableGcpPlacement;
+                setEnableGcpPlacement(next);
+                if (next) {
+                  toast(
+                    pairedGcpMode
+                      ? "Click 1: Legacy landmark → Click 2: Drone marker"
+                      : "Click on map to drop GCP point",
+                    { icon: "📍", duration: 2200 }
+                  );
+                }
+                closeSidebar();
+              }}
+              title="2. Place Ground Control Points (GCPs) on landmarks"
+            >
+              <Pin size={15} style={{ color: enableGcpPlacement ? "#0D9488" : "var(--accent-gold)" }} />
+              <span>Drop GCP {enableGcpPlacement ? "(Active)" : ""}</span>
+            </button>
+
+            {/* 3. 4-5 Clean & ULPIN */}
+            <button
+              className="sidebar-tool-btn"
+              onClick={() => {
+                runCleanupAndUlpin();
+                closeSidebar();
+              }}
+              disabled={loading || !selectedId}
+              title="3. PostGIS topology overlap removal & Base-14 ULPIN generation"
+            >
+              <Layers size={15} style={{ color: "var(--accent-primary)" }} />
+              <span>4-5 Clean & ULPIN</span>
+            </button>
+
+            {/* 4. TPS Warping */}
+            <button
+              className="sidebar-tool-btn"
+              onClick={() => {
+                setShowCalibrationDrawer(true);
+                closeSidebar();
+              }}
+              title="4. Thin-Plate Spline non-linear rubber sheeting for paper distortions"
+            >
+              <Sliders size={15} style={{ color: "var(--accent-sky)" }} />
+              <span>TPS Warping ({pairedGcpMode ? `${gcpPairs.length} pairs` : `${gcpPoints.length} pts`})</span>
+            </button>
+
+            {/* 5. GEOSAM */}
+            <button
+              className="sidebar-tool-btn"
+              onClick={() => {
+                runGeoSamExtraction();
+                closeSidebar();
+              }}
+              disabled={loading || !selectedId}
+              title="5. Meta Segment Anything (GeoSAM) zero-shot boundary delineation"
+            >
+              <Sparkles size={15} style={{ color: "#7C3AED" }} />
+              <span>GEOSAM</span>
+            </button>
+
+
+            {/* 7. Batch Align */}
+            <button
+              className="sidebar-tool-btn"
+              onClick={() => {
+                startBatchAlignment();
+                closeSidebar();
+              }}
+              disabled={loading || batchProgress.isRunning}
+              title="7. Asynchronously align all draft parcels in Ward 12"
+            >
+              <Zap size={15} className={batchProgress.isRunning ? "animate-spin" : ""} style={{ color: "#D97706" }} />
+              <span>
+                Batch Align {batchProgress.isRunning ? `(${batchProgress.completed}/${batchProgress.total})` : ""}
+              </span>
+            </button>
+          </div>
+
+          {/* 5. Special Feature: Curtain Swipe (Split-View Slider) */}
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border-subtle)" }}>
+            <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              <SplitSquareVertical size={13} style={{ color: "var(--accent-primary)" }} />
+              <span>Step 3: Verification (Swipe)</span>
+            </div>
+
+            <div style={{ background: "var(--bg-secondary)", padding: "10px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
+              <button
+                onClick={() => {
+                  setIsCurtainSwipeActive(!isCurtainSwipeActive);
+                  closeSidebar();
+                }}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  padding: "8px 10px",
+                  borderRadius: "var(--radius-sm)",
+                  border: isCurtainSwipeActive ? "1.5px solid #0D9488" : "1px solid var(--border-glass)",
+                  background: isCurtainSwipeActive ? "#0D9488" : "#FFFFFF",
+                  color: isCurtainSwipeActive ? "#FFFFFF" : "var(--text-primary)",
+                  fontWeight: 700,
+                  fontSize: "0.8125rem",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  marginBottom: 8,
+                }}
+              >
+                <SplitSquareVertical size={14} />
+                <span>{isCurtainSwipeActive ? "Curtain Swipe: ON" : "Curtain Swipe"}</span>
+              </button>
+
+              <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", lineHeight: 1.35 }}>
+                ◀ <strong>Old Map</strong> | <strong>Drone Map</strong> ▶
+                <br />
+                Swipe slider left/right to verify aligned boundaries with Cadastre overlay.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 6. Footer: Signout Button */}
+        <div style={{ padding: "14px 16px", borderTop: "1px solid var(--border-subtle)", background: "#F8FAFC" }}>
+          <button
+            onClick={() => {
+              logout();
+              router.push("/");
+            }}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              padding: "8px 12px",
+              borderRadius: "var(--radius-md)",
+              background: "#FEF2F2",
+              border: "1px solid #FECACA",
+              color: "#DC2626",
+              fontWeight: 700,
+              fontSize: "0.8125rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            title="Step 4: Sign out of Patwari session"
+          >
+            <LogOut size={15} />
+            <span>Signout</span>
+          </button>
+        </div>
+          </div>
+        </>
+      )}
+
+      {/* Map Canvas - Full Width */}
+      <div style={{ width: "100%", height: "calc(100vh - 68px)", position: "absolute", top: 68, left: 0, zIndex: 10 }}>
         <MapViewer
           geojsonData={geojson}
           selectedParcelId={selectedId}
@@ -586,13 +965,11 @@ export default function PatwariPage() {
           gcpPairs={gcpPairs}
           onAddGcpPair={handleAddGcpPair}
           showOcclusionAlerts={true}
+          enableCurtainSwipe={isCurtainSwipeActive}
           // Task 2.2: Vertex Editing
           enableVertexEdit={isVertexEditMode}
           activePolygonCoords={activeVertexCoords}
           onVertexChange={handleVertexChange}
-          // Task 2.3: GeoSAM Prompt Box
-          enableBboxPrompt={enableBboxPrompt}
-          onBboxSelected={handleBboxSelected}
           aiTracedFeature={aiTracedFeature}
           aiTraceConfidence={geosamResult?.confidence}
           isOccluded={geosamResult?.isOccluded}
@@ -606,97 +983,217 @@ export default function PatwariPage() {
           oldMapStrokeColor={oldMapStrokeColor}
           onOpenMapSourceModal={() => setIsMapSourceModalOpen(true)}
           leftSlot={
-            <button
-              onClick={() => setIsRosterOpen(!isRosterOpen)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 7,
-                padding: "5px 12px",
-                borderRadius: "var(--radius-sm)",
-                border: isRosterOpen ? "1px solid var(--border-glass)" : "1.5px solid var(--accent-primary-light)",
-                background: isRosterOpen ? "var(--bg-secondary)" : "#F0FDFA",
-                color: isRosterOpen ? "var(--text-secondary)" : "var(--accent-primary)",
-                fontSize: "0.8125rem",
-                fontWeight: 800,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-                whiteSpace: "nowrap",
-              }}
-              title={isRosterOpen ? "Hide Halqa Mohanlalganj Parcel Roster" : "Open Halqa Mohanlalganj Parcel Roster"}
-            >
-              {isRosterOpen ? <X size={14} /> : <Building2 size={15} style={{ color: "var(--accent-primary)" }} />}
-              <span>{isRosterOpen ? "Hide Roster" : `Parcel Roster (${parcels.length})`}</span>
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Patwari Name Box (Single Dropdown Arrow) */}
+              <button
+                onClick={toggleSidebar}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "5px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  background: isSidebarOpen ? "#CCFBF1" : "var(--accent-primary-bg)",
+                  border: isSidebarOpen ? "1.5px solid #0D9488" : "1px solid #99F6E4",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  whiteSpace: "nowrap",
+                }}
+                title={isSidebarOpen ? "Close Tools Sidebar" : "Open Tools Sidebar"}
+                aria-label="Toggle Patwari Tools Sidebar"
+              >
+                {/* Avatar Badge */}
+                <div
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, #0D9488 0%, #0F766E 100%)",
+                    color: "#FFFFFF",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.72rem",
+                    fontWeight: 900,
+                    border: "1px solid #99F6E4",
+                    flexShrink: 0,
+                  }}
+                >
+                  RK
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#0F766E" }}>
+                    {officer?.name || "Ramesh Kumar Sharma"}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "0.625rem",
+                      fontWeight: 800,
+                      padding: "1px 5px",
+                      borderRadius: 4,
+                      background: "#0D9488",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    PATWARI
+                  </span>
+                </div>
+
+                {/* Only ONE single dropdown arrow */}
+                <ChevronDown
+                  size={15}
+                  style={{
+                    color: "#0D9488",
+                    transform: isSidebarOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                  }}
+                />
+              </button>
+
+              <div style={{ width: 1, height: 20, background: "var(--border-subtle)", flexShrink: 0 }} />
+
+              {/* Parcel Roster Toggle */}
+              <button
+                onClick={() => {
+                  setIsRosterOpen((prev) => {
+                    const next = !prev;
+                    if (next) setIsSidebarOpen(false);
+                    return next;
+                  });
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 7,
+                  padding: "5px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  border: isRosterOpen ? "1px solid var(--border-glass)" : "1.5px solid var(--accent-primary-light)",
+                  background: isRosterOpen ? "var(--bg-secondary)" : "#F0FDFA",
+                  color: isRosterOpen ? "var(--text-secondary)" : "var(--accent-primary)",
+                  fontSize: "0.8125rem",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  whiteSpace: "nowrap",
+                }}
+                title={isRosterOpen ? "Hide Halqa Mohanlalganj Parcel Roster" : "Open Halqa Mohanlalganj Parcel Roster"}
+              >
+                {isRosterOpen ? <X size={14} /> : <Building2 size={15} style={{ color: "var(--accent-primary)" }} />}
+                <span>{isRosterOpen ? "Hide Roster" : `Parcel Roster (${parcels.length})`}</span>
+              </button>
+            </div>
           }
         />
       </div>
 
-      {/* ───── Task 2.2: Floating Vertex HITL Calibration HUD ───── */}
+      {/* ───── Task 2.2: Floating Vertex HITL Calibration HUD (Responsive & Compact) ───── */}
       {isVertexEditMode && selectedParcel && (
         <div
           className="glass-card animate-fade-in-up"
           style={{
-            position: "absolute",
-            bottom: 90,
+            position: "fixed",
+            bottom: 24,
             left: "50%",
             transform: "translateX(-50%)",
-            zIndex: 450,
-            padding: "10px 18px",
-            background: "rgba(15, 23, 42, 0.95)",
+            zIndex: 1000,
+            padding: "8px 14px",
+            background: "rgba(15, 23, 42, 0.96)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
             color: "#FFFFFF",
             borderRadius: "var(--radius-lg)",
             display: "flex",
             alignItems: "center",
-            gap: 16,
-            boxShadow: "0 10px 35px rgba(0, 0, 0, 0.4)",
-            border: "1.5px solid rgba(56, 189, 248, 0.5)",
-            whiteSpace: "nowrap",
+            justifyContent: "center",
+            gap: 12,
+            boxShadow: "0 12px 35px rgba(0, 0, 0, 0.45)",
+            border: "1.5px solid rgba(56, 189, 248, 0.6)",
+            maxWidth: "calc(100vw - 32px)",
+            width: "max-content",
+            boxSizing: "border-box",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#38BDF8", animation: "pulse 1.5s infinite" }} />
-            <span style={{ fontWeight: 800, fontSize: "0.875rem", letterSpacing: "0.02em" }}>
-              Vertex Calibration (HITL): Khasra {selectedParcel.khasra_no}
+          {/* Khasra Indicator */}
+          <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#38BDF8", animation: "pulse 1.5s infinite" }} />
+            <span style={{ fontWeight: 800, fontSize: "0.8125rem", color: "#FFFFFF", letterSpacing: "0.01em" }}>
+              Khasra {selectedParcel.khasra_no}
+            </span>
+            <span
+              style={{
+                fontSize: "0.6875rem",
+                fontWeight: 700,
+                padding: "1px 6px",
+                borderRadius: 4,
+                background: "rgba(56, 189, 248, 0.2)",
+                color: "#38BDF8",
+                border: "1px solid rgba(56, 189, 248, 0.4)",
+              }}
+            >
+              Calibration
             </span>
           </div>
 
-          <div style={{ width: 1, height: 20, background: "rgba(255, 255, 255, 0.2)" }} />
+          <div style={{ width: 1, height: 18, background: "rgba(255, 255, 255, 0.2)", flexShrink: 0 }} />
 
-          {/* Instantaneous Area Readout */}
-          <div style={{ fontSize: "0.8125rem", display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Area Readout */}
+          <div style={{ fontSize: "0.78rem", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <span style={{ color: "#94A3B8" }}>Area:</span>
             <strong style={{ color: "#FFFFFF" }}>{currentAreaSqm.toFixed(1)} m²</strong>
             <span
               style={{
-                fontWeight: 800,
+                fontWeight: 700,
+                fontSize: "0.72rem",
                 color: Math.abs(deltaArea) < 0.1 ? "#94A3B8" : deltaArea > 0 ? "#38BDF8" : "#F59E0B",
               }}
             >
-              (ΔArea: {deltaArea >= 0 ? "+" : ""}{deltaArea.toFixed(1)} m² / {deltaPercent >= 0 ? "+" : ""}{deltaPercent.toFixed(2)}%)
+              ({deltaArea >= 0 ? "+" : ""}{deltaArea.toFixed(1)} m² / {deltaPercent >= 0 ? "+" : ""}{deltaPercent.toFixed(1)}%)
             </span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 1, height: 18, background: "rgba(255, 255, 255, 0.2)", flexShrink: 0 }} />
+
+          {/* Action Buttons */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <button
               onClick={handleResetVertices}
               className="btn-secondary"
               style={{
-                padding: "4px 10px",
-                fontSize: "0.78rem",
+                padding: "4px 8px",
+                fontSize: "0.75rem",
                 background: "rgba(255, 255, 255, 0.1)",
                 color: "#FFFFFF",
                 border: "1px solid rgba(255, 255, 255, 0.2)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                cursor: "pointer",
               }}
+              title="Reset corners to original shape"
             >
-              <RotateCcw size={12} /> Reset
+              <RotateCcw size={11} />
+              <span>Reset</span>
             </button>
             <button
               onClick={handleSaveVertexChanges}
               className="btn-primary"
-              style={{ padding: "5px 12px", fontSize: "0.78rem" }}
+              style={{
+                padding: "5px 12px",
+                fontSize: "0.75rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                cursor: "pointer",
+                background: "#0D9488",
+                border: "1px solid #99F6E4",
+              }}
+              title="Lock and save calibrated boundary coordinates"
             >
-              <Check size={13} /> Lock Boundary
+              <Check size={12} />
+              <span>Lock Boundary</span>
             </button>
           </div>
         </div>
@@ -708,11 +1205,11 @@ export default function PatwariPage() {
           className="glass-card animate-fade-in-up"
           style={{
             position: "absolute",
-            top: 122,
-            left: 16,
+            top: 80,
+            left: 20,
             zIndex: 430,
             width: 326,
-            maxHeight: "calc(100vh - 230px)",
+            maxHeight: "calc(100vh - 160px)",
             display: "flex",
             flexDirection: "column",
             background: "rgba(255, 255, 255, 0.98)",
@@ -888,11 +1385,11 @@ export default function PatwariPage() {
         className="glass-card animate-fade-in-up"
         style={{
           position: "absolute",
-          top: 122,
+          top: 80,
           right: 20,
           zIndex: 400,
           width: 350,
-          maxHeight: "calc(100vh - 230px)",
+          maxHeight: "calc(100vh - 160px)",
           overflowY: "auto",
           padding: isDossierCollapsed ? "12px 18px" : "18px 20px",
           background: "rgba(255, 255, 255, 0.98)",
@@ -964,7 +1461,7 @@ export default function PatwariPage() {
                   </span>
                 </div>
 
-                {/* Task 2.2: Vertex Edit Button */}
+                {/* Task 2.2: Manual Corner Drag Handle (HITL) */}
                 <div style={{ marginBottom: 12 }}>
                   <button
                     onClick={() => {
@@ -973,6 +1470,7 @@ export default function PatwariPage() {
                       if (next) {
                         toast("Corner Drag Mode Active: Drag any blue corner handle to adjust boundaries", {
                           icon: "📐",
+                          duration: 2200,
                         });
                       }
                     }}
@@ -980,9 +1478,9 @@ export default function PatwariPage() {
                       width: "100%",
                       padding: "8px 12px",
                       borderRadius: "var(--radius-md)",
-                      border: isVertexEditMode ? "1.5px solid #0284C7" : "1px solid var(--border-glass)",
-                      background: isVertexEditMode ? "#E0F2FE" : "var(--bg-secondary)",
-                      color: isVertexEditMode ? "#0369A1" : "var(--text-primary)",
+                      border: isVertexEditMode ? "1.5px solid #0284C7" : "1px solid #BAE6FD",
+                      background: isVertexEditMode ? "#E0F2FE" : "#F0F9FF",
+                      color: isVertexEditMode ? "#0369A1" : "#0284C7",
                       fontWeight: 700,
                       fontSize: "0.8125rem",
                       display: "flex",
@@ -992,9 +1490,10 @@ export default function PatwariPage() {
                       cursor: "pointer",
                       transition: "all 0.15s ease",
                     }}
+                    title="Manually adjust parcel corners by dragging vertex handles on map"
                   >
                     <Move size={15} />
-                    {isVertexEditMode ? "Exit Corner Drag Mode" : "Manual Corner Drag Handle (HITL)"}
+                    <span>{isVertexEditMode ? "Exit Corner Drag Mode" : "Manual Corner Drag Handle (HITL)"}</span>
                   </button>
                 </div>
 
@@ -1060,15 +1559,35 @@ export default function PatwariPage() {
                   </div>
                 )}
 
-                {/* Submit to Tehsildar Button */}
-                <button
-                  className="btn-primary"
-                  onClick={submitForApproval}
-                  disabled={loading}
-                  style={{ width: "100%", padding: "10px 16px" }}
-                >
-                  <Send size={15} /> Send to Tehsildar for HITL Approval
-                </button>
+                {/* HITL Statutory Legal Approval: Send to Tehsildar */}
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed var(--border-subtle)" }}>
+                  <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: 6, fontWeight: 600 }}>
+                    Statutory Clearance Pipeline:
+                  </div>
+                  <button
+                    className="btn-primary"
+                    onClick={submitForApproval}
+                    disabled={loading}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      fontSize: "0.8125rem",
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      background: "linear-gradient(135deg, #1E3A8A 0%, #172554 100%)",
+                      borderColor: "#1E3A8A",
+                      color: "#FFFFFF",
+                      boxShadow: "0 2px 8px rgba(30, 58, 138, 0.25)",
+                    }}
+                    title="Transmit aligned cadastral record to Tehsildar Court for final statutory decree"
+                  >
+                    <Send size={15} />
+                    <span>Send to Tehsildar for HITL Approval</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)", display: "flex", gap: 10, alignItems: "center", background: "var(--bg-secondary)", padding: 14, borderRadius: "var(--radius-md)" }}>
@@ -1078,148 +1597,6 @@ export default function PatwariPage() {
             )}
           </div>
         )}
-      </div>
-
-      {/* ───── Bottom Center: Consolidated Unified Pipeline Action Dock ───── */}
-      <div
-        className="glass-card animate-fade-in-up"
-        style={{
-          position: "absolute",
-          bottom: 24,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 400,
-          padding: "10px 16px",
-          display: "flex",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 10,
-          background: "rgba(255, 255, 255, 0.98)",
-          borderRadius: "var(--radius-lg)",
-          boxShadow: "0 10px 35px rgba(15, 23, 42, 0.15)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingRight: 4 }}>
-          <span style={{ fontWeight: 800, fontSize: "0.875rem", color: "var(--text-primary)" }}>
-            Harmonization:
-          </span>
-          <span className="badge-pastel-teal" style={{ fontSize: "0.75rem", padding: "2px 8px" }}>
-            Step {activePipelineStep} of 5
-          </span>
-        </div>
-
-        <div style={{ width: 1, height: 24, background: "var(--border-subtle)" }} />
-
-        {/* Step 2: Align Map */}
-        <button
-          className="btn-primary"
-          onClick={runAlign}
-          disabled={loading || !selectedId}
-          title="ORB feature detection & RANSAC homography"
-        >
-          <ScanLine size={15} /> 2. Align (ORB)
-        </button>
-
-        {/* Step 3: GeoSAM AI */}
-        <button
-          className="btn-primary"
-          onClick={runGeoSamExtraction}
-          disabled={loading || !selectedId}
-          title="Meta Segment Anything (GeoSAM) zero-shot boundary tracing with occlusion checks"
-        >
-          <Sparkles size={15} /> 3. GeoSAM AI
-        </button>
-
-        {/* Task 2.3: GeoSAM Interactive Prompt Box */}
-        <button
-          onClick={() => {
-            const next = !enableBboxPrompt;
-            setEnableBboxPrompt(next);
-            if (next) {
-              toast("GeoSAM Bounding Box Prompt: Click 2 opposite corners on the drone map", { icon: "🎯" });
-            }
-          }}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "8px 14px",
-            borderRadius: "var(--radius-md)",
-            border: enableBboxPrompt ? "1.5px solid #0D9488" : "1px solid var(--border-glass)",
-            background: enableBboxPrompt ? "#CCFBF1" : "#FFFFFF",
-            color: enableBboxPrompt ? "#0D9488" : "var(--text-primary)",
-            fontSize: "0.8125rem",
-            fontWeight: 700,
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-          title="Interactive bounding-box prompt tool for physical property boundaries"
-        >
-          <Crosshair size={15} /> {enableBboxPrompt ? "Box Prompt Active" : "Prompt BBox"}
-        </button>
-
-        {/* Step 4 & 5: PostGIS & ULPIN */}
-        <button
-          className="btn-primary"
-          onClick={runCleanupAndUlpin}
-          disabled={loading || !selectedId}
-          title="PostGIS ST_Difference, ST_Snap (0.05m), and Base-14 ULPIN generation"
-        >
-          <Layers size={15} /> 4-5. Clean & ULPIN
-        </button>
-
-        <div style={{ width: 1, height: 24, background: "var(--border-subtle)" }} />
-
-        {/* Task 2.4: GCP Drop Mode Toggle */}
-        <button
-          className="btn-secondary"
-          onClick={() => {
-            const next = !enableGcpPlacement;
-            setEnableGcpPlacement(next);
-            if (next) {
-              toast(
-                pairedGcpMode
-                  ? "Paired Landmark Mode: Click 1 on Legacy Landmark, Click 2 on Drone Marker"
-                  : "Click on map to drop GCP points",
-                { icon: "📍" }
-              );
-            }
-          }}
-          style={{
-            background: enableGcpPlacement ? "var(--accent-primary-bg)" : "#FFFFFF",
-            borderColor: enableGcpPlacement ? "var(--accent-primary)" : "var(--border-glass)",
-            color: enableGcpPlacement ? "var(--accent-primary)" : "var(--text-primary)",
-          }}
-        >
-          <Pin size={15} /> {enableGcpPlacement ? "GCP Active" : "Drop GCP"}
-        </button>
-
-        {/* TPS Drawer Toggle with Pair count */}
-        <button className="btn-secondary" onClick={() => setShowCalibrationDrawer(true)}>
-          <Sliders size={15} /> TPS Warping ({pairedGcpMode ? `${gcpPairs.length} pairs` : `${gcpPoints.length} pts`})
-        </button>
-
-        {/* Village Bulk / Batch Alignment Action */}
-        <button
-          className="btn-secondary"
-          onClick={startBatchAlignment}
-          disabled={loading || batchProgress.isRunning}
-          style={{
-            background: batchProgress.isRunning ? "var(--accent-sun-bg)" : "#F0FDFA",
-            borderColor: batchProgress.isRunning ? "#FDE68A" : "#99F6E4",
-            color: batchProgress.isRunning ? "#92400E" : "#0D9488",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            fontWeight: 700,
-          }}
-          title="Asynchronously align all DRAFT parcels in Mohanlalganj Ward 12 using the new batch pipeline"
-        >
-          <Zap size={15} className={batchProgress.isRunning ? "animate-spin" : ""} />
-          {batchProgress.isRunning
-            ? `Batch: ${batchProgress.completed}/${batchProgress.total} (${batchProgress.status})`
-            : "Batch Align Ward 12"}
-        </button>
       </div>
 
       {/* ───── Task 2.4: Upgraded Thin-Plate Splines & Paired GCP Modal ───── */}
@@ -1398,7 +1775,7 @@ export default function PatwariPage() {
                     pairedGcpMode
                       ? "Click 1 on old cadastre landmark, then Click 2 on drone marker"
                       : "Click on map to drop GCP points",
-                    { icon: "📍" }
+                    { icon: "📍", duration: 2200 }
                   );
                 }}
               >
@@ -1413,37 +1790,49 @@ export default function PatwariPage() {
                   try {
                     const formattedGcps = pairedGcpMode
                       ? gcpPairs.map((p) => ({
-                          id: p.id,
-                          legacy_coord: [p.legacy[1], p.legacy[0]],
-                          drone_coord: [p.drone[1], p.drone[0]],
-                          label: p.label,
+                          source_lon: p.legacy[1],
+                          source_lat: p.legacy[0],
+                          target_lon: p.drone[1],
+                          target_lat: p.drone[0],
                         }))
                       : gcpPoints.map((p) => ({
-                          id: p.id,
-                          legacy_coord: [p.lng - 0.0003, p.lat - 0.0002],
-                          drone_coord: [p.lng, p.lat],
-                          label: p.label,
+                          source_lon: p.lng - 0.0003,
+                          source_lat: p.lat - 0.0002,
+                          target_lon: p.lng,
+                          target_lat: p.lat,
                         }));
+
+                    const parcelCoords = selectedParcel?.boundary?.coordinates || [
+                      [[80.899, 26.76], [80.902, 26.76], [80.902, 26.762], [80.899, 26.762], [80.899, 26.76]],
+                    ];
 
                     const res = await fetch(`${API}/v1/align-map`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
-                        legacy_geojson: {
-                          type: "Polygon",
-                          coordinates: [
-                            [[80.899, 26.76], [80.902, 26.76], [80.902, 26.762], [80.899, 26.762], [80.899, 26.76]],
-                          ],
-                        },
+                        legacy_coordinates: parcelCoords,
                         gcps: formattedGcps,
                       }),
                     });
-                    if (!res.ok) throw new Error("TPS calculation error");
+                    if (!res.ok) {
+                      const errData = await res.json().catch(() => ({}));
+                      throw new Error(errData.detail || "TPS calculation error");
+                    }
                     const data = await res.json();
                     toast.success(
-                      `TPS Warping complete! Confidence: ${data.confidence_score}% (RMSE: ${sectorRmseMeters.toFixed(2)}m)`,
+                      `TPS Warping complete! Confidence: ${data.confidence_score}% (Method: ${data.diagnostics?.gcp_method || "TPS"})`,
                       { id: tId }
                     );
+
+                    // Update selected parcel boundary in local view if available
+                    if (selectedParcel && data.aligned_geojson) {
+                      setSelectedParcel({
+                        ...selectedParcel,
+                        boundary: data.aligned_geojson,
+                        confidence_score: data.confidence_score,
+                      });
+                    }
+
                     setShowCalibrationDrawer(false);
                     await fetchData();
                   } catch (err: any) {

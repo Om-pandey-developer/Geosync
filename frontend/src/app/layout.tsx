@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Toaster } from "react-hot-toast";
 import TopNavbar from "@/components/TopNavbar";
 import "./globals.css";
 
@@ -12,6 +11,8 @@ export const metadata: Metadata = {
 };
 
 import { AuthProvider } from "@/lib/authContext";
+
+import NotificationCenter from "@/components/NotificationCenter";
 
 export default function RootLayout({
   children,
@@ -37,17 +38,7 @@ export default function RootLayout({
           <TopNavbar />
           {children}
         </AuthProvider>
-        <Toaster 
-          position="bottom-right" 
-          toastOptions={{
-            style: {
-              background: 'var(--bg-glass-strong)',
-              color: 'var(--text-primary)',
-              backdropFilter: 'blur(16px)',
-              border: '1px solid var(--border-glass)',
-            }
-          }} 
-        />
+        <NotificationCenter />
       </body>
     </html>
   );

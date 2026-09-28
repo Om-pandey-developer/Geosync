@@ -1,0 +1,30 @@
+[
+  {
+    "id": "gcp-1",
+    "name": "Khasra 101 South Boundary Stone (Stone Triangulation #1)",
+    "source": { "lng": 80.90118, "lat": 26.76036 },
+    "target": { "lng": 80.90100, "lat": 26.76050 },
+    "error_m": 0.04
+  },
+  {
+    "id": "gcp-2",
+    "name": "Khasra 104 East Agricultural Canal Junction",
+    "source": { "lng": 80.90478, "lat": 26.76036 },
+    "target": { "lng": 80.90460, "lat": 26.76050 },
+    "error_m": 0.03
+  },
+  {
+    "id": "gcp-3",
+    "name": "Khasra 114 North Road Intersection (NAKSHA Drone Survey Pillar)",
+    "source": { "lng": 80.90478, "lat": 26.76396 },
+    "target": { "lng": 80.90460, "lat": 26.76410 },
+    "error_m": 0.05
+  },
+  {
+    "id": "gcp-4",
+    "name": "Khasra 112 Northwest Well Junction Marker",
+    "source": { "lng": 80.90118, "lat": 26.76396 },
+    "target": { "lng": 80.90100, "lat": 26.76410 },
+    "error_m": 0.04
+  }
+]

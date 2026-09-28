@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   MapPin,
   Shield,
   Layers,
   Cpu,
   ArrowRight,
-  Fingerprint,
-  ScanLine,
+  ArrowDown,
   Globe2,
   Sparkles,
   Zap,
@@ -51,49 +51,13 @@ export default function LandingPage() {
   const [testbedFilter, setTestbedFilter] = useState<string>("ALL");
 
   const handleEnterPatwari = () => {
-    loginAs("patwari");
-    router.push("/patwari");
+    router.push("/login?role=patwari");
   };
 
   const handleEnterTehsildar = () => {
-    loginAs("tehsildar");
-    router.push("/tehsildar");
+    router.push("/login?role=tehsildar");
   };
 
-  const workflowSteps = [
-    {
-      step: "01",
-      icon: <Layers size={22} />,
-      title: "1. Multi-Source Cadastral Ingestion",
-      desc: "Historical 50-year distorted cloth cadastre maps (scanned raster or legacy BhuNaksha vectors) ingested alongside 5cm NAKSHA drone orthomosaics standardized to true ground coordinates in EPSG:3857.",
-      color: "var(--accent-primary)",
-      badge: "EPSG:3857 • Old & New Layers",
-    },
-    {
-      step: "02",
-      icon: <ScanLine size={22} />,
-      title: "2. ORB Homography & TPS Warping",
-      desc: "Fast ORB descriptor matching and RANSAC projective homography combined with dual-click Ground Control Point (GCP) Thin-Plate Spline rubber-sheeting to correct severe non-linear paper shrinkage and rotational skew.",
-      color: "var(--accent-sky)",
-      badge: "RANSAC + TPS Warping",
-    },
-    {
-      step: "03",
-      icon: <Sparkles size={22} />,
-      title: "3. GeoSAM AI Zero-Shot Segmentation",
-      desc: "Air-gapped Meta ViT-H vision foundation model zero-shot property boundary tracing in <10ms, enhanced with dual-channel radiometric tree canopy and shadow occlusion detection scoring.",
-      color: "var(--accent-lavender)",
-      badge: "ViT-H Zero-Shot AI",
-    },
-    {
-      step: "04",
-      icon: <Fingerprint size={22} />,
-      title: "4. PostGIS Purity & Base-14 ULPIN",
-      desc: "Autonomous PostGIS 3.4 ST_Difference overlap trimming, ST_Snap 0.05m gap sealing, and automated 14-digit DoLR/ECCMA compliant Bhu-Aadhaar generation with Tehsildar SHA-256 e-Sign sealing.",
-      color: "var(--accent-mint)",
-      badge: "OGC / PostGIS 3.4",
-    },
-  ];
 
   const testbedParcels = [
     {
@@ -287,20 +251,6 @@ export default function LandingPage() {
             Dual Portals
           </a>
           <a
-            href="#pipeline"
-            style={{
-              fontSize: "0.875rem",
-              fontWeight: 700,
-              color: "var(--text-secondary)",
-              textDecoration: "none",
-              transition: "color 0.15s ease",
-            }}
-            onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "var(--accent-primary)")}
-            onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "var(--text-secondary)")}
-          >
-            4-Stage Architecture
-          </a>
-          <a
             href="#testbed"
             style={{
               fontSize: "0.875rem",
@@ -314,37 +264,29 @@ export default function LandingPage() {
           >
             Mohanlalganj Testbed
           </a>
-        </nav>
-
-        {/* Right Action Trigger Group */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            onClick={() => setIsSourceModalOpen(true)}
-            className="btn-secondary"
-            style={{ padding: "8px 14px", fontSize: "0.8125rem" }}
-            title="Upload Old Map (Paper Scan) and New Map (Drone Photo)"
-          >
-            <Layers size={16} style={{ color: "var(--accent-primary)" }} />
-            <span>Map Layers</span>
-          </button>
-
-          <a
-            href="#portals"
-            className="btn-primary"
+          <Link
+            href="/login"
             style={{
-              padding: "8px 16px",
-              fontSize: "0.8125rem",
+              fontSize: "0.84rem",
+              fontWeight: 800,
+              color: "var(--accent-primary)",
               textDecoration: "none",
+              padding: "6px 14px",
+              borderRadius: "var(--radius-sm)",
+              background: "var(--accent-primary-bg)",
+              border: "1.5px solid #99F6E4",
               display: "inline-flex",
               alignItems: "center",
-              gap: 8,
-              fontWeight: 700,
+              gap: 6,
+              transition: "all 0.15s ease",
             }}
           >
-            <Compass size={15} />
-            <span>Officer Portals ↓</span>
-          </a>
-        </div>
+            <Lock size={13} />
+            <span>Officer Login</span>
+          </Link>
+        </nav>
+
+
       </header>
 
       {/* ═════════════════════════════════════════════════════════════
@@ -488,82 +430,12 @@ export default function LandingPage() {
             }}
           >
             <Compass size={20} />
-            <span>Select Officer Portal Below ↓</span>
-            <ArrowRight size={18} />
+            <span>Select Officer Portal Below</span>
+            <ArrowDown size={18} />
           </a>
 
-          <button
-            onClick={() => setIsSourceModalOpen(true)}
-            className="btn-secondary"
-            style={{ padding: "14px 24px", fontSize: "0.95rem" }}
-          >
-            <Layers size={20} style={{ color: "var(--accent-primary)" }} />
-            <span>Upload Old &amp; New Maps</span>
-          </button>
         </div>
 
-        {/* Live Technical Stack Counters */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-            gap: 14,
-            marginTop: 40,
-            textAlign: "left",
-          }}
-        >
-          <div className="stats-counter-card">
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: "var(--accent-primary)" }} />
-            <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 800, textTransform: "uppercase" }}>
-              Cadastral Resolution
-            </div>
-            <div style={{ fontSize: "1.45rem", fontWeight: 900, color: "var(--accent-primary)", marginTop: 4 }}>
-              5cm GSD Drone
-            </div>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: 2, fontWeight: 500 }}>
-              True orthomosaic EPSG:3857
-            </div>
-          </div>
-
-          <div className="stats-counter-card">
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: "var(--accent-sky)" }} />
-            <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 800, textTransform: "uppercase" }}>
-              AI Boundary Model
-            </div>
-            <div style={{ fontSize: "1.45rem", fontWeight: 900, color: "var(--accent-sky)", marginTop: 4 }}>
-              &lt;10ms ViT-H
-            </div>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: 2, fontWeight: 500 }}>
-              Zero-shot GeoSAM with canopy filter
-            </div>
-          </div>
-
-          <div className="stats-counter-card">
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: "var(--accent-mint)" }} />
-            <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 800, textTransform: "uppercase" }}>
-              Topological Purity
-            </div>
-            <div style={{ fontSize: "1.45rem", fontWeight: 900, color: "var(--accent-mint)", marginTop: 4 }}>
-              100% Purity
-            </div>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: 2, fontWeight: 500 }}>
-              ST_Difference &bull; 0.05m Snap
-            </div>
-          </div>
-
-          <div className="stats-counter-card">
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: "var(--accent-gold)" }} />
-            <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 800, textTransform: "uppercase" }}>
-              Legal Sanctity
-            </div>
-            <div style={{ fontSize: "1.45rem", fontWeight: 900, color: "var(--accent-gold)", marginTop: 4 }}>
-              SHA-256 Seal
-            </div>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: 2, fontWeight: 500 }}>
-              Form-II Decree &bull; 14-Digit ULPIN
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* ═════════════════════════════════════════════════════════════
@@ -1035,80 +907,91 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <h3 style={{ fontSize: "1.5rem", fontWeight: 900, color: "var(--text-primary)", marginBottom: 8 }}>
+              <h3 style={{ fontSize: "1.45rem", fontWeight: 900, color: "var(--text-primary)", marginBottom: 6 }}>
                 Patwari / Lekhpal Studio
               </h3>
 
               <p
                 style={{
-                  fontSize: "0.9375rem",
+                  fontSize: "0.875rem",
                   color: "var(--text-secondary)",
-                  lineHeight: 1.6,
-                  marginBottom: 20,
-                }}
-              >
-                The field engineer&apos;s command center: Import historical BhuNaksha GeoJSON or scanned cloth maps, drop Ground Control Points (GCPs), execute Thin-Plate Spline rubber-sheeting, drag polygon corner vertices (HITL calibration), and extract boundaries using zero-shot GeoSAM ViT-H AI.
-              </p>
-
-              {/* Key Features */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "10px 14px",
-                  fontSize: "0.8125rem",
-                  color: "var(--text-secondary)",
-                  marginBottom: 20,
-                  background: "var(--bg-secondary)",
-                  padding: 18,
-                  borderRadius: "var(--radius-md)",
-                  border: "1px solid var(--border-subtle)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-primary)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>Old & New Map Manager</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-primary)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>Paired Landmark TPS Warping</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-primary)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>GeoSAM AI Bounding Box</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-primary)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>Corner Drag Handle (HITL)</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-primary)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>Canopy & Shadow Occlusion</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-primary)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>50-Parcel Batch Alignment</span>
-                </div>
-              </div>
-
-              {/* Role-Based Clearance Status */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "8px 12px",
-                  borderRadius: "var(--radius-sm)",
-                  background: "rgba(13, 148, 136, 0.08)",
-                  border: "1px solid rgba(13, 148, 136, 0.2)",
+                  lineHeight: 1.5,
                   marginBottom: 16,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "#0F766E", fontWeight: 700 }}>
-                  <Shield size={14} />
-                  <span>Authorized Role: Revenue Patwari / Field Surveyor</span>
-                </div>
-                <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)", fontFamily: "monospace", fontWeight: 700 }}>#PAT-442</span>
+                Field survey GIS studio for cadastral map ingestion, landmark GCP rubber-sheeting, and boundary alignment.
+              </p>
+
+              {/* Patwari Cadastral GIS Vector Graphic */}
+              <div
+                style={{
+                  marginBottom: 22,
+                  borderRadius: "var(--radius-md)",
+                  overflow: "hidden",
+                  border: "1.5px solid #CCFBF1",
+                  boxShadow: "0 4px 16px rgba(13, 148, 136, 0.08)",
+                }}
+              >
+                <svg
+                  viewBox="0 0 420 180"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  style={{ width: "100%", height: "auto", display: "block" }}
+                >
+                  <defs>
+                    <linearGradient id="patBg" x1="0" y1="0" x2="420" y2="180" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#F0FDFA" />
+                      <stop offset="1" stopColor="#E6FFFA" />
+                    </linearGradient>
+                    <linearGradient id="patScan" x1="0" y1="0" x2="0" y2="1">
+                      <stop stopColor="#2DD4BF" stopOpacity="0.45" />
+                      <stop offset="1" stopColor="#0D9488" stopOpacity="0.08" />
+                    </linearGradient>
+                    <pattern id="patGrid" width="28" height="28" patternUnits="userSpaceOnUse">
+                      <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#CCFBF1" strokeWidth="1" />
+                      <circle cx="28" cy="28" r="1.5" fill="#99F6E4" />
+                    </pattern>
+                    <filter id="patGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#0D9488" floodOpacity="0.18" />
+                    </filter>
+                  </defs>
+
+                  <rect width="420" height="180" fill="url(#patBg)" />
+                  <rect width="420" height="180" fill="url(#patGrid)" />
+
+                  <path d="M 64 22 L 175 155 L 35 155 Z" fill="url(#patScan)" />
+                  <circle cx="64" cy="22" r="18" fill="#0D9488" filter="url(#patGlow)" />
+                  <circle cx="64" cy="22" r="26" stroke="#14B8A6" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+                  <path d="M 55 22 L 73 22 M 64 13 L 64 31" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
+
+                  <polygon points="110,65 195,45 235,105 145,130" fill="#14B8A6" fillOpacity="0.25" stroke="#0D9488" strokeWidth="2.5" />
+                  <polygon points="195,45 285,40 315,95 235,105" fill="#2DD4BF" fillOpacity="0.16" stroke="#14B8A6" strokeWidth="2" strokeDasharray="5 3" />
+                  <polygon points="145,130 235,105 255,160 160,165" fill="#0D9488" fillOpacity="0.12" stroke="#0F766E" strokeWidth="1.5" />
+
+                  <circle cx="110" cy="65" r="4.5" fill="#0D9488" stroke="#FFFFFF" strokeWidth="2" />
+                  <circle cx="195" cy="45" r="4.5" fill="#0D9488" stroke="#FFFFFF" strokeWidth="2" />
+                  <circle cx="235" cy="105" r="5.5" fill="#F59E0B" stroke="#FFFFFF" strokeWidth="2.5" />
+                  <circle cx="145" cy="130" r="4.5" fill="#0D9488" stroke="#FFFFFF" strokeWidth="2" />
+                  <circle cx="285" cy="40" r="4" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="1.5" />
+                  <circle cx="315" cy="95" r="4" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="1.5" />
+
+                  <g transform="translate(132, 78)">
+                    <rect x="0" y="0" width="80" height="22" rx="11" fill="#0F766E" filter="url(#patGlow)" />
+                    <text x="40" y="15" fontSize="10" fontWeight="800" fill="#FFFFFF" textAnchor="middle">Khasra #117</text>
+                  </g>
+
+                  <g transform="translate(305, 50)" filter="url(#patGlow)">
+                    <rect x="0" y="0" width="102" height="82" rx="8" fill="#FFFFFF" stroke="#99F6E4" strokeWidth="1.5" />
+                    <circle cx="22" cy="22" r="13" fill="#F0FDFA" stroke="#0D9488" strokeWidth="1.5" />
+                    <path d="M 22 13 L 22 31 M 13 22 L 31 22" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
+                    <circle cx="22" cy="22" r="3.5" fill="#0D9488" />
+                    <text x="42" y="20" fontSize="10" fontWeight="800" fill="#0F766E">RTK GPS</text>
+                    <text x="42" y="32" fontSize="8.5" fontWeight="600" fill="#64748B">±0.02m Fix</text>
+                    <line x1="8" y1="42" x2="94" y2="42" stroke="#E2E8F0" strokeWidth="1" />
+                    <rect x="8" y="50" width="86" height="22" rx="5" fill="#0D9488" />
+                    <text x="51" y="65" fontSize="8.5" fontWeight="700" fill="#FFFFFF" textAnchor="middle">5cm Drone GSD</text>
+                  </g>
+                </svg>
               </div>
             </div>
 
@@ -1126,7 +1009,7 @@ export default function LandingPage() {
                 boxShadow: "0 4px 14px rgba(13, 148, 136, 0.35)",
               }}
             >
-              <span>Authenticate &amp; Enter Patwari Studio</span>
+              <span>Login &amp; Enter Patwari Studio</span>
               <ArrowRight size={18} />
             </div>
           </div>
@@ -1198,80 +1081,112 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <h3 style={{ fontSize: "1.5rem", fontWeight: 900, color: "var(--text-primary)", marginBottom: 8 }}>
+              <h3 style={{ fontSize: "1.45rem", fontWeight: 900, color: "var(--text-primary)", marginBottom: 6 }}>
                 Tehsildar Adjudication Chamber
               </h3>
 
               <p
                 style={{
-                  fontSize: "0.9375rem",
+                  fontSize: "0.875rem",
                   color: "var(--text-secondary)",
-                  lineHeight: 1.6,
-                  marginBottom: 20,
-                }}
-              >
-                The revenue magistrate&apos;s judicial bench: Adjudicate contested boundary disputes, review split-screen curtain swipe evidence between historical and drone cadastre, verify AI confidence, stamp cryptographic SHA-256 seals, and issue statutory Form-II Survey Certificates.
-              </p>
-
-              {/* Key Features */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "10px 14px",
-                  fontSize: "0.8125rem",
-                  color: "var(--text-secondary)",
-                  marginBottom: 20,
-                  background: "linear-gradient(90deg, #FEF3C7 0%, #F8FAFC 100%)",
-                  padding: 18,
-                  borderRadius: "var(--radius-md)",
-                  border: "1px solid #FDE68A",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-gold)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>Quasi-Judicial Docket Queue</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-gold)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>Curtain Swipe Evidence Canvas</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-gold)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>Cryptographic SHA-256 e-Sign</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-gold)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>Form-II PDF Certificate Export</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-gold)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>Immutable Cadastral Audit Log</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={16} style={{ color: "var(--accent-gold)", flexShrink: 0 }} />
-                  <span style={{ fontWeight: 700 }}>Statutory Land Stack Sanction</span>
-                </div>
-              </div>
-
-              {/* Role-Based Clearance Status */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "8px 12px",
-                  borderRadius: "var(--radius-sm)",
-                  background: "rgba(30, 58, 138, 0.08)",
-                  border: "1px solid rgba(30, 58, 138, 0.2)",
+                  lineHeight: 1.5,
                   marginBottom: 16,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "#1E3A8A", fontWeight: 700 }}>
-                  <Scale size={14} />
-                  <span>Authorized Role: Judicial Revenue Magistrate</span>
-                </div>
-                <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)", fontFamily: "monospace", fontWeight: 700 }}>#SDM-081</span>
+                Statutory revenue magistrate bench for contested land dispute adjudication, SHA-256 seals, and Form-II certificates.
+              </p>
+
+              {/* Tehsildar Judicial Decree & Scales SVG Graphic */}
+              <div
+                style={{
+                  marginBottom: 22,
+                  borderRadius: "var(--radius-md)",
+                  overflow: "hidden",
+                  border: "1.5px solid #FDE68A",
+                  boxShadow: "0 4px 16px rgba(217, 119, 6, 0.08)",
+                }}
+              >
+                <svg
+                  viewBox="0 0 420 180"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  style={{ width: "100%", height: "auto", display: "block" }}
+                >
+                  <defs>
+                    <linearGradient id="tehBg" x1="0" y1="0" x2="420" y2="180" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#FFFBEB" />
+                      <stop offset="1" stopColor="#FEF3C7" />
+                    </linearGradient>
+                    <linearGradient id="tehGold" x1="0" y1="0" x2="1" y2="1">
+                      <stop stopColor="#F59E0B" />
+                      <stop offset="1" stopColor="#D97706" />
+                    </linearGradient>
+                    <linearGradient id="tehNavy" x1="0" y1="0" x2="1" y2="1">
+                      <stop stopColor="#1E3A8A" />
+                      <stop offset="1" stopColor="#0F172A" />
+                    </linearGradient>
+                    <filter id="tehGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#D97706" floodOpacity="0.22" />
+                    </filter>
+                  </defs>
+
+                  <rect width="420" height="180" fill="url(#tehBg)" />
+
+                  <g opacity="0.14" stroke="#B45309" strokeWidth="2.5">
+                    <line x1="28" y1="20" x2="28" y2="160" />
+                    <line x1="42" y1="20" x2="42" y2="160" />
+                    <line x1="18" y1="20" x2="52" y2="20" strokeWidth="4" />
+                    <line x1="18" y1="160" x2="52" y2="160" strokeWidth="4" />
+                  </g>
+
+                  <g transform="translate(56, 18)" filter="url(#tehGlow)">
+                    <rect x="0" y="0" width="112" height="142" rx="7" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="1.5" />
+                    <rect x="12" y="14" width="88" height="9" rx="2" fill="url(#tehNavy)" />
+                    <rect x="12" y="32" width="68" height="4" rx="2" fill="#CBD5E1" />
+                    <rect x="12" y="42" width="82" height="4" rx="2" fill="#E2E8F0" />
+                    <rect x="12" y="52" width="75" height="4" rx="2" fill="#E2E8F0" />
+                    <rect x="12" y="62" width="58" height="4" rx="2" fill="#E2E8F0" />
+
+                    <rect x="12" y="86" width="46" height="18" rx="4" fill="#FEF3C7" stroke="#FDE68A" />
+                    <text x="35" y="99" fontSize="9" fontWeight="800" fill="#92400E" textAnchor="middle">FORM-II</text>
+
+                    <g transform="translate(68, 86)">
+                      <path d="M 12 30 L 6 48 L 16 42 L 22 48 L 18 30 Z" fill="#D97706" />
+                      <path d="M 22 30 L 28 48 L 20 42 L 14 48 L 18 30 Z" fill="#B45309" />
+                      <circle cx="18" cy="18" r="18" fill="url(#tehGold)" filter="url(#tehGlow)" />
+                      <circle cx="18" cy="18" r="14" stroke="#FEF3C7" strokeWidth="1.5" strokeDasharray="3 2" />
+                      <path d="M 12 18 L 16 22 L 25 13" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </g>
+                  </g>
+
+                  <g transform="translate(200, 22)">
+                    <path d="M 25 138 L 75 138 M 38 138 L 50 25 L 62 138" stroke="url(#tehNavy)" strokeWidth="3" strokeLinecap="round" />
+                    <rect x="22" y="135" width="56" height="8" rx="3" fill="url(#tehNavy)" />
+                    <circle cx="50" cy="22" r="6" fill="url(#tehGold)" />
+
+                    <line x1="8" y1="36" x2="92" y2="36" stroke="url(#tehGold)" strokeWidth="3.5" strokeLinecap="round" />
+                    <circle cx="50" cy="36" r="4" fill="url(#tehNavy)" />
+
+                    <line x1="12" y1="36" x2="0" y2="72" stroke="#B45309" strokeWidth="1.5" />
+                    <line x1="12" y1="36" x2="24" y2="72" stroke="#B45309" strokeWidth="1.5" />
+                    <path d="M -4 72 Q 12 85 28 72 Z" fill="url(#tehGold)" />
+
+                    <line x1="88" y1="36" x2="76" y2="72" stroke="#B45309" strokeWidth="1.5" />
+                    <line x1="88" y1="36" x2="100" y2="72" stroke="#B45309" strokeWidth="1.5" />
+                    <path d="M 72 72 Q 88 85 104 72 Z" fill="url(#tehGold)" />
+                  </g>
+
+                  <g transform="translate(305, 48)" filter="url(#tehGlow)">
+                    <rect x="0" y="0" width="102" height="86" rx="8" fill="#FFFFFF" stroke="#FDE68A" strokeWidth="1.5" />
+                    <rect x="8" y="10" width="86" height="20" rx="4" fill="#FEF3C7" />
+                    <text x="51" y="24" fontSize="8.5" fontWeight="800" fill="#92400E" textAnchor="middle">STATUTORY DECREE</text>
+                    <text x="12" y="44" fontSize="9" fontWeight="700" fill="#1E3A8A">14-Digit ULPIN</text>
+                    <text x="12" y="56" fontSize="8" fontWeight="600" fill="#64748B">Bhu-Aadhaar Issued</text>
+                    <line x1="8" y1="64" x2="94" y2="64" stroke="#E2E8F0" strokeWidth="1" />
+                    <rect x="8" y="68" width="86" height="14" rx="3" fill="url(#tehNavy)" />
+                    <text x="51" y="78.5" fontSize="7.5" fontWeight="800" fill="#FEF3C7" textAnchor="middle">SHA-256 Verified</text>
+                  </g>
+                </svg>
               </div>
             </div>
 
@@ -1290,7 +1205,7 @@ export default function LandingPage() {
                 border: "1px solid rgba(245, 158, 11, 0.4)",
               }}
             >
-              <span>Authenticate &amp; Enter Magistrate Chamber</span>
+              <span>Login &amp; Enter Magistrate Chamber</span>
               <ArrowRight size={18} style={{ color: "#FCD34D" }} />
             </div>
           </div>
@@ -1429,102 +1344,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═════════════════════════════════════════════════════════════
-          4-STEP CADASTRAL HARMONIZATION PIPELINE ARCHITECTURE
-          ═════════════════════════════════════════════════════════════ */}
-      <section id="pipeline" style={{ width: "100%", maxWidth: 1140, margin: "0 24px 54px" }}>
-        <h2
-          style={{
-            fontSize: "1.75rem",
-            fontWeight: 900,
-            textAlign: "center",
-            marginBottom: 28,
-            color: "var(--text-primary)",
-            letterSpacing: "-0.03em",
-          }}
-        >
-          Automated Spatial Harmonization Architecture
-        </h2>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-            gap: 20,
-            width: "100%",
-          }}
-        >
-          {workflowSteps.map((f, i) => (
-            <div
-              key={i}
-              className="card-elevated-hover"
-              style={{
-                padding: "26px 22px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                background: "#FFFFFF",
-                borderRadius: "var(--radius-lg)",
-                border: "1.5px solid var(--border-glass)",
-                boxShadow: "var(--shadow-sm)",
-              }}
-            >
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                  <div
-                    style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: "var(--radius-md)",
-                      background: "var(--bg-secondary)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: f.color,
-                      border: "1px solid var(--border-subtle)",
-                    }}
-                  >
-                    {f.icon}
-                  </div>
-                  <span
-                    style={{
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                      padding: "4px 8px",
-                      background: "var(--bg-secondary)",
-                      borderRadius: "var(--radius-sm)",
-                      color: "var(--text-primary)",
-                      border: "1px solid var(--border-subtle)",
-                    }}
-                  >
-                    {f.badge}
-                  </span>
-                </div>
-
-                <h3
-                  style={{
-                    fontSize: "1.125rem",
-                    fontWeight: 800,
-                    marginBottom: 10,
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  {f.title}
-                </h3>
-                <p
-                  style={{
-                    fontSize: "0.875rem",
-                    color: "var(--text-secondary)",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {f.desc}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* ═════════════════════════════════════════════════════════════
           INSTITUTIONAL TRUST & FOOTER
@@ -1551,9 +1370,6 @@ export default function LandingPage() {
         <p style={{ color: "var(--text-secondary)", marginBottom: 4 }}>
           Department of Land Resources (DoLR), Ministry of Rural Development &bull; Government of India
         </p>
-        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-          Next.js 16 &bull; React 19 &bull; Python FastAPI 0.115 &bull; PostGIS 3.4 &bull; Thin-Plate Splines &bull; Meta ViT-H AI
-        </div>
       </footer>
 
       {/* Global Map Layers Modal Triggerable from Home */}

@@ -11,8 +11,8 @@ When the frontend sends JSON data to our API, Pydantic automatically:
 """
 
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any, Union
+from pydantic import BaseModel, Field, model_validator
 
 
 # ──────────────────── Parcel Schemas ────────────────────
@@ -72,10 +72,26 @@ class AlignmentResult(BaseModel):
 
 class GroundControlPoint(BaseModel):
     """A single manual GCP mapping source (legacy) coordinates to target (drone)."""
-    source_lon: float = Field(..., description="Longitude in legacy map (WGS84)")
-    source_lat: float = Field(..., description="Latitude in legacy map (WGS84)")
-    target_lon: float = Field(..., description="Longitude in drone imagery (WGS84)")
-    target_lat: float = Field(..., description="Latitude in drone imagery (WGS84)")
+    source_lon: Optional[float] = Field(default=None, description="Longitude in legacy map (WGS84)")
+    source_lat: Optional[float] = Field(default=None, description="Latitude in legacy map (WGS84)")
+    target_lon: Optional[float] = Field(default=None, description="Longitude in drone imagery (WGS84)")
+    target_lat: Optional[float] = Field(default=None, description="Latitude in drone imagery (WGS84)")
+    id: Optional[Union[str, int]] = None
+    label: Optional[str] = None
+    legacy_coord: Optional[List[float]] = None
+    drone_coord: Optional[List[float]] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_coords(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "legacy_coord" in data and isinstance(data["legacy_coord"], (list, tuple)) and len(data["legacy_coord"]) >= 2:
+                data.setdefault("source_lon", data["legacy_coord"][0])
+                data.setdefault("source_lat", data["legacy_coord"][1])
+            if "drone_coord" in data and isinstance(data["drone_coord"], (list, tuple)) and len(data["drone_coord"]) >= 2:
+                data.setdefault("target_lon", data["drone_coord"][0])
+                data.setdefault("target_lat", data["drone_coord"][1])
+        return data
 
 
 class RasterBounds(BaseModel):
@@ -104,11 +120,11 @@ class MapAlignmentRequest(BaseModel):
     Accepts legacy cadastral GeoJSON coordinates and optional drone raster metadata
     plus ground control points for precision alignment.
     """
-    legacy_coordinates: List[List[List[float]]] = Field(
-        ...,
+    legacy_coordinates: Optional[List[List[List[float]]]] = Field(
+        default=None,
         description="GeoJSON Polygon coordinate rings [[[lon,lat], ...], ...]",
-        min_length=1,
     )
+    legacy_geojson: Optional[Dict[str, Any]] = None
     raster_metadata: RasterMetadata = Field(
         default_factory=RasterMetadata,
         description="Reference drone raster metadata (bounds, resolution, CRS)"
@@ -117,6 +133,24 @@ class MapAlignmentRequest(BaseModel):
         default=None,
         description="Optional manual Ground Control Points for TPS/Affine warping"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_legacy_coords(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("legacy_coordinates") and "legacy_geojson" in data:
+                geo = data["legacy_geojson"]
+                if isinstance(geo, dict):
+                    if geo.get("type") == "Polygon" and "coordinates" in geo:
+                        data["legacy_coordinates"] = geo["coordinates"]
+                    elif geo.get("type") == "Feature" and "geometry" in geo:
+                        data["legacy_coordinates"] = geo["geometry"].get("coordinates", [])
+            # Fallback coordinate if empty
+            if not data.get("legacy_coordinates"):
+                data["legacy_coordinates"] = [
+                    [[80.899, 26.76], [80.902, 26.76], [80.902, 26.762], [80.899, 26.762], [80.899, 26.76]]
+                ]
+        return data
 
 
 class AlignmentDiagnostics(BaseModel):

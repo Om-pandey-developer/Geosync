@@ -21,12 +21,9 @@ import type { Feature, FeatureCollection } from "geojson";
 import {
   Layers,
   Eye,
-  Pin,
   Sliders,
   SplitSquareVertical,
-  Crosshair,
   Sparkles,
-  Move,
   RotateCcw,
   AlertTriangle,
   ArrowRightLeft,
@@ -364,6 +361,10 @@ export default function MapViewer({
   const [isDraggingSlider, setIsDraggingSlider] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    setIsSwipeActive(enableCurtainSwipe);
+  }, [enableCurtainSwipe]);
+
   // Task 2.5: Layer Opacity Slider State (0% - 100%)
   const [vectorOpacity, setVectorOpacity] = useState(80);
 
@@ -648,32 +649,6 @@ export default function MapViewer({
           <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>Map View:</span>
         </div>
 
-        {/* Old & New Map Layer & Source Manager Trigger */}
-        {onOpenMapSourceModal && (
-          <button
-            onClick={onOpenMapSourceModal}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "5px 12px",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--accent-primary-light)",
-              background: "#F0FDFA",
-              color: "var(--accent-primary)",
-              fontSize: "0.8125rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              flexShrink: 0,
-            }}
-            title="Configure or upload Old Map (BhuNaksha/Scans) & New Map (Drone/Satellite)"
-          >
-            <Layers size={14} style={{ color: "var(--accent-primary)" }} />
-            <span>Map Layers (Old & New)</span>
-          </button>
-        )}
-
         {/* Base Layer Switchers */}
         <div style={{ display: "flex", gap: 6, background: "var(--bg-secondary)", padding: 3, borderRadius: "var(--radius-sm)", flexShrink: 0 }}>
           <button
@@ -692,8 +667,9 @@ export default function MapViewer({
               color: !isSwipeActive && baseLayer === "drone" ? "#FFFFFF" : "var(--text-secondary)",
               transition: "all 0.15s ease",
             }}
+            title="Switch to High-Resolution Drone Orthomosaic Map"
           >
-            5cm Drone
+            drone map
           </button>
           <button
             onClick={() => {
@@ -711,33 +687,11 @@ export default function MapViewer({
               color: !isSwipeActive && baseLayer === "minimal" ? "#FFFFFF" : "var(--text-secondary)",
               transition: "all 0.15s ease",
             }}
+            title="Switch to Legacy Cadastral Map"
           >
-            Light Cadastral
+            old map
           </button>
         </div>
-
-        {/* Task 2.1: Split-Screen Curtain Swipe Toggle */}
-        <button
-          onClick={() => setIsSwipeActive(!isSwipeActive)}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "5px 12px",
-            borderRadius: "var(--radius-sm)",
-            border: isSwipeActive ? "1px solid #0D9488" : "1px solid var(--border-glass)",
-            background: isSwipeActive ? "#CCFBF1" : "#FFFFFF",
-            color: isSwipeActive ? "#0D9488" : "var(--text-secondary)",
-            fontSize: "0.8125rem",
-            fontWeight: 700,
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-            flexShrink: 0,
-          }}
-        >
-          <SplitSquareVertical size={14} />
-          <span>{isSwipeActive ? "Swipe Mode (ON)" : "Curtain Swipe"}</span>
-        </button>
 
         <div style={{ width: 1, height: 20, background: "var(--border-subtle)", flexShrink: 0 }} />
 
@@ -783,67 +737,6 @@ export default function MapViewer({
             }}
           />
         </div>
-
-        {/* Active Mode Badges */}
-        {enableBboxPrompt && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "4px 10px",
-              background: "#CCFBF1",
-              border: "1px solid #99F6E4",
-              color: "#0D9488",
-              borderRadius: "var(--radius-sm)",
-              fontWeight: 800,
-              fontSize: "0.78rem",
-              flexShrink: 0,
-            }}
-          >
-            <Crosshair size={13} /> Click 2 corners for GeoSAM AI Bounding Box
-          </div>
-        )}
-
-        {pairedGcpMode && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "4px 10px",
-              background: "#FEF3C7",
-              border: "1px solid #FDE68A",
-              color: "#92400E",
-              borderRadius: "var(--radius-sm)",
-              fontWeight: 800,
-              fontSize: "0.78rem",
-              flexShrink: 0,
-            }}
-          >
-            <Pin size={13} /> Click 1: Legacy landmark → Click 2: Drone marker
-          </div>
-        )}
-
-        {enableVertexEdit && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "4px 10px",
-              background: "#E0F2FE",
-              border: "1px solid #BAE6FD",
-              color: "#0369A1",
-              borderRadius: "var(--radius-sm)",
-              fontWeight: 800,
-              fontSize: "0.78rem",
-              flexShrink: 0,
-            }}
-          >
-            <Move size={13} /> Corner Drag Mode Active (HITL)
-          </div>
-        )}
       </div>
 
       {/* ───── Pure Leaflet Map Canvas (Fills Remaining Height) ───── */}
@@ -1124,7 +1017,7 @@ export default function MapViewer({
               pointerEvents: "none",
             }}
           >
-            ◀ LEGACY BHUNAKSHA MAP
+            ◀ OLD MAP (BHUNAKSHA)
           </div>
           <div
             style={{
@@ -1143,7 +1036,7 @@ export default function MapViewer({
               pointerEvents: "none",
             }}
           >
-            5cm DRONE ORTHOMOSAIC ▶
+            DRONE MAP ▶
           </div>
         </>
       )}

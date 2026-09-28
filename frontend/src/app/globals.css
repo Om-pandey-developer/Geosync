@@ -510,6 +510,22 @@ select option {
   animation: fadeInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+@keyframes dropdownSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-dropdown {
+  animation: dropdownSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top left;
+}
+
 @keyframes pulseGlow {
   0%, 100% {
     box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.4);
@@ -597,4 +613,42 @@ select option {
   background: rgba(15, 23, 42, 0.06);
   color: var(--text-secondary);
   border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+/* ───────────────── Patwari Left Sidebar Tool Navigation ───────────────── */
+.sidebar-tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+  background: #FFFFFF;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.sidebar-tool-btn:hover:not(:disabled) {
+  background: #F0FDFA;
+  border-color: #99F6E4;
+  color: var(--accent-primary);
+  transform: translateX(2px);
+}
+
+.sidebar-tool-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--bg-secondary);
+}
+
+.sidebar-tool-btn.active {
+  background: #CCFBF1;
+  border-color: #0D9488;
+  color: #0F766E;
+  box-shadow: 0 1px 4px rgba(13, 148, 136, 0.2);
 }

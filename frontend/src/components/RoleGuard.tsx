@@ -422,12 +422,21 @@ export default function RoleGuard({ requiredRole, children }: RoleGuardProps) {
         {/* Buttons */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <button
-            onClick={() => loginAs(requiredRole)}
+            onClick={() => router.push(`/login?role=${requiredRole}`)}
             className={requiredRole === "patwari" ? "btn-primary" : "btn-judicial"}
             style={{ width: "100%", padding: "12px 20px", fontSize: "0.95rem", justifyContent: "center" }}
           >
-            <UserCheck size={18} />
-            <span>Verify & Authenticate as {targetName}</span>
+            <Lock size={18} />
+            <span>Open Officer Login Portal &rarr;</span>
+          </button>
+
+          <button
+            onClick={() => loginAs(requiredRole)}
+            className="btn-secondary"
+            style={{ width: "100%", padding: "10px 16px", fontSize: "0.85rem", justifyContent: "center" }}
+          >
+            <UserCheck size={16} />
+            <span>Quick 1-Click Demo Login as {targetName}</span>
           </button>
 
           <button

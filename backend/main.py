@@ -126,6 +126,7 @@ app.include_router(alignment_router, prefix="/api")
 
 
 @app.get("/", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
 def health_check():
     return {
         "service": "GeoSync API",

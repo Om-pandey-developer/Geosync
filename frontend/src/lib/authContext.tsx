@@ -41,11 +41,37 @@ export const OFFICER_PRESETS: Record<"patwari" | "tehsildar", OfficerProfile> = 
   },
 };
 
+export interface DemoCredential {
+  username: string;
+  aliases: string[];
+  password: string;
+  role: "patwari" | "tehsildar";
+  label: string;
+}
+
+export const DEMO_CREDENTIALS: Record<"patwari" | "tehsildar", DemoCredential> = {
+  patwari: {
+    username: "patwari@geosync.gov.in",
+    aliases: ["patwari", "pat-442", "PAT-UP-LKO-442", "patwari123"],
+    password: "patwari@123",
+    role: "patwari",
+    label: "Halqa Patwari (Field Surveyor)",
+  },
+  tehsildar: {
+    username: "tehsildar@geosync.gov.in",
+    aliases: ["tehsildar", "sdm-081", "SDM-UP-LKO-081", "tehsildar123"],
+    password: "tehsildar@123",
+    role: "tehsildar",
+    label: "Tehsildar (Revenue Magistrate)",
+  },
+};
+
 interface AuthContextType {
   role: UserRole;
   profile: OfficerProfile | null;
   officer: OfficerProfile | null;
   loginAs: (role: "patwari" | "tehsildar") => void;
+  loginWithCredentials: (username: string, password: string) => { success: boolean; role?: "patwari" | "tehsildar"; error?: string };
   logout: () => void;
   hasRole: (requiredRole: "patwari" | "tehsildar") => boolean;
   isLoading: boolean;
@@ -56,6 +82,7 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   officer: null,
   loginAs: () => {},
+  loginWithCredentials: () => ({ success: false, error: "Not initialized" }),
   logout: () => {},
   hasRole: () => false,
   isLoading: true,
@@ -135,8 +162,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [role]
   );
 
+  const loginWithCredentials = useCallback(
+    (username: string, password: string) => {
+      const cleanUser = username.trim().toLowerCase();
+      const cleanPass = password.trim();
+
+      // Check Patwari credentials
+      const isPatwariUser =
+        cleanUser === DEMO_CREDENTIALS.patwari.username.toLowerCase() ||
+        DEMO_CREDENTIALS.patwari.aliases.map((a) => a.toLowerCase()).includes(cleanUser);
+      const isPatwariPass = cleanPass === DEMO_CREDENTIALS.patwari.password;
+
+      if (isPatwariUser && isPatwariPass) {
+        loginAs("patwari");
+        return { success: true, role: "patwari" as const };
+      }
+
+      // Check Tehsildar credentials
+      const isTehsildarUser =
+        cleanUser === DEMO_CREDENTIALS.tehsildar.username.toLowerCase() ||
+        DEMO_CREDENTIALS.tehsildar.aliases.map((a) => a.toLowerCase()).includes(cleanUser);
+      const isTehsildarPass = cleanPass === DEMO_CREDENTIALS.tehsildar.password;
+
+      if (isTehsildarUser && isTehsildarPass) {
+        loginAs("tehsildar");
+        return { success: true, role: "tehsildar" as const };
+      }
+
+      // If user matched but wrong password
+      if (isPatwariUser && !isPatwariPass) {
+        return {
+          success: false,
+          error: `Incorrect password for Patwari. Demo password is: ${DEMO_CREDENTIALS.patwari.password}`,
+        };
+      }
+      if (isTehsildarUser && !isTehsildarPass) {
+        return {
+          success: false,
+          error: `Incorrect password for Tehsildar. Demo password is: ${DEMO_CREDENTIALS.tehsildar.password}`,
+        };
+      }
+
+      return {
+        success: false,
+        error: "Invalid Officer ID or Password. Please use the verified demo credentials provided.",
+      };
+    },
+    [loginAs]
+  );
+
   return (
-    <AuthContext.Provider value={{ role, profile, officer: profile, loginAs, logout, hasRole, isLoading }}>
+    <AuthContext.Provider
+      value={{
+        role,
+        profile,
+        officer: profile,
+        loginAs,
+        loginWithCredentials,
+        logout,
+        hasRole,
+        isLoading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

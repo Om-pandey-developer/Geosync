@@ -5,39 +5,22 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Globe2,
   Compass,
-  UserCheck,
-  Layers,
   Scale,
-  Compass as CompassIcon,
-  Shield,
-  FileCheck2,
-  Lock,
-  ChevronRight,
-  ArrowRight,
-  ExternalLink,
   LogOut,
 } from "lucide-react";
 import OnboardingTour from "@/components/OnboardingTour";
-import RegistrationModal from "@/components/RegistrationModal";
 import { useAuth } from "@/lib/authContext";
 
 export default function TopNavbar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { role, officer, logout } = useAuth();
+  const { officer, logout } = useAuth();
   const [tourOpen, setTourOpen] = useState(false);
-  const [regModalOpen, setRegModalOpen] = useState(false);
 
   if (pathname === "/") return null;
 
-  const isPatwari = pathname.includes("patwari");
-  const isTehsildar = pathname.includes("tehsildar");
-
-  const handleOpenMapSource = () => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("open-map-source-modal"));
-    }
-  };
+  const isLogin = pathname.includes("login");
+  const isTehsildar = pathname.includes("tehsildar") && !isLogin;
 
   return (
     <>
@@ -120,13 +103,13 @@ export default function TopNavbar() {
                     fontWeight: 800,
                     padding: "1px 6px",
                     borderRadius: 4,
-                    background: isTehsildar ? "#EFF6FF" : "var(--accent-primary-bg)",
-                    color: isTehsildar ? "#1E3A8A" : "var(--accent-primary)",
-                    border: isTehsildar ? "1px solid #BFDBFE" : "1px solid #99F6E4",
+                    background: isTehsildar ? "#EFF6FF" : isLogin ? "#F1F5F9" : "var(--accent-primary-bg)",
+                    color: isTehsildar ? "#1E3A8A" : isLogin ? "var(--text-secondary)" : "var(--accent-primary)",
+                    border: isTehsildar ? "1px solid #BFDBFE" : isLogin ? "1px solid var(--border-subtle)" : "1px solid #99F6E4",
                     textTransform: "uppercase",
                   }}
                 >
-                  {isTehsildar ? "Judicial" : "Field GIS"}
+                  {isTehsildar ? "Judicial" : isLogin ? "Auth Portal" : "Field GIS"}
                 </span>
               </div>
               <div
@@ -142,45 +125,10 @@ export default function TopNavbar() {
             </div>
           </button>
 
-          <div style={{ width: 1, height: 28, background: "var(--border-subtle)" }} />
-
-          {/* DEDICATED ROLE TITLE & IDENTITY */}
-          {isPatwari && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: "var(--radius-sm)",
-                  background: "var(--accent-primary-bg)",
-                  border: "1px solid #99F6E4",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <div
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: "#0D9488",
-                    animation: "pulseGlow 2s infinite",
-                  }}
-                />
-                <div>
-                  <div style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#0F766E" }}>
-                    Surveyor GIS Studio • Halqa Mohanlalganj-12
-                  </div>
-                  <div style={{ fontSize: "0.6875rem", color: "#0D9488", fontWeight: 600 }}>
-                    Lekhpal: Ramesh Kumar • RTK GPS Locked (±1.4cm)
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {isTehsildar && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <>
+              <div style={{ width: 1, height: 28, background: "var(--border-subtle)" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div
                 style={{
                   padding: "4px 12px",
@@ -211,121 +159,99 @@ export default function TopNavbar() {
                 </div>
               </div>
             </div>
-          )}
+          </>
+        )}
         </div>
 
         {/* ═══════════ RIGHT: DEDICATED TOOL CLUSTER & PORTAL SWITCH ═══════════ */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {/* Universal Map Layers Modal Trigger */}
-          <button
-            onClick={handleOpenMapSource}
-            className="btn-secondary"
-            style={{
-              padding: "6px 12px",
-              fontSize: "0.8125rem",
-              fontWeight: 700,
-              background: "#FFFFFF",
-              borderColor: "var(--border-glass)",
-            }}
-            title="Configure or upload Old Map (BhuNaksha/Scans) & New Map (Drone/Satellite)"
-          >
-            <Layers size={15} style={{ color: "var(--accent-primary)" }} />
-            <span>Map Layers (Old & New)</span>
-          </button>
 
-          {/* Quick Onboarding Tour */}
-          <button
-            onClick={() => setTourOpen(true)}
-            className="btn-ghost"
-            style={{ padding: "6px 10px", fontSize: "0.8125rem" }}
-            title="Start Guided System Tour"
-          >
-            <Compass size={15} style={{ color: "var(--accent-primary)" }} />
-            <span>Tour</span>
-          </button>
-
-          {/* Officer KYC / Parcel Registration */}
-          <button
-            onClick={() => setRegModalOpen(true)}
-            className="btn-ghost"
-            style={{ padding: "6px 10px", fontSize: "0.8125rem" }}
-            title="Verify Officer / Add Parcel"
-          >
-            <UserCheck size={15} style={{ color: "var(--accent-primary)" }} />
-            <span>Verify</span>
-          </button>
-
-          <div style={{ width: 1, height: 26, background: "var(--border-subtle)", margin: "0 4px" }} />
-
-          {/* ═══════════ AUTHENTICATED OFFICER CLEARANCE & SIGN OUT ═══════════ */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "4px 10px",
-                borderRadius: "var(--radius-md)",
-                background: isTehsildar ? "rgba(30, 58, 138, 0.08)" : "rgba(13, 148, 136, 0.08)",
-                border: isTehsildar ? "1px solid rgba(30, 58, 138, 0.25)" : "1px solid rgba(13, 148, 136, 0.25)",
-              }}
+          {/* Quick Onboarding Tour (Only on authenticated dashboards, never on login page) */}
+          {!isLogin && (
+            <button
+              onClick={() => setTourOpen(true)}
+              className="btn-ghost"
+              style={{ padding: "6px 10px", fontSize: "0.8125rem" }}
+              title="Start Guided System Tour"
             >
-              <div
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  background: isTehsildar ? "#1E3A8A" : "#0D9488",
-                  boxShadow: `0 0 6px ${isTehsildar ? "#1E3A8A" : "#0D9488"}`,
-                }}
-              />
-              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
-                <span
+              <Compass size={15} style={{ color: "var(--accent-primary)" }} />
+              <span>Tour</span>
+            </button>
+          )}
+
+          {/* ═══════════ AUTHENTICATED MAGISTRATE CLEARANCE & SIGN OUT (TEHSILDAR DASHBOARD ONLY) ═══════════ */}
+          {isTehsildar && !isLogin && (
+            <>
+              <div style={{ width: 1, height: 26, background: "var(--border-subtle)", margin: "0 4px" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div
                   style={{
-                    fontSize: "0.625rem",
-                    fontWeight: 800,
-                    color: isTehsildar ? "#1E3A8A" : "#0F766E",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "4px 10px",
+                    borderRadius: "var(--radius-md)",
+                    background: "rgba(30, 58, 138, 0.08)",
+                    border: "1px solid rgba(30, 58, 138, 0.25)",
                   }}
                 >
-                  {isTehsildar ? "⚖️ Magistrate Clearance" : "🛡️ Patwari Clearance"}
-                </span>
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-primary)" }}>
-                  {officer?.name || (isTehsildar ? "Smt. Priya Sharma, PCS" : "Ramesh Kumar Sharma")}
-                </span>
-              </div>
-            </div>
+                  <div
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: "#1E3A8A",
+                      boxShadow: "0 0 6px #1E3A8A",
+                    }}
+                  />
+                  <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+                    <span
+                      style={{
+                        fontSize: "0.625rem",
+                        fontWeight: 800,
+                        color: "#1E3A8A",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      ⚖️ Magistrate Clearance
+                    </span>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                      {officer?.name || "Smt. Priya Sharma, PCS"}
+                    </span>
+                  </div>
+                </div>
 
-            <button
-              onClick={() => {
-                logout();
-                router.push("/");
-              }}
-              className="btn-ghost"
-              style={{
-                padding: "6px 10px",
-                fontSize: "0.8125rem",
-                color: "#DC2626",
-                borderColor: "rgba(220, 38, 38, 0.25)",
-                background: "#FEF2F2",
-                fontWeight: 600,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-              title="Terminate officer statutory session and exit to National Gateway"
-            >
-              <LogOut size={13} style={{ color: "#DC2626" }} />
-              <span>Sign Out</span>
-            </button>
-          </div>
+                <button
+                  onClick={() => {
+                    logout();
+                    router.push("/");
+                  }}
+                  className="btn-ghost"
+                  style={{
+                    padding: "6px 10px",
+                    fontSize: "0.8125rem",
+                    color: "#DC2626",
+                    borderColor: "rgba(220, 38, 38, 0.25)",
+                    background: "#FEF2F2",
+                    fontWeight: 600,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                  title="Terminate officer statutory session and return to National Gateway (Home)"
+                >
+                  <LogOut size={13} style={{ color: "#DC2626" }} />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </header>
 
       {/* Global Modals */}
       <OnboardingTour isOpen={tourOpen} onClose={() => setTourOpen(false)} />
-      <RegistrationModal isOpen={regModalOpen} onClose={() => setRegModalOpen(false)} />
     </>
   );
 }
