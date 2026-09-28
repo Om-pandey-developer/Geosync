@@ -73,7 +73,9 @@ export default function TehsildarPage() {
   const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(BASEMAP_PRESETS[0]);
   const [activeOldMapPresetId, setActiveOldMapPresetId] = useState<string>("mohanlalganj-1974");
   const [customOldMapGeojson, setCustomOldMapGeojson] = useState<FeatureCollection | null>(null);
-  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(null);
+  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(
+    "/demo_datasets/mohanlalganj_1974_cadastral_cloth_map.png"
+  );
   const [oldMapOpacity, setOldMapOpacity] = useState<number>(80);
   const [oldMapStrokeColor, setOldMapStrokeColor] = useState<string>("#D97706");
 

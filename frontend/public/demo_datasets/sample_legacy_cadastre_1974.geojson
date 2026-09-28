@@ -1,0 +1,744 @@
+{
+  "type": "FeatureCollection",
+  "name": "BhuNaksha_1974_Mohanlalganj_Ward12_Distorted",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "101",
+        "owner_name": "Ram Prasad Verma",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90121,
+              26.76033
+            ],
+            [
+              80.902191,
+              26.760373
+            ],
+            [
+              80.902099,
+              26.761439
+            ],
+            [
+              80.90112,
+              26.761345
+            ],
+            [
+              80.90121,
+              26.76033
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "102",
+        "owner_name": "Sita Devi",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90121,
+              26.76153
+            ],
+            [
+              80.902191,
+              26.761573
+            ],
+            [
+              80.902099,
+              26.762639
+            ],
+            [
+              80.90112,
+              26.762545
+            ],
+            [
+              80.90121,
+              26.76153
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "103",
+        "owner_name": "Mohan Lal Yadav",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90121,
+              26.76273
+            ],
+            [
+              80.902191,
+              26.762773
+            ],
+            [
+              80.902099,
+              26.763839
+            ],
+            [
+              80.90112,
+              26.763745
+            ],
+            [
+              80.90121,
+              26.76273
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "104",
+        "owner_name": "Geeta Singh",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90121,
+              26.76393
+            ],
+            [
+              80.902191,
+              26.763973
+            ],
+            [
+              80.902099,
+              26.765039
+            ],
+            [
+              80.90112,
+              26.764945
+            ],
+            [
+              80.90121,
+              26.76393
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "105",
+        "owner_name": "Rajesh Kumar",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90241,
+              26.76033
+            ],
+            [
+              80.903391,
+              26.760373
+            ],
+            [
+              80.903299,
+              26.761439
+            ],
+            [
+              80.90232,
+              26.761345
+            ],
+            [
+              80.90241,
+              26.76033
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "106/1",
+        "owner_name": "Sunita Mishra",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90241,
+              26.76153
+            ],
+            [
+              80.903391,
+              26.761573
+            ],
+            [
+              80.903299,
+              26.762639
+            ],
+            [
+              80.90232,
+              26.762545
+            ],
+            [
+              80.90241,
+              26.76153
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "106/2",
+        "owner_name": "Anil Mishra",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90241,
+              26.76273
+            ],
+            [
+              80.903391,
+              26.762773
+            ],
+            [
+              80.903299,
+              26.763839
+            ],
+            [
+              80.90232,
+              26.763745
+            ],
+            [
+              80.90241,
+              26.76273
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "107",
+        "owner_name": "Pradeep Tiwari",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90241,
+              26.76393
+            ],
+            [
+              80.903391,
+              26.763973
+            ],
+            [
+              80.903299,
+              26.765039
+            ],
+            [
+              80.90232,
+              26.764945
+            ],
+            [
+              80.90241,
+              26.76393
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "108",
+        "owner_name": "Kamla Devi Gupta",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90361,
+              26.76033
+            ],
+            [
+              80.904591,
+              26.760373
+            ],
+            [
+              80.904499,
+              26.761439
+            ],
+            [
+              80.90352,
+              26.761345
+            ],
+            [
+              80.90361,
+              26.76033
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "109",
+        "owner_name": "Suresh Chandra",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90361,
+              26.76153
+            ],
+            [
+              80.904591,
+              26.761573
+            ],
+            [
+              80.904499,
+              26.762639
+            ],
+            [
+              80.90352,
+              26.762545
+            ],
+            [
+              80.90361,
+              26.76153
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "110",
+        "owner_name": "Rekha Pandey",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90361,
+              26.76273
+            ],
+            [
+              80.904591,
+              26.762773
+            ],
+            [
+              80.904499,
+              26.763839
+            ],
+            [
+              80.90352,
+              26.763745
+            ],
+            [
+              80.90361,
+              26.76273
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "111",
+        "owner_name": "Dinesh Sharma",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90361,
+              26.76393
+            ],
+            [
+              80.904591,
+              26.763973
+            ],
+            [
+              80.904499,
+              26.765039
+            ],
+            [
+              80.90352,
+              26.764945
+            ],
+            [
+              80.90361,
+              26.76393
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "112",
+        "owner_name": "Meera Bai",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90481,
+              26.76033
+            ],
+            [
+              80.905791,
+              26.760373
+            ],
+            [
+              80.905699,
+              26.761439
+            ],
+            [
+              80.90472,
+              26.761345
+            ],
+            [
+              80.90481,
+              26.76033
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "113/1",
+        "owner_name": "Harish Patel",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90481,
+              26.76153
+            ],
+            [
+              80.905791,
+              26.761573
+            ],
+            [
+              80.905699,
+              26.762639
+            ],
+            [
+              80.90472,
+              26.762545
+            ],
+            [
+              80.90481,
+              26.76153
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "113/2",
+        "owner_name": "Kavita Patel",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90481,
+              26.76273
+            ],
+            [
+              80.905791,
+              26.762773
+            ],
+            [
+              80.905699,
+              26.763839
+            ],
+            [
+              80.90472,
+              26.763745
+            ],
+            [
+              80.90481,
+              26.76273
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "114",
+        "owner_name": "Vijay Kushwaha",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90481,
+              26.76393
+            ],
+            [
+              80.905791,
+              26.763973
+            ],
+            [
+              80.905699,
+              26.765039
+            ],
+            [
+              80.90472,
+              26.764945
+            ],
+            [
+              80.90481,
+              26.76393
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "115",
+        "owner_name": "Lakshmi Narayan",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90121,
+              26.76513
+            ],
+            [
+              80.902191,
+              26.765173
+            ],
+            [
+              80.902099,
+              26.766239
+            ],
+            [
+              80.90112,
+              26.766145
+            ],
+            [
+              80.90121,
+              26.76513
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "khasra_no": "116",
+        "owner_name": "Asha Rani",
+        "village": "Mohanlalganj",
+        "tehsil": "Mohanlalganj",
+        "district": "Lucknow",
+        "state": "Uttar Pradesh",
+        "map_year": 1974,
+        "distortion_type": "50-yr paper moisture shrinkage & 2.4deg drift",
+        "alignment_status": "DRAFT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              80.90241,
+              26.76513
+            ],
+            [
+              80.903391,
+              26.765173
+            ],
+            [
+              80.903299,
+              26.766239
+            ],
+            [
+              80.90232,
+              26.766145
+            ],
+            [
+              80.90241,
+              26.76513
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

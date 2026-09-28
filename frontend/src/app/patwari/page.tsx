@@ -145,7 +145,9 @@ export default function PatwariPage() {
   const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(BASEMAP_PRESETS[0]);
   const [activeOldMapPresetId, setActiveOldMapPresetId] = useState<string>("mohanlalganj-1974");
   const [customOldMapGeojson, setCustomOldMapGeojson] = useState<FeatureCollection | null>(null);
-  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(null);
+  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(
+    "/demo_datasets/mohanlalganj_1974_cadastral_cloth_map.png"
+  );
   const [oldMapOpacity, setOldMapOpacity] = useState<number>(80);
   const [oldMapStrokeColor, setOldMapStrokeColor] = useState<string>("#D97706");
 
@@ -1802,7 +1804,8 @@ export default function PatwariPage() {
                           target_lat: p.lat,
                         }));
 
-                    const parcelCoords = selectedParcel?.boundary?.coordinates || [
+                    const activeFeature = geojson?.features.find((f: any) => f.properties?.id === selectedId);
+                    const parcelCoords = (activeFeature?.geometry as any)?.coordinates || [
                       [[80.899, 26.76], [80.902, 26.76], [80.902, 26.762], [80.899, 26.762], [80.899, 26.76]],
                     ];
 
@@ -1825,11 +1828,17 @@ export default function PatwariPage() {
                     );
 
                     // Update selected parcel boundary in local view if available
-                    if (selectedParcel && data.aligned_geojson) {
-                      setSelectedParcel({
-                        ...selectedParcel,
-                        boundary: data.aligned_geojson,
-                        confidence_score: data.confidence_score,
+                    if (selectedId && data.aligned_geojson) {
+                      setGeojson((prev) => {
+                        if (!prev) return prev;
+                        return {
+                          ...prev,
+                          features: prev.features.map((f: any) =>
+                            f.properties?.id === selectedId
+                              ? { ...f, geometry: data.aligned_geojson }
+                              : f
+                          ),
+                        };
                       });
                     }
 

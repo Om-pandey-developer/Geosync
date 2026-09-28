@@ -509,10 +509,10 @@ export default function MapViewer({
 
     return {
       color: isSelected ? "#0F172A" : palette.stroke,
-      weight: isSelected ? 3.5 : 2.75,
+      weight: isSelected ? 3.5 : 2.5,
       opacity: opacityRatio,
       fillColor: isSelected ? "#38BDF8" : palette.fill,
-      fillOpacity: (isSelected ? 0.65 : 0.4) * opacityRatio,
+      fillOpacity: (isSelected ? 0.35 : 0.12) * opacityRatio,
       dashArray: occluded ? "5, 5" : isDraft ? "6, 6" : undefined,
     };
   };
@@ -523,6 +523,12 @@ export default function MapViewer({
 
     layer.on("click", () => {
       if (onParcelClick) onParcelClick(props.id);
+    });
+
+    layer.bindTooltip(`Khasra ${props.khasra_no}`, {
+      permanent: true,
+      direction: "center",
+      className: "khasra-permanent-label",
     });
 
     const occluded = showOcclusionAlerts && (props.alignment_confidence ?? 1.0) < 0.8;
@@ -804,6 +810,13 @@ export default function MapViewer({
               url={tileUrls.minimal}
               attribution="&copy; BhuNaksha Legacy Cadastral &copy; Carto"
               maxZoom={19}
+            />
+            {/* Real 1974 Historical Cloth Map on the left swipe pane */}
+            <ImageOverlay
+              url={scannedMapOverlayUrl || "/demo_datasets/mohanlalganj_1974_cadastral_cloth_map.png"}
+              bounds={scannedMapBounds}
+              opacity={0.92}
+              zIndex={360}
             />
           </Pane>
         )}
