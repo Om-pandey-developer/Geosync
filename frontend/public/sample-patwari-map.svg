@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900">
+  <defs>
+    <!-- Paper texture -->
+    <radialGradient id="patwariPaper" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#FFFDF9"/>
+      <stop offset="70%" stop-color="#FBF3E3"/>
+      <stop offset="100%" stop-color="#F0E3CA"/>
+    </radialGradient>
+    <pattern id="surveyGrid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#E2CCA8" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="900" fill="url(#patwariPaper)"/>
+  <rect width="1200" height="900" fill="url(#surveyGrid)" opacity="0.5"/>
+
+  <!-- Border & Official Seal -->
+  <rect x="25" y="25" width="1150" height="850" fill="none" stroke="#78350F" stroke-width="2.5"/>
+  <rect x="35" y="35" width="1130" height="830" fill="none" stroke="#B45309" stroke-width="1"/>
+
+  <!-- Title Header -->
+  <g transform="translate(60, 75)">
+    <text font-family="'Times New Roman', serif" font-size="22" font-weight="bold" fill="#78350F" letter-spacing="1.5">
+      कार्यालय लेखपाल / पटवारी • क्षेत्रीय भू-अभिलेख एवं नक्शा खसरा
+    </text>
+    <text y="24" font-family="sans-serif" font-size="13" fill="#92400E">
+      PATWARI FIELD SURVEY CADASTRE RECORD • WARD 12 MOHANLALGANJ • KHASRA REVISED SHEET
+    </text>
+  </g>
+
+  <!-- Cadastral Plots with Patwari Field Notes -->
+  <g fill="#FEF3C7" fill-opacity="0.3" stroke="#92400E" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <polygon points="178,172 342,160 370,312 195,332"/>
+    <text x="255" y="248" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">12/1</text>
+    <text x="240" y="268" font-family="sans-serif" font-size="10" fill="#92400E">लेखपाल पड़ताल</text>
+
+    <polygon points="342,160 520,148 560,302 370,312"/>
+    <text x="430" y="238" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">12/2</text>
+    <text x="415" y="258" font-family="sans-serif" font-size="10" fill="#92400E">सत्यापित</text>
+
+    <polygon points="520,148 710,134 746,292 560,302"/>
+    <text x="615" y="228" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">12/3</text>
+    <text x="600" y="248" font-family="sans-serif" font-size="10" fill="#92400E">सत्यापित</text>
+
+    <polygon points="710,134 910,120 950,284 746,292"/>
+    <text x="815" y="212" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">12/4</text>
+    <text x="800" y="232" font-family="sans-serif" font-size="10" fill="#92400E">सत्यापित</text>
+
+    <polygon points="195,332 370,312 396,492 216,512"/>
+    <text x="285" y="415" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">13/1</text>
+
+    <polygon points="370,312 560,302 592,482 396,492"/>
+    <text x="465" y="400" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">13/2</text>
+
+    <polygon points="560,302 746,292 782,472 592,482"/>
+    <text x="655" y="390" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">13/3</text>
+
+    <polygon points="746,292 950,284 986,468 782,472"/>
+    <text x="850" y="380" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">13/4</text>
+
+    <polygon points="216,512 396,492 422,682 232,702"/>
+    <text x="305" y="600" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">14/1</text>
+
+    <polygon points="396,492 592,482 622,672 422,682"/>
+    <text x="490" y="585" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">14/2</text>
+
+    <polygon points="592,482 782,472 816,662 622,672"/>
+    <text x="685" y="575" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">14/3</text>
+
+    <polygon points="782,472 986,468 1016,658 816,662"/>
+    <text x="885" y="565" font-family="sans-serif" font-weight="bold" font-size="16" fill="#78350F">14/4</text>
+  </g>
+
+  <!-- Village Boundary Stone Markers -->
+  <g fill="#DC2626" stroke="#FFFFFF" stroke-width="1.5">
+    <circle cx="178" cy="172" r="5"/>
+    <circle cx="520" cy="148" r="5"/>
+    <circle cx="910" cy="120" r="5"/>
+    <circle cx="216" cy="512" r="5"/>
+    <circle cx="782" cy="472" r="5"/>
+  </g>
+
+  <!-- Patwari Official Signature Seal -->
+  <g transform="translate(920, 740)">
+    <circle cx="60" cy="40" r="42" fill="none" stroke="#B45309" stroke-width="2" stroke-dasharray="4,2"/>
+    <text x="60" y="32" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="bold" fill="#78350F">राजस्व विभाग</text>
+    <text x="60" y="46" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#92400E">हस्ताक्षर लेखपाल</text>
+    <text x="60" y="58" text-anchor="middle" font-family="sans-serif" font-size="8" fill="#B45309">रमेश कुमार शर्मा</text>
+  </g>
+</svg>

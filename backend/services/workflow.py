@@ -141,10 +141,12 @@ def get_pending_approvals(db: Session) -> list:
 
     return [
         {
+            "id": str(ar.id),
             "approval_id": str(ar.id),
             "parcel_id": str(ar.parcel_id),
             "requested_by": ar.requested_by,
             "status": ar.status,
+            "created_at": ar.requested_at.isoformat() if ar.requested_at else None,
             "requested_at": ar.requested_at.isoformat() if ar.requested_at else None,
             "khasra_no": p.khasra_no,
             "owner_name": p.owner_name,
@@ -155,6 +157,18 @@ def get_pending_approvals(db: Session) -> list:
             "area_sqm": p.area_sqm,
             "alignment_status": p.alignment_status.value if hasattr(p.alignment_status, "value") else str(p.alignment_status),
             "alignment_confidence": p.alignment_confidence,
+            "parcel": {
+                "id": str(p.id),
+                "khasra_no": p.khasra_no,
+                "owner_name": p.owner_name,
+                "village": p.village,
+                "tehsil": p.tehsil,
+                "district": p.district,
+                "ulpin": p.ulpin,
+                "area_sqm": p.area_sqm,
+                "alignment_status": p.alignment_status.value if hasattr(p.alignment_status, "value") else str(p.alignment_status),
+                "alignment_confidence": p.alignment_confidence,
+            },
         }
         for ar, p in records
     ]

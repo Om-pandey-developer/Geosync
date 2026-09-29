@@ -52,4 +52,6 @@ backend/storage/models/*.onnx
 backend/storage/models/*.pt
 backend/storage/uploads/
 backend/storage/sam_cache/*.pkl
+backend/storage/alignment_reports/
+demo_datasets/output_test/
 

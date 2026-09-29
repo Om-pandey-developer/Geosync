@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900">
+  <defs>
+    <!-- Paper texture gradient -->
+    <radialGradient id="paperGrad" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#FDFBF7"/>
+      <stop offset="60%" stop-color="#F6EFE0"/>
+      <stop offset="100%" stop-color="#EADBBE"/>
+    </radialGradient>
+    <!-- Old Cloth Grid pattern -->
+    <pattern id="cadGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#D1B88B" stroke-width="0.5" stroke-dasharray="2,2"/>
+    </pattern>
+  </defs>
+
+  <!-- Background: Vintage Cadastral Cloth Parchment -->
+  <rect width="1200" height="900" fill="url(#paperGrad)"/>
+  <rect width="1200" height="900" fill="url(#cadGrid)" opacity="0.45"/>
+
+  <!-- Border & Revenue Seal -->
+  <rect x="25" y="25" width="1150" height="850" fill="none" stroke="#8C6239" stroke-width="3"/>
+  <rect x="35" y="35" width="1130" height="830" fill="none" stroke="#B3885C" stroke-width="1.2"/>
+
+  <!-- Header Banner -->
+  <g transform="translate(60, 75)">
+    <text font-family="'Times New Roman', serif" font-size="24" font-weight="bold" fill="#4A3525" letter-spacing="2">
+      ग्राम मोहनलालगंज • चकबन्दी बन्दोबस्त नक्शा (1974)
+    </text>
+    <text y="24" font-family="sans-serif" font-size="13" fill="#75563B">
+      SETTLEMENT SURVEY RECORD SHEET • SCALE 1:4000 • TEHSIL MOHANLALGANJ, LUCKNOW
+    </text>
+  </g>
+
+  <!-- North Arrow -->
+  <g transform="translate(1110, 110)">
+    <circle r="36" fill="#FDFBF7" stroke="#8C6239" stroke-width="1.5"/>
+    <polygon points="0,-30 8,0 0,-6 -8,0" fill="#8C6239"/>
+    <polygon points="0,30 8,0 0,6 -8,0" fill="#D1B88B"/>
+    <text y="-34" text-anchor="middle" font-family="sans-serif" font-weight="bold" font-size="14" fill="#4A3525">N</text>
+  </g>
+
+  <!-- Cadastral Plots (Irregular Hand-Drafted Legacy Polygons with non-linear distortion) -->
+  <g fill="#F2E6CE" fill-opacity="0.35" stroke="#3D2918" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Plot 12/1 -->
+    <polygon points="180,180 340,165 370,310 195,330"/>
+    <text x="260" y="250" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">12/1</text>
+    <text x="245" y="270" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">2.41 बीघा</text>
+
+    <!-- Plot 12/2 -->
+    <polygon points="340,165 520,150 560,300 370,310"/>
+    <text x="430" y="240" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">12/2</text>
+    <text x="415" y="260" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">1.95 बीघा</text>
+
+    <!-- Plot 12/3 -->
+    <polygon points="520,150 710,135 745,290 560,300"/>
+    <text x="615" y="230" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">12/3</text>
+    <text x="600" y="250" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">2.88 बीघा</text>
+
+    <!-- Plot 12/4 (Chak Road Junction) -->
+    <polygon points="710,135 910,120 950,285 745,290"/>
+    <text x="815" y="215" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">12/4</text>
+    <text x="800" y="235" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">3.10 बीघा</text>
+
+    <!-- Row 2: Plots 13/1 to 13/4 -->
+    <polygon points="195,330 370,310 395,490 215,510"/>
+    <text x="285" y="420" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">13/1</text>
+    <text x="270" y="440" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">2.15 बीघा</text>
+
+    <polygon points="370,310 560,300 590,480 395,490"/>
+    <text x="465" y="405" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">13/2</text>
+    <text x="450" y="425" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">2.70 बीघा</text>
+
+    <polygon points="560,300 745,290 780,470 590,480"/>
+    <text x="655" y="395" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">13/3</text>
+    <text x="640" y="415" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">3.05 बीघा</text>
+
+    <polygon points="745,290 950,285 985,465 780,470"/>
+    <text x="850" y="385" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">13/4</text>
+    <text x="835" y="405" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">2.90 बीघा</text>
+
+    <!-- Row 3: Plots 14/1 to 14/4 -->
+    <polygon points="215,510 395,490 420,680 230,700"/>
+    <text x="305" y="605" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">14/1</text>
+    <text x="290" y="625" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">2.50 बीघा</text>
+
+    <polygon points="395,490 590,480 620,670 420,680"/>
+    <text x="490" y="590" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">14/2</text>
+    <text x="475" y="610" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">2.65 बीघा</text>
+
+    <polygon points="590,480 780,470 815,660 620,670"/>
+    <text x="685" y="580" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">14/3</text>
+    <text x="670" y="600" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">3.15 बीघा</text>
+
+    <polygon points="780,470 985,465 1015,655 815,660"/>
+    <text x="885" y="570" font-family="'Times New Roman', serif" font-weight="bold" font-size="18" fill="#3D2918" stroke="none">14/4</text>
+    <text x="870" y="590" font-family="sans-serif" font-size="11" fill="#75563B" stroke="none">3.20 बीघा</text>
+  </g>
+
+  <!-- Chak Marg (Village Pathway) with dashed lines -->
+  <path d="M 160 520 C 350 500, 750 480, 1040 470" fill="none" stroke="#B3885C" stroke-width="12" stroke-linecap="round"/>
+  <path d="M 160 520 C 350 500, 750 480, 1040 470" fill="none" stroke="#5C3A1D" stroke-width="1.8" stroke-dasharray="6,4"/>
+  <text x="560" y="514" font-family="sans-serif" font-weight="bold" font-size="11" fill="#5C3A1D" transform="rotate(-1, 560, 514)">चक मार्ग (रास्ता)</text>
+
+  <!-- Old Survey Boundary Stones / Sihad (Tri-junctions) -->
+  <g fill="#A63A24" stroke="#FFFFFF" stroke-width="1.5">
+    <polygon points="180,172 188,188 172,188" />
+    <polygon points="520,142 528,158 512,158" />
+    <polygon points="910,112 918,128 902,128" />
+    <polygon points="215,502 223,518 207,518" />
+    <polygon points="780,462 788,478 772,478" />
+  </g>
+
+  <!-- Revenue Stamp Footer -->
+  <g transform="translate(60, 830)">
+    <text font-family="'Times New Roman', serif" font-style="italic" font-size="13" fill="#6B4F35">
+      प्रमाणित प्रतिलिपि: राजस्व अभिलेखागार, तहसील मोहनलालगंज • राजस्व निरीक्षक एवं चकबन्दी अधिकारी हस्ताक्षर युक्त
+    </text>
+  </g>
+</svg>

@@ -111,7 +111,10 @@ interface MapSourceModalProps {
   activeOldMapPresetId: string;
   onSelectOldMapPreset: (presetId: string) => void;
   onUploadCustomGeojson?: (geojson: FeatureCollection, filename: string) => void;
-  onUploadScannedMap?: (imageUrl: string, filename: string) => void;
+  /** Called with (imageUrl, filename, bounds?) — bounds are [[swLat, swLng], [neLat, neLng]] */
+  onUploadScannedMap?: (imageUrl: string, filename: string, bounds?: [[number, number], [number, number]]) => void;
+  /** Called with (imageUrl, filename, bounds?) — bounds are [[swLat, swLng], [neLat, neLng]] */
+  onUploadDroneImage?: (imageUrl: string, filename: string, bounds?: [[number, number], [number, number]]) => void;
   // Styling Controls
   oldMapOpacity: number;
   onChangeOldMapOpacity: (opacity: number) => void;
@@ -128,6 +131,7 @@ export default function MapSourceModal({
   onSelectOldMapPreset,
   onUploadCustomGeojson,
   onUploadScannedMap,
+  onUploadDroneImage,
   oldMapOpacity,
   onChangeOldMapOpacity,
 }: MapSourceModalProps) {
@@ -136,6 +140,35 @@ export default function MapSourceModal({
   const [uploadedDroneFileName, setUploadedDroneFileName] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const droneImageInputRef = useRef<HTMLInputElement>(null);
+
+  // Bounding-box coordinate inputs for the scanned (old) map
+  const [scanSwLat, setScanSwLat] = useState("");
+  const [scanSwLng, setScanSwLng] = useState("");
+  const [scanNeLat, setScanNeLat] = useState("");
+  const [scanNeLng, setScanNeLng] = useState("");
+
+  // Bounding-box coordinate inputs for the drone (new) image
+  const [droneSwLat, setDroneSwLat] = useState("");
+  const [droneSwLng, setDroneSwLng] = useState("");
+  const [droneNeLat, setDroneNeLat] = useState("");
+  const [droneNeLng, setDroneNeLng] = useState("");
+
+  // Pending image data URL (stored until user confirms coordinates)
+  const [pendingScanDataUrl, setPendingScanDataUrl] = useState<string | null>(null);
+  const [pendingScanFileName, setPendingScanFileName] = useState<string | null>(null);
+  const [pendingDroneDataUrl, setPendingDroneDataUrl] = useState<string | null>(null);
+  const [pendingDroneFileName, setPendingDroneFileName] = useState<string | null>(null);
+
+  /** Parse 4 coordinate strings into a bounds tuple, or return null if invalid */
+  const parseBounds = (
+    swLat: string, swLng: string, neLat: string, neLng: string
+  ): [[number, number], [number, number]] | null => {
+    const vals = [swLat, swLng, neLat, neLng].map(Number);
+    if (vals.some(isNaN)) return null;
+    const [swLa, swLo, neLa, neLo] = vals;
+    if (swLa >= neLa || swLo >= neLo) return null;
+    return [[swLa, swLo], [neLa, neLo]];
+  };
 
   if (!isOpen) return null;
 
@@ -152,13 +185,29 @@ export default function MapSourceModal({
     const reader = new FileReader();
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
-      if (onUploadScannedMap) {
-        onUploadScannedMap(dataUrl, file.name);
-      }
-      setUploadedFileName(file.name);
-      toast.success(`Loaded paper map scan: ${file.name}`);
+      setPendingScanDataUrl(dataUrl);
+      setPendingScanFileName(file.name);
+      setUploadedFileName(null); // clear confirmed state until coordinates submitted
+      toast("Image loaded — enter the geographic coordinates below and click \"Apply Coordinates\".", { icon: "📍" });
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleApplyScanBounds = () => {
+    if (!pendingScanDataUrl || !pendingScanFileName) {
+      toast.error("Please upload a scanned map image first.");
+      return;
+    }
+    const bounds = parseBounds(scanSwLat, scanSwLng, scanNeLat, scanNeLng);
+    if (!bounds) {
+      toast.error("Invalid coordinates. Ensure SW lat/lng < NE lat/lng and all fields are numbers.");
+      return;
+    }
+    if (onUploadScannedMap) {
+      onUploadScannedMap(pendingScanDataUrl, pendingScanFileName, bounds);
+    }
+    setUploadedFileName(pendingScanFileName);
+    toast.success(`Scanned map pinned to coordinates. Bounds: [${bounds[0]}] → [${bounds[1]}]`);
   };
 
   // Handle Drone Image Upload (New Map - PNG/JPG only)
@@ -174,13 +223,29 @@ export default function MapSourceModal({
     const reader = new FileReader();
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
-      setUploadedDroneFileName(file.name);
-      if (onUploadScannedMap) {
-        // Can be viewed as high-res raster
-      }
-      toast.success(`Loaded drone aerial photo: ${file.name}`);
+      setPendingDroneDataUrl(dataUrl);
+      setPendingDroneFileName(file.name);
+      setUploadedDroneFileName(null);
+      toast("Drone image loaded — enter the geographic coordinates below and click \"Apply Coordinates\".", { icon: "🚁" });
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleApplyDroneBounds = () => {
+    if (!pendingDroneDataUrl || !pendingDroneFileName) {
+      toast.error("Please upload a drone image first.");
+      return;
+    }
+    const bounds = parseBounds(droneSwLat, droneSwLng, droneNeLat, droneNeLng);
+    if (!bounds) {
+      toast.error("Invalid coordinates. Ensure SW lat/lng < NE lat/lng and all fields are numbers.");
+      return;
+    }
+    if (onUploadDroneImage) {
+      onUploadDroneImage(pendingDroneDataUrl, pendingDroneFileName, bounds);
+    }
+    setUploadedDroneFileName(pendingDroneFileName);
+    toast.success(`Drone image pinned to coordinates. Bounds: [${bounds[0]}] → [${bounds[1]}]`);
   };
 
 
@@ -373,7 +438,13 @@ export default function MapSourceModal({
                     <span>Upload Map Photo (PNG / JPG)</span>
                   </button>
 
-                  {uploadedFileName ? (
+                  {pendingScanFileName && !uploadedFileName && (
+                    <span style={{ fontSize: "0.8rem", color: "#92400E", fontWeight: 600 }}>
+                      📎 {pendingScanFileName} — enter coordinates below
+                    </span>
+                  )}
+
+                  {uploadedFileName && (
                     <div
                       style={{
                         fontSize: "0.8125rem",
@@ -389,13 +460,64 @@ export default function MapSourceModal({
                       }}
                     >
                       <Check size={14} />
-                      <span>Loaded Map: {uploadedFileName}</span>
+                      <span>Pinned: {uploadedFileName}</span>
                     </div>
-                  ) : (
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                      Allowed formats: <strong>PNG</strong> or <strong>JPG</strong>
-                    </span>
                   )}
+                </div>
+
+                {/* Coordinate Bounding Box Inputs for Scanned Map */}
+                <div
+                  style={{
+                    marginTop: 14,
+                    padding: "14px 16px",
+                    background: "#FFFBEB",
+                    border: "1px solid #FDE68A",
+                    borderRadius: "var(--radius-md)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                    <MapPin size={14} style={{ color: "#D97706" }} />
+                    <strong style={{ fontSize: "0.8125rem", color: "#92400E" }}>Geographic Bounding Box (required to place image on map)</strong>
+                  </div>
+                  <p style={{ fontSize: "0.75rem", color: "#B45309", marginBottom: 12, lineHeight: 1.5 }}>
+                    Enter the real-world coordinates of your map's corners. You can read these from a GPS device, Google Maps, or a survey report.
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    {([
+                      { label: "SW Latitude (South edge)", value: scanSwLat, setter: setScanSwLat, placeholder: "e.g. 26.758" },
+                      { label: "SW Longitude (West edge)", value: scanSwLng, setter: setScanSwLng, placeholder: "e.g. 80.898" },
+                      { label: "NE Latitude (North edge)", value: scanNeLat, setter: setScanNeLat, placeholder: "e.g. 26.764" },
+                      { label: "NE Longitude (East edge)", value: scanNeLng, setter: setScanNeLng, placeholder: "e.g. 80.905" },
+                    ] as { label: string; value: string; setter: (v: string) => void; placeholder: string }[]).map(({ label, value, setter, placeholder }) => (
+                      <div key={label}>
+                        <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "#92400E", display: "block", marginBottom: 4 }}>{label}</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={value}
+                          onChange={(e) => setter(e.target.value)}
+                          placeholder={placeholder}
+                          style={{
+                            width: "100%",
+                            padding: "7px 10px",
+                            borderRadius: "var(--radius-sm)",
+                            border: "1px solid #FCD34D",
+                            fontSize: "0.8125rem",
+                            background: "#FFFFFF",
+                            outline: "none",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleApplyScanBounds}
+                    className="btn-primary"
+                    style={{ marginTop: 12, padding: "8px 16px", fontSize: "0.8125rem", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <Check size={14} /> Apply Coordinates & Place Map
+                  </button>
                 </div>
               </div>
 
@@ -475,7 +597,13 @@ export default function MapSourceModal({
                     <span>Upload Drone Photo (PNG / JPG)</span>
                   </button>
 
-                  {uploadedDroneFileName ? (
+                  {pendingDroneFileName && !uploadedDroneFileName && (
+                    <span style={{ fontSize: "0.8rem", color: "#0F766E", fontWeight: 600 }}>
+                      🚁 {pendingDroneFileName} — enter coordinates below
+                    </span>
+                  )}
+
+                  {uploadedDroneFileName && (
                     <div
                       style={{
                         fontSize: "0.8125rem",
@@ -491,13 +619,64 @@ export default function MapSourceModal({
                       }}
                     >
                       <Check size={14} />
-                      <span>Loaded Drone Photo: {uploadedDroneFileName}</span>
+                      <span>Pinned: {uploadedDroneFileName}</span>
                     </div>
-                  ) : (
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                      Allowed formats: <strong>PNG</strong> or <strong>JPG</strong>
-                    </span>
                   )}
+                </div>
+
+                {/* Coordinate Bounding Box Inputs for Drone Image */}
+                <div
+                  style={{
+                    marginTop: 14,
+                    padding: "14px 16px",
+                    background: "#F0FDFA",
+                    border: "1px solid #99F6E4",
+                    borderRadius: "var(--radius-md)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                    <MapPin size={14} style={{ color: "#0D9488" }} />
+                    <strong style={{ fontSize: "0.8125rem", color: "#0F766E" }}>Geographic Bounding Box (required to place image on map)</strong>
+                  </div>
+                  <p style={{ fontSize: "0.75rem", color: "#0F766E", marginBottom: 12, lineHeight: 1.5 }}>
+                    Enter the GPS coordinates covering the drone survey area. These are usually available in the GCP report or your drone flight log.
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    {([
+                      { label: "SW Latitude (South edge)", value: droneSwLat, setter: setDroneSwLat, placeholder: "e.g. 26.758" },
+                      { label: "SW Longitude (West edge)", value: droneSwLng, setter: setDroneSwLng, placeholder: "e.g. 80.898" },
+                      { label: "NE Latitude (North edge)", value: droneNeLat, setter: setDroneNeLat, placeholder: "e.g. 26.764" },
+                      { label: "NE Longitude (East edge)", value: droneNeLng, setter: setDroneNeLng, placeholder: "e.g. 80.905" },
+                    ] as { label: string; value: string; setter: (v: string) => void; placeholder: string }[]).map(({ label, value, setter, placeholder }) => (
+                      <div key={label}>
+                        <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "#0F766E", display: "block", marginBottom: 4 }}>{label}</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={value}
+                          onChange={(e) => setter(e.target.value)}
+                          placeholder={placeholder}
+                          style={{
+                            width: "100%",
+                            padding: "7px 10px",
+                            borderRadius: "var(--radius-sm)",
+                            border: "1px solid #99F6E4",
+                            fontSize: "0.8125rem",
+                            background: "#FFFFFF",
+                            outline: "none",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleApplyDroneBounds}
+                    className="btn-primary"
+                    style={{ marginTop: 12, padding: "8px 16px", fontSize: "0.8125rem", fontWeight: 700, display: "flex", alignItems: "center", gap: 6, background: "#0D9488" }}
+                  >
+                    <Check size={14} /> Apply Coordinates & Place Image
+                  </button>
                 </div>
               </div>
             </div>

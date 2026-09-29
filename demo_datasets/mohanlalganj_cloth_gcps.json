@@ -1,0 +1,98 @@
+[
+  {
+    "id": "gcp-1",
+    "source": [
+      58.0,
+      58.0
+    ],
+    "target": [
+      128.0,
+      119.0
+    ],
+    "name": "Cadastral Vertex #1"
+  },
+  {
+    "id": "gcp-2",
+    "source": [
+      211.0,
+      58.0
+    ],
+    "target": [
+      238.0,
+      113.0
+    ],
+    "name": "Cadastral Vertex #2"
+  },
+  {
+    "id": "gcp-3",
+    "source": [
+      224.0,
+      59.0
+    ],
+    "target": [
+      259.0,
+      119.0
+    ],
+    "name": "Cadastral Vertex #3"
+  },
+  {
+    "id": "gcp-4",
+    "source": [
+      378.0,
+      59.0
+    ],
+    "target": [
+      370.0,
+      113.0
+    ],
+    "name": "Cadastral Vertex #4"
+  },
+  {
+    "id": "gcp-5",
+    "source": [
+      58.0,
+      189.0
+    ],
+    "target": [
+      136.0,
+      211.0
+    ],
+    "name": "Cadastral Vertex #5"
+  },
+  {
+    "id": "gcp-6",
+    "source": [
+      711.0,
+      189.0
+    ],
+    "target": [
+      640.0,
+      211.0
+    ],
+    "name": "Cadastral Vertex #6"
+  },
+  {
+    "id": "gcp-7",
+    "source": [
+      58.0,
+      711.0
+    ],
+    "target": [
+      136.0,
+      630.0
+    ],
+    "name": "Cadastral Vertex #7"
+  },
+  {
+    "id": "gcp-8",
+    "source": [
+      711.0,
+      711.0
+    ],
+    "target": [
+      640.0,
+      630.0
+    ],
+    "name": "Cadastral Vertex #8"
+  }
+]

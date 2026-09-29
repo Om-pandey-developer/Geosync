@@ -539,6 +539,18 @@ select option {
   animation: pulseGlow 2s infinite;
 }
 
+/* Curtain swipe drag-handle pulse ring */
+@keyframes curtain-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
 /* ───────────────── Leaflet Custom Popups & Stacking ───────────────── */
 .custom-bright-popup .leaflet-popup-content-wrapper {
   background: rgba(255, 255, 255, 0.98) !important;

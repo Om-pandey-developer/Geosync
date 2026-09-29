@@ -406,7 +406,7 @@ export default function RoleGuard({ requiredRole, children }: RoleGuardProps) {
           }}
         >
           <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>
-            Demonstration Digital Token
+            Officer Digital Clearance Token
           </div>
           <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-primary)", marginTop: 4 }}>
             {OFFICER_PRESETS[requiredRole].name}
@@ -436,7 +436,7 @@ export default function RoleGuard({ requiredRole, children }: RoleGuardProps) {
             style={{ width: "100%", padding: "10px 16px", fontSize: "0.85rem", justifyContent: "center" }}
           >
             <UserCheck size={16} />
-            <span>Quick 1-Click Demo Login as {targetName}</span>
+            <span>Authorized Officer Login as {targetName}</span>
           </button>
 
           <button

@@ -45,14 +45,14 @@ function LoginForm() {
     }
   }, [searchParams]);
 
-  // Quick auto-fill helper for demo
+  // Quick auto-fill helper
   const handleAutoFill = (roleToFill: "patwari" | "tehsildar") => {
     setActiveRole(roleToFill);
     const creds = DEMO_CREDENTIALS[roleToFill];
     setUsername(creds.username);
     setPassword(creds.password);
     setErrorMsg(null);
-    toast.success(`Demo credentials loaded for ${creds.label}`);
+    toast.success(`Credentials applied: ${creds.username}`);
   };
 
   const handleTabSwitch = (newRole: "patwari" | "tehsildar") => {
@@ -337,17 +337,42 @@ function LoginForm() {
           <form onSubmit={handleSubmit}>
             {/* Officer ID / Email */}
             <div style={{ marginBottom: 18 }}>
-              <label
+              <div
                 style={{
-                  display: "block",
-                  fontSize: "0.8125rem",
-                  fontWeight: 700,
-                  color: "var(--text-primary)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                   marginBottom: 6,
                 }}
               >
-                Officer ID / Government Email
-              </label>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.8125rem",
+                    fontWeight: 700,
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  Officer ID / Government Email
+                </label>
+                <button
+                  type="button"
+                  onClick={() => handleAutoFill(isPatwari ? "patwari" : "tehsildar")}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    color: isPatwari ? "#0D9488" : "#D97706",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                  }}
+                  title="Click to autofill this ID"
+                >
+                  {isPatwari ? "patwari@geosync.gov.in" : "tehsildar@geosync.gov.in"}
+                </button>
+              </div>
               <div style={{ position: "relative" }}>
                 <div
                   style={{
@@ -501,132 +526,78 @@ function LoginForm() {
             </button>
           </form>
 
-          {/* ═══════════ FAKE DEMO CREDENTIALS HELPER ═══════════ */}
+          {/* Officer Login IDs */}
           <div
             style={{
-              marginTop: 26,
-              padding: "18px 20px",
-              borderRadius: "var(--radius-md)",
-              background: "#F8FAFC",
-              border: "1.5px dashed var(--border-subtle)",
-              textAlign: "left",
+              marginTop: 22,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 10,
             }}
           >
-            <div
+            {/* Patwari Login ID */}
+            <button
+              type="button"
+              onClick={() => handleAutoFill("patwari")}
               style={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 12,
+                justifyContent: "center",
+                gap: 8,
+                padding: "11px 14px",
+                borderRadius: "var(--radius-md)",
+                background: isPatwari ? "#F0FDFA" : "#F8FAFC",
+                border: isPatwari ? "1.5px solid #0D9488" : "1px solid var(--border-subtle)",
+                color: isPatwari ? "#0F766E" : "var(--text-secondary)",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                boxShadow: isPatwari ? "0 2px 8px rgba(13, 148, 136, 0.12)" : "none",
               }}
+              title="Click to autofill patwari@geosync.gov.in"
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Sparkles size={16} style={{ color: "var(--accent-primary)" }} />
-                <span
-                  style={{
-                    fontSize: "0.8125rem",
-                    fontWeight: 800,
-                    color: "var(--text-primary)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  Authorized Demo Credentials
-                </span>
-              </div>
+              <Compass size={15} style={{ color: isPatwari ? "#0D9488" : "var(--text-muted)" }} />
               <span
                 style={{
-                  fontSize: "0.6875rem",
-                  padding: "2px 6px",
-                  borderRadius: 4,
-                  background: "#E2E8F0",
-                  color: "#475569",
+                  fontSize: "0.8125rem",
                   fontWeight: 700,
+                  fontFamily: "monospace",
                 }}
               >
-                1-Click Ready
+                patwari@geosync.gov.in
               </span>
-            </div>
+            </button>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: "0.8125rem" }}>
-              {/* Patwari Demo Row */}
-              <div
+            {/* Tehsildar Login ID */}
+            <button
+              type="button"
+              onClick={() => handleAutoFill("tehsildar")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "11px 14px",
+                borderRadius: "var(--radius-md)",
+                background: !isPatwari ? "#FFFBEB" : "#F8FAFC",
+                border: !isPatwari ? "1.5px solid #D97706" : "1px solid var(--border-subtle)",
+                color: !isPatwari ? "#92400E" : "var(--text-secondary)",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                boxShadow: !isPatwari ? "0 2px 8px rgba(217, 119, 6, 0.12)" : "none",
+              }}
+              title="Click to autofill tehsildar@geosync.gov.in"
+            >
+              <Scale size={15} style={{ color: !isPatwari ? "#D97706" : "var(--text-muted)" }} />
+              <span
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "8px 12px",
-                  borderRadius: "var(--radius-sm)",
-                  background: "#FFFFFF",
-                  border: isPatwari ? "1px solid #99F6E4" : "1px solid var(--border-subtle)",
+                  fontSize: "0.8125rem",
+                  fontWeight: 700,
+                  fontFamily: "monospace",
                 }}
               >
-                <div>
-                  <div style={{ fontWeight: 800, color: "#0F766E", display: "flex", alignItems: "center", gap: 6 }}>
-                    <Compass size={14} /> Patwari ID: <code>patwari@geosync.gov.in</code>
-                  </div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 2 }}>
-                    Password: <code>patwari@123</code> &bull; Officer: Ramesh Kumar Sharma
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleAutoFill("patwari")}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "var(--radius-sm)",
-                    background: "var(--accent-primary-bg)",
-                    border: "1px solid #99F6E4",
-                    color: "var(--accent-primary)",
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Auto-Fill
-                </button>
-              </div>
-
-              {/* Tehsildar Demo Row */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "8px 12px",
-                  borderRadius: "var(--radius-sm)",
-                  background: "#FFFFFF",
-                  border: !isPatwari ? "1px solid #FDE68A" : "1px solid var(--border-subtle)",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 800, color: "#92400E", display: "flex", alignItems: "center", gap: 6 }}>
-                    <Scale size={14} /> Tehsildar ID: <code>tehsildar@geosync.gov.in</code>
-                  </div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 2 }}>
-                    Password: <code>tehsildar@123</code> &bull; Magistrate: Smt. Priya Sharma
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleAutoFill("tehsildar")}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "var(--radius-sm)",
-                    background: "#FEF3C7",
-                    border: "1px solid #FDE68A",
-                    color: "#92400E",
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Auto-Fill
-                </button>
-              </div>
-            </div>
+                tehsildar@geosync.gov.in
+              </span>
+            </button>
           </div>
         </div>
 

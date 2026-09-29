@@ -193,19 +193,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isPatwariUser && !isPatwariPass) {
         return {
           success: false,
-          error: `Incorrect password for Patwari. Demo password is: ${DEMO_CREDENTIALS.patwari.password}`,
+          error: "Incorrect password for Patwari officer profile.",
         };
       }
       if (isTehsildarUser && !isTehsildarPass) {
         return {
           success: false,
-          error: `Incorrect password for Tehsildar. Demo password is: ${DEMO_CREDENTIALS.tehsildar.password}`,
+          error: "Incorrect password for Tehsildar judicial profile.",
         };
       }
 
       return {
         success: false,
-        error: "Invalid Officer ID or Password. Please use the verified demo credentials provided.",
+        error: "Invalid Officer ID or Password. Please verify your credentials.",
       };
     },
     [loginAs]

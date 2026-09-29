@@ -124,6 +124,14 @@ app.include_router(tasks_router, prefix="/api")
 # Phase 2: Map Alignment Engine at /api/v1/align-map
 app.include_router(alignment_router, prefix="/api")
 
+# ── Static File Storage (Output 3-panel reports, GeoJSON, and upload scratch) ──
+from fastapi.staticfiles import StaticFiles
+_storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "storage")
+os.makedirs(os.path.join(_storage_dir, "alignment_reports"), exist_ok=True)
+os.makedirs(os.path.join(_storage_dir, "uploads"), exist_ok=True)
+app.mount("/storage", StaticFiles(directory=_storage_dir), name="storage")
+app.mount("/api/storage", StaticFiles(directory=_storage_dir), name="api_storage")
+
 
 @app.get("/", tags=["Health"])
 @app.get("/api/health", tags=["Health"])
