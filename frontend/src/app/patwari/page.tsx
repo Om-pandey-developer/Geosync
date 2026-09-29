@@ -639,7 +639,9 @@ export default function PatwariPage() {
   const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(BASEMAP_PRESETS[0]);
   const [activeOldMapPresetId, setActiveOldMapPresetId] = useState<string>("mohanlalganj-1974");
   const [customOldMapGeojson, setCustomOldMapGeojson] = useState<FeatureCollection | null>(null);
-  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(null);
+  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(
+    "/demo_datasets/mohanlalganj_1974_cadastral_cloth_map.png"
+  );
   const [scannedMapBounds, setScannedMapBounds] = useState<[[number, number], [number, number]] | undefined>(undefined);
   const [droneMapOverlayUrl, setDroneMapOverlayUrl] = useState<string | null>(null);
   const [droneMapBounds, setDroneMapBounds] = useState<[[number, number], [number, number]] | undefined>(undefined);
@@ -3449,8 +3451,8 @@ export default function PatwariPage() {
                           target_lat: p.lat,
                         }));
 
-                    const feat = geojson?.features.find((f: any) => f.properties?.id === selectedId);
-                    const parcelCoords = (feat?.geometry as any)?.coordinates || [
+                    const activeFeature = geojson?.features.find((f: any) => f.properties?.id === selectedId);
+                    const parcelCoords = (activeFeature?.geometry as any)?.coordinates || [
                       [[80.899, 26.76], [80.902, 26.76], [80.902, 26.762], [80.899, 26.762], [80.899, 26.76]],
                     ];
 

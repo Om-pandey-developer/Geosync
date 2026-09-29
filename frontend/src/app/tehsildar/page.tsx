@@ -88,7 +88,9 @@ export default function TehsildarPage() {
   const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(BASEMAP_PRESETS[0]);
   const [activeOldMapPresetId, setActiveOldMapPresetId] = useState<string>("mohanlalganj-1974");
   const [customOldMapGeojson, setCustomOldMapGeojson] = useState<FeatureCollection | null>(null);
-  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(null);
+  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(
+    "/demo_datasets/mohanlalganj_1974_cadastral_cloth_map.png"
+  );
   const [droneMapOverlayUrl, setDroneMapOverlayUrl] = useState<string | null>(null);
   const [isSideBySideActive, setIsSideBySideActive] = useState<boolean>(true);
   const [alignmentSession, setAlignmentSession] = useState<{

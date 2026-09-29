@@ -230,8 +230,8 @@ class CommitParcelResponse(BaseModel):
 
 class CadastralAuditLogOut(BaseModel):
     """Response schema for immutable audit ledger items."""
-    id: str
-    parcel_id: str
+    id: Union[str, Any]
+    parcel_id: Union[str, Any]
     officer_id: str
     officer_role: str
     action: str
