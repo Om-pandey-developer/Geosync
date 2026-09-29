@@ -307,6 +307,13 @@ export default function PatwariPage() {
     }
   };
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchData();
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
+
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1160,22 +1167,37 @@ export default function PatwariPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <button
               onClick={handleResetVertices}
-              className="btn-secondary"
               style={{
-                padding: "4px 8px",
+                padding: "5px 12px",
                 fontSize: "0.75rem",
-                background: "rgba(255, 255, 255, 0.1)",
+                fontWeight: 700,
+                borderRadius: "var(--radius-md)",
+                background: "rgba(255, 255, 255, 0.16)",
                 color: "#FFFFFF",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
+                border: "1.5px solid rgba(255, 255, 255, 0.5)",
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 4,
+                gap: 6,
                 cursor: "pointer",
+                transition: "all 0.15s ease",
+                boxShadow: "0 1px 4px rgba(0, 0, 0, 0.2)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.28)";
+                e.currentTarget.style.borderColor = "#FFFFFF";
+                e.currentTarget.style.boxShadow = "0 0 12px rgba(255, 255, 255, 0.35)";
+                e.currentTarget.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.16)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.5)";
+                e.currentTarget.style.boxShadow = "0 1px 4px rgba(0, 0, 0, 0.2)";
+                e.currentTarget.style.transform = "none";
               }}
               title="Reset corners to original shape"
             >
-              <RotateCcw size={11} />
-              <span>Reset</span>
+              <RotateCcw size={13} style={{ color: "#FFFFFF" }} />
+              <span style={{ color: "#FFFFFF", fontWeight: 700 }}>Reset</span>
             </button>
             <button
               onClick={handleSaveVertexChanges}
@@ -1405,15 +1427,41 @@ export default function PatwariPage() {
             <MapPin size={18} style={{ color: "var(--accent-primary)" }} /> Parcel Dossier
           </h2>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <button
-              onClick={fetchData}
-              className="btn-ghost"
-              style={{ padding: 6, color: "var(--text-primary)" }}
+              onClick={handleRefresh}
               title="Reload Cadastral Data"
               aria-label="Reload Cadastral Data"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "6px",
+                borderRadius: "var(--radius-md)",
+                background: "var(--accent-primary-bg)",
+                color: "var(--accent-primary)",
+                border: "1px solid rgba(13, 148, 136, 0.25)",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--accent-primary)";
+                e.currentTarget.style.color = "#ffffff";
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(13, 148, 136, 0.35)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "var(--accent-primary-bg)";
+                e.currentTarget.style.color = "var(--accent-primary)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
             >
-              <RefreshCw size={15} />
+              <RefreshCw
+                size={15}
+                className={isRefreshing ? "animate-spin" : ""}
+                style={{
+                  transition: "transform 0.2s ease",
+                }}
+              />
             </button>
             <button
               onClick={() => setIsDossierCollapsed(!isDossierCollapsed)}

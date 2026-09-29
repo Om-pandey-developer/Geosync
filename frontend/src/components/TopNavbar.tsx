@@ -125,42 +125,6 @@ export default function TopNavbar() {
             </div>
           </button>
 
-          {isTehsildar && (
-            <>
-              <div style={{ width: 1, height: 28, background: "var(--border-subtle)" }} />
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div
-                style={{
-                  padding: "4px 12px",
-                  borderRadius: "var(--radius-sm)",
-                  background: "linear-gradient(90deg, #FEF3C7 0%, #FFFBEB 100%)",
-                  border: "1px solid #FCD34D",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <div
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: "#D97706",
-                    boxShadow: "0 0 6px #F59E0B",
-                  }}
-                />
-                <div>
-                  <div style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#92400E" }}>
-                    Revenue Magistrate Adjudication Chamber
-                  </div>
-                  <div style={{ fontSize: "0.6875rem", color: "#B45309", fontWeight: 600 }}>
-                    Bench: Smt. Priya Sharma, PCS (Assistant Collector) • e-Sign DSC Level-3
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
         </div>
 
         {/* ═══════════ RIGHT: DEDICATED TOOL CLUSTER & PORTAL SWITCH ═══════════ */}
@@ -179,74 +143,6 @@ export default function TopNavbar() {
             </button>
           )}
 
-          {/* ═══════════ AUTHENTICATED MAGISTRATE CLEARANCE & SIGN OUT (TEHSILDAR DASHBOARD ONLY) ═══════════ */}
-          {isTehsildar && !isLogin && (
-            <>
-              <div style={{ width: 1, height: 26, background: "var(--border-subtle)", margin: "0 4px" }} />
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "4px 10px",
-                    borderRadius: "var(--radius-md)",
-                    background: "rgba(30, 58, 138, 0.08)",
-                    border: "1px solid rgba(30, 58, 138, 0.25)",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: "50%",
-                      background: "#1E3A8A",
-                      boxShadow: "0 0 6px #1E3A8A",
-                    }}
-                  />
-                  <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
-                    <span
-                      style={{
-                        fontSize: "0.625rem",
-                        fontWeight: 800,
-                        color: "#1E3A8A",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.04em",
-                      }}
-                    >
-                      ⚖️ Magistrate Clearance
-                    </span>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-primary)" }}>
-                      {officer?.name || "Smt. Priya Sharma, PCS"}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    logout();
-                    router.push("/");
-                  }}
-                  className="btn-ghost"
-                  style={{
-                    padding: "6px 10px",
-                    fontSize: "0.8125rem",
-                    color: "#DC2626",
-                    borderColor: "rgba(220, 38, 38, 0.25)",
-                    background: "#FEF2F2",
-                    fontWeight: 600,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                  title="Terminate officer statutory session and return to National Gateway (Home)"
-                >
-                  <LogOut size={13} style={{ color: "#DC2626" }} />
-                  <span>Sign Out</span>
-                </button>
-              </div>
-            </>
-          )}
         </div>
       </header>
 
