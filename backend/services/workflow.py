@@ -305,19 +305,19 @@ def get_dashboard_stats(db: Session) -> dict:
     """Returns aggregate statistics for the Tehsildar dashboard."""
     total = db.query(func.count(Parcel.id)).scalar() or 0
     raw_count = db.query(func.count(Parcel.id)).filter(
-        (Parcel.alignment_status == AlignmentStatusEnum.DRAFT) | (Parcel.alignment_status == "raw")
+        Parcel.alignment_status == AlignmentStatusEnum.DRAFT
     ).scalar() or 0
     aligned_count = db.query(func.count(Parcel.id)).filter(
-        (Parcel.alignment_status == AlignmentStatusEnum.ALIGNED_DRAFT) | (Parcel.alignment_status == "aligned")
+        Parcel.alignment_status == AlignmentStatusEnum.ALIGNED_DRAFT
     ).scalar() or 0
     cleaned_count = db.query(func.count(Parcel.id)).filter(
-        (Parcel.alignment_status == AlignmentStatusEnum.TOPOLOGY_CLEANED) | (Parcel.alignment_status == "cleaned")
+        Parcel.alignment_status == AlignmentStatusEnum.TOPOLOGY_CLEANED
     ).scalar() or 0
     ulpin_count = db.query(func.count(Parcel.id)).filter(
-        (Parcel.alignment_status == AlignmentStatusEnum.ULPIN_ASSIGNED) | (Parcel.alignment_status == "ulpin_assigned")
+        Parcel.alignment_status == AlignmentStatusEnum.ULPIN_ASSIGNED
     ).scalar() or 0
     published_count = db.query(func.count(Parcel.id)).filter(
-        (Parcel.alignment_status == AlignmentStatusEnum.PUBLISHED) | (Parcel.alignment_status == "PUBLISHED")
+        Parcel.alignment_status == AlignmentStatusEnum.PUBLISHED
     ).scalar() or 0
 
     pending = db.query(func.count(ApprovalRequest.id)).filter(ApprovalRequest.status == "pending").scalar() or 0

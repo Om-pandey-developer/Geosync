@@ -11,7 +11,7 @@ services:
     dockerContext: .
     plan: free
     region: oregon
-    healthCheckPath: /api/dashboard/stats
+    healthCheckPath: /api/health
     envVars:
       - key: PORT
         value: 8000

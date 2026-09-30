@@ -646,7 +646,7 @@ def align_batch(
     """
     query = db.query(Parcel).filter(
         Parcel.village == payload.village,
-        (Parcel.alignment_status == AlignmentStatusEnum.DRAFT) | (Parcel.alignment_status == "raw")
+        Parcel.alignment_status == AlignmentStatusEnum.DRAFT,
     )
     if payload.ward:
         query = query.filter(Parcel.tehsil == payload.ward)
