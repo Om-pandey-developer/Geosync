@@ -698,3 +698,55 @@ export const BENCHMARK_MAP_FILES = {
     preview: "/demo_datasets/mohanlalganj_drone_orthomosaic.png",
   },
 };
+
+export interface CadastralBlockCoord {
+  x: number;
+  y: number;
+  w?: number;
+  h?: number;
+  khasra_no: string;
+}
+
+export const CADASTRAL_BENCHMARK_BLOCKS: CadastralBlockCoord[] = [
+  { x: 476, y: 92, khasra_no: "36475" },
+  { x: 669, y: 158, w: 90, h: 65, khasra_no: "1" },
+  { x: 921, y: 154, khasra_no: "57" },
+  { x: 27, y: 229, w: 40, h: 80, khasra_no: "5827269" },
+  { x: 323, y: 201, w: 35, h: 60, khasra_no: "272" },
+  { x: 407, y: 199, w: 75, h: 70, khasra_no: "656565" },
+  { x: 1094, y: 188, khasra_no: "45454" },
+  { x: 96, y: 343, khasra_no: "895" },
+  { x: 156, y: 323, khasra_no: "57360" },
+  { x: 642, y: 301, khasra_no: "12" },
+  { x: 711, y: 279, khasra_no: "345" },
+  { x: 825, y: 288, khasra_no: "123" },
+  { x: 930, y: 347, khasra_no: "610" },
+  { x: 1045, y: 346, khasra_no: "987" },
+  { x: 194, y: 366, khasra_no: "357" },
+  { x: 344, y: 362, khasra_no: "555" },
+  { x: 496, y: 362, khasra_no: "777" },
+  { x: 627, y: 421, khasra_no: "144" },
+  { x: 717, y: 409, khasra_no: "581" },
+  { x: 812, y: 414, khasra_no: "321" },
+  { x: 934, y: 427, khasra_no: "233" },
+  { x: 1023, y: 429, khasra_no: "6767" },
+  { x: 1143, y: 412, khasra_no: "25" },
+  { x: 1195, y: 404, khasra_no: "682" },
+  { x: 154, y: 432, khasra_no: "987" },
+  { x: 329, y: 426, khasra_no: "999" },
+  { x: 489, y: 425, khasra_no: "999" },
+  { x: 151, y: 483, khasra_no: "58627" },
+  { x: 326, y: 480, khasra_no: "69572" },
+  { x: 486, y: 495, khasra_no: "628" },
+  { x: 28, y: 543, khasra_no: "555" },
+  { x: 321, y: 550, khasra_no: "5927" },
+  { x: 736, y: 532, w: 160, h: 60, khasra_no: "0" },
+  { x: 965, y: 543, khasra_no: "377" },
+  { x: 1054, y: 517, khasra_no: "222" },
+  { x: 1057, y: 564, khasra_no: "2555" },
+  { x: 1166, y: 565, khasra_no: "888" },
+];
+
+export const RED_KHASRA_SET = new Set(["1", "36475", "57", "144", "45454", "895", "6767", "25"]);
+export const AMBER_KHASRA_SET = new Set(["272", "345", "581", "123", "12", "610", "357", "777", "321", "233", "682", "58627", "69572", "987"]);
+

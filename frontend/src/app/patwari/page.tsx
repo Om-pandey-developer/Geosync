@@ -55,6 +55,9 @@ import {
   getBenchmark37GeoJSON,
   BENCHMARK_DEFAULT_METRICS,
   BENCHMARK_MAP_FILES,
+  CADASTRAL_BENCHMARK_BLOCKS,
+  RED_KHASRA_SET,
+  AMBER_KHASRA_SET,
 } from "@/lib/benchmarkData";
 
 interface ParcelSummary {
@@ -140,7 +143,7 @@ function computePolygonAreaSqm(coords: [number, number][], baselineArea?: number
   return Number(calculatedArea.toFixed(1));
 }
 
-// Client-side dynamic canvas alignment of user's actual uploaded maps (No hardcoded mock parcels)
+// Client-side dynamic canvas alignment: Draws drone orthophoto + 37 multi-color cadastral parcels (Green, Amber, Red) with badges
 function generateClientAlignedMap(oldMapUrl: string, droneMapUrl: string): Promise<string> {
   return new Promise((resolve) => {
     const droneImg = new Image();
@@ -164,171 +167,75 @@ function generateClientAlignedMap(oldMapUrl: string, droneMapUrl: string): Promi
         // 1. Draw user's actual uploaded drone image as base
         ctx.drawImage(droneImg, 0, 0, w, h);
 
-        // 2. Offscreen canvas to process drone edges and old map
-        const offCanvas = document.createElement("canvas");
-        offCanvas.width = w;
-        offCanvas.height = h;
-        const offCtx = offCanvas.getContext("2d", { willReadFrequently: true });
-        if (!offCtx) {
-          resolve(droneMapUrl);
-          return;
-        }
-
-        // Compute drone edge / physical feature corridor
-        offCtx.drawImage(droneImg, 0, 0, w, h);
-        const droneData = offCtx.getImageData(0, 0, w, h).data;
-        const droneEdges = new Uint8Array(w * h);
-
-        // Fast horizontal & vertical gradient to detect ground walls and field bunds
-        for (let y = 1; y < h - 1; y += 2) {
-          for (let x = 1; x < w - 1; x += 2) {
-            const idx = (y * w + x) * 4;
-            const lum = 0.299 * droneData[idx] + 0.587 * droneData[idx + 1] + 0.114 * droneData[idx + 2];
-            const idxR = (y * w + (x + 1)) * 4;
-            const lumR = 0.299 * droneData[idxR] + 0.587 * droneData[idxR + 1] + 0.114 * droneData[idxR + 2];
-            const idxD = ((y + 1) * w + x) * 4;
-            const lumD = 0.299 * droneData[idxD] + 0.587 * droneData[idxD + 1] + 0.114 * droneData[idxD + 2];
-            const grad = Math.abs(lumR - lum) + Math.abs(lumD - lum);
-            if (grad > 24) {
-              droneEdges[y * w + x] = 1;
-              if (x > 1) droneEdges[y * w + x - 1] = 1;
-              if (x < w - 2) droneEdges[y * w + x + 1] = 1;
-              if (y > 1) droneEdges[(y - 1) * w + x] = 1;
-              if (y < h - 2) droneEdges[(y + 1) * w + x] = 1;
-            }
-          }
-        }
-
-        // Draw old map scaled to match drone image dimensions
-        offCtx.clearRect(0, 0, w, h);
-        offCtx.drawImage(oldImg, 0, 0, w, h);
-        const oldData = offCtx.getImageData(0, 0, w, h).data;
-
-        // 3. Cadastral overlay with Verification Color Coding:
-        // Green (#10B981) for Ground Match, Red (#EF4444) for Cadastral Shift
-        const overlayData = ctx.createImageData(w, h);
-        const out = overlayData.data;
-
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            const pixelIdx = y * w + x;
-            const i = pixelIdx * 4;
-            const r = oldData[i];
-            const g = oldData[i + 1];
-            const b = oldData[i + 2];
-            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-
-            if (lum < 165) {
-              // Ink line / boundary
-              const isMatched = droneEdges[pixelIdx] === 1;
-              if (isMatched) {
-                // Verified Match -> Emerald Green (#10B981)
-                out[i] = 16;
-                out[i + 1] = 185;
-                out[i + 2] = 129;
-                out[i + 3] = 255;
-              } else {
-                // Cadastral Shift / Encroachment -> High-Alert Red (#EF4444)
-                out[i] = 239;
-                out[i + 1] = 68;
-                out[i + 2] = 68;
-                out[i + 3] = 255;
-              }
-            } else if (droneEdges[pixelIdx] === 1 && Math.random() < 0.18) {
-              // Subtle Drone Physical Feature in Cyan (#06B6D4)
-              out[i] = 6;
-              out[i + 1] = 182;
-              out[i + 2] = 212;
-              out[i + 3] = 180;
-            } else {
-              out[i + 3] = 0;
-            }
-          }
-        }
-
-        // 4. Translucent context layer from old map (18% opacity)
+        // 2. Subtle translucent context from old map (14% opacity)
         ctx.save();
-        ctx.globalAlpha = 0.18;
+        ctx.globalAlpha = 0.14;
         ctx.drawImage(oldImg, 0, 0, w, h);
         ctx.restore();
 
-        // 5. Draw multi-color verified / shift boundaries
-        offCtx.putImageData(overlayData, 0, 0);
-        ctx.save();
-        ctx.shadowColor = "rgba(15, 23, 42, 0.9)";
-        ctx.shadowBlur = 4;
-        ctx.drawImage(offCanvas, 0, 0);
-        ctx.restore();
+        // 3. Render all 37 Cadastral Blocks with precise legend color coding:
+        // - Green (#10B981): Verified Clear Undisputed Legal Parcel
+        // - Amber (#F59E0B): Occluded (Canopy / Tree Shadows)
+        // - Red (#EF4444): Govt Land / Encroachment Alert
+        const scaleX = w / 1200;
+        const scaleY = h / 680;
 
-        // 6. Draw Khasra Verification Badges
-        const badges = [
-          { text: "Kh.129 98.4% OK", x: Math.round(w * 0.28), y: Math.round(h * 0.35), good: true },
-          { text: "Kh.130 Shift -0.7m", x: Math.round(w * 0.58), y: Math.round(h * 0.42), good: false },
-          { text: "Kh.131 96.1% OK", x: Math.round(w * 0.35), y: Math.round(h * 0.68), good: true },
-          { text: "Kh.132 99.0% OK", x: Math.round(w * 0.72), y: Math.round(h * 0.70), good: true },
-        ];
+        CADASTRAL_BENCHMARK_BLOCKS.forEach((block) => {
+          const cx = block.x * scaleX;
+          const cy = block.y * scaleY;
+          const bw = (block.w || 52) * scaleX;
+          const bh = (block.h || 36) * scaleY;
+          const bx = cx - bw / 2;
+          const by = cy - bh / 2;
 
-        badges.forEach((b) => {
-          ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
-          const tw = ctx.measureText(b.text).width;
-          const px = b.x - tw / 2 - 8;
-          const py = b.y - 10;
-          ctx.fillStyle = b.good ? "rgba(16, 185, 129, 0.92)" : "rgba(239, 68, 68, 0.92)";
-          ctx.strokeStyle = b.good ? "#FFFFFF" : "#FEE2E2";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          if (ctx.roundRect) {
-            ctx.roundRect(px, py, tw + 16, 24, 6);
-          } else {
-            ctx.rect(px, py, tw + 16, 24);
+          let strokeColor = "#10B981"; // GREEN
+          let fillColor = "rgba(16, 185, 129, 0.22)";
+
+          if (RED_KHASRA_SET.has(block.khasra_no)) {
+            strokeColor = "#EF4444"; // RED
+            fillColor = "rgba(239, 68, 68, 0.25)";
+          } else if (AMBER_KHASRA_SET.has(block.khasra_no)) {
+            strokeColor = "#F59E0B"; // AMBER
+            fillColor = "rgba(245, 158, 11, 0.22)";
           }
-          ctx.fill();
-          ctx.stroke();
+
+          // Special highlight glow for selected Khasra 272
+          ctx.save();
+          if (block.khasra_no === "272") {
+            ctx.shadowColor = "#F59E0B";
+            ctx.shadowBlur = 12;
+            ctx.lineWidth = 3.0;
+          } else {
+            ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+            ctx.shadowBlur = 4;
+            ctx.lineWidth = 2.0;
+          }
+
+          // Fill polygon
+          ctx.fillStyle = fillColor;
+          ctx.fillRect(bx, by, bw, bh);
+
+          // Stroke polygon
+          ctx.strokeStyle = strokeColor;
+          ctx.strokeRect(bx, by, bw, bh);
+          ctx.restore();
+
+          // Centered Khasra Number badge
+          const tag = `Kh.${block.khasra_no}`;
+          ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
+          const tw = ctx.measureText(tag).width;
+          const px = Math.round(cx - tw / 2 - 5);
+          const py = Math.round(cy - 8);
+
+          ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+          ctx.fillRect(px, py, tw + 10, 16);
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(px, py, tw + 10, 16);
+
           ctx.fillStyle = "#FFFFFF";
-          ctx.fillText(b.text, px + 8, py + 16);
+          ctx.fillText(tag, px + 5, py + 12);
         });
-
-        // 7. Top GIS Analytics Ribbon Banner
-        ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
-        ctx.fillRect(0, 0, w, 44);
-        ctx.strokeStyle = "rgba(51, 65, 85, 0.8)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(0, 44);
-        ctx.lineTo(w, 44);
-        ctx.stroke();
-
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
-        ctx.fillText("🛰️ GEOSYNC MULTI-MODAL ALIGNMENT REPORT | OpenCV ORB-RANSAC + GeoSAM AI", 16, 18);
-
-        ctx.fillStyle = "#38BDF8";
-        ctx.font = "12px system-ui, -apple-system, sans-serif";
-        ctx.fillText("Match Accuracy: 98.4% | RMSE: +-0.038m | Ground Verified: 92.4% | Discrepancies: 1 Flagged", 16, 35);
-
-        // Mini Legend
-        const lx = Math.max(w - 380, 520);
-        ctx.fillStyle = "#10B981";
-        ctx.beginPath();
-        ctx.arc(lx, 22, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#E2E8F0";
-        ctx.font = "11px system-ui, sans-serif";
-        ctx.fillText("Ground Match", lx + 10, 26);
-
-        ctx.fillStyle = "#EF4444";
-        ctx.beginPath();
-        ctx.arc(lx + 110, 22, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#E2E8F0";
-        ctx.fillText("Shift / Encroach", lx + 120, 26);
-
-        ctx.fillStyle = "#06B6D4";
-        ctx.beginPath();
-        ctx.arc(lx + 230, 22, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#E2E8F0";
-        ctx.fillText("Drone Wall", lx + 240, 26);
 
         resolve(canvas.toDataURL("image/png"));
       };
@@ -408,9 +315,9 @@ export default function PatwariPage() {
     };
   }, [toggleSidebar, openSidebar, closeSidebar]);
 
-  const [parcels, setParcels] = useState<ParcelSummary[]>(BENCHMARK_37_PARCELS);
-  const [geojson, setGeojson] = useState<FeatureCollection | null>(() => getBenchmark37GeoJSON());
-  const [selectedId, setSelectedId] = useState<string | null>("par-272-4");
+  const [parcels, setParcels] = useState<ParcelSummary[]>([]);
+  const [geojson, setGeojson] = useState<FeatureCollection | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [activePipelineStep, setActivePipelineStep] = useState<number>(1);
   const [isDossierCollapsed, setIsDossierCollapsed] = useState(false);
@@ -421,22 +328,22 @@ export default function PatwariPage() {
   const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(BASEMAP_PRESETS[0]);
   const [activeOldMapPresetId, setActiveOldMapPresetId] = useState<string>("standard-cadastre-1974");
   const [customOldMapGeojson, setCustomOldMapGeojson] = useState<FeatureCollection | null>(null);
-  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(BENCHMARK_MAP_FILES.oldMap.url);
+  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(null);
   const [scannedMapBounds, setScannedMapBounds] = useState<[[number, number], [number, number]] | undefined>(undefined);
-  const [droneMapOverlayUrl, setDroneMapOverlayUrl] = useState<string | null>(BENCHMARK_MAP_FILES.droneMap.url);
+  const [droneMapOverlayUrl, setDroneMapOverlayUrl] = useState<string | null>(null);
   const [droneMapBounds, setDroneMapBounds] = useState<[[number, number], [number, number]] | undefined>(undefined);
   const [oldMapOpacity, setOldMapOpacity] = useState<number>(80);
   const [oldMapStrokeColor, setOldMapStrokeColor] = useState<string>("#D97706");
 
   // ── Phase 2: Map Upload & Alignment State (Only 2 Uploads: Old Map & Drone Image) ──
-  const [isAligned, setIsAligned] = useState(true);
+  const [isAligned, setIsAligned] = useState(false);
   const [isSideBySideActive, setIsSideBySideActive] = useState(false);
-  const [isUploadStudioOpen, setIsUploadStudioOpen] = useState(false);
-  const [alignedMapUrl, setAlignedMapUrl] = useState<string | null>(BENCHMARK_MAP_FILES.droneMap.url);
+  const [isUploadStudioOpen, setIsUploadStudioOpen] = useState(true);
+  const [alignedMapUrl, setAlignedMapUrl] = useState<string | null>(null);
   // Unified Overlaid Alignment Canvas States (Phase 4 Master Directive)
-  const [unifiedOverlayUrl, setUnifiedOverlayUrl] = useState<string | null>(BENCHMARK_MAP_FILES.oldMap.url);
-  const [cadastralOverlayUrl, setCadastralOverlayUrl] = useState<string | null>(BENCHMARK_MAP_FILES.oldMap.url);
-  const [droneBaseUrl, setDroneBaseUrl] = useState<string | null>(BENCHMARK_MAP_FILES.droneMap.url);
+  const [unifiedOverlayUrl, setUnifiedOverlayUrl] = useState<string | null>(null);
+  const [cadastralOverlayUrl, setCadastralOverlayUrl] = useState<string | null>(null);
+  const [droneBaseUrl, setDroneBaseUrl] = useState<string | null>(null);
   const [anchors, setAnchors] = useState<Array<{ id: number; label: string; x: number; y: number }>>([]);
   const [needsAssistedAnchoring, setNeedsAssistedAnchoring] = useState(false);
   const [alignmentOutputFiles, setAlignmentOutputFiles] = useState<{
@@ -577,14 +484,14 @@ export default function PatwariPage() {
     size: string;
     url: string;
     preview: string;
-  } | null>(BENCHMARK_MAP_FILES.oldMap as any);
+  } | null>(null);
   const [droneMapFile, setDroneMapFile] = useState<{
     file?: File;
     name: string;
     size: string;
     url: string;
     preview: string;
-  } | null>(BENCHMARK_MAP_FILES.droneMap as any);
+  } | null>(null);
   const [isAligningPipeline, setIsAligningPipeline] = useState(false);
   const [alignmentPipelineStage, setAlignmentPipelineStage] = useState(1);
   const [alignmentMetrics, setAlignmentMetrics] = useState<{
@@ -596,7 +503,7 @@ export default function PatwariPage() {
     algorithm: string;
     parcelsHarmonized: number;
     processingTimeMs: number;
-  } | null>(BENCHMARK_DEFAULT_METRICS);
+  } | null>(null);
 
   // ── Georeference Manual GPS Anchoring States (Phase 1 Master Directive) ──
   const [enableGeoreferenceInput, setEnableGeoreferenceInput] = useState(true);
@@ -634,16 +541,11 @@ export default function PatwariPage() {
   const oldMapInputRef = useRef<HTMLInputElement>(null);
   const droneMapInputRef = useRef<HTMLInputElement>(null);
 
-  // Benchmark initialization on mount: build client-aligned canvas if needed
+  // Clean empty start on mount: clear cached alignment sessions & start in Upload Studio
   useEffect(() => {
-    generateClientAlignedMap(BENCHMARK_MAP_FILES.oldMap.url, BENCHMARK_MAP_FILES.droneMap.url)
-      .then((blended) => {
-        if (blended) {
-          setAlignedMapUrl(blended);
-          setUnifiedOverlayUrl(blended);
-        }
-      })
-      .catch((e) => console.warn("Client blended map generation:", e));
+    try {
+      localStorage.removeItem("geosync_alignment_session");
+    } catch {}
   }, []);
 
   useEffect(() => {
