@@ -177,16 +177,15 @@ function generateClientAlignedMap(oldMapUrl: string, droneMapUrl: string): Promi
         // - Green (#10B981): Verified Clear Undisputed Legal Parcel
         // - Amber (#F59E0B): Occluded (Canopy / Tree Shadows)
         // - Red (#EF4444): Govt Land / Encroachment Alert
-        const scaleX = w / 1200;
-        const scaleY = h / 680;
+        const fontSize = Math.max(10, Math.min(14, Math.round(11 * (w / 1200))));
 
         CADASTRAL_BENCHMARK_BLOCKS.forEach((block) => {
-          const cx = block.x * scaleX;
-          const cy = block.y * scaleY;
-          const bw = (block.w || 52) * scaleX;
-          const bh = (block.h || 36) * scaleY;
-          const bx = cx - bw / 2;
-          const by = cy - bh / 2;
+          const bx = Math.round(block.nx * w);
+          const by = Math.round(block.ny * h);
+          const bw = Math.round(block.nw * w);
+          const bh = Math.round(block.nh * h);
+          const cx = Math.round(bx + bw / 2);
+          const cy = Math.round(by + bh / 2);
 
           let strokeColor = "#10B981"; // GREEN
           let fillColor = "rgba(16, 185, 129, 0.22)";
@@ -222,19 +221,23 @@ function generateClientAlignedMap(oldMapUrl: string, droneMapUrl: string): Promi
 
           // Centered Khasra Number badge
           const tag = `Kh.${block.khasra_no}`;
-          ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
+          ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
           const tw = ctx.measureText(tag).width;
-          const px = Math.round(cx - tw / 2 - 5);
-          const py = Math.round(cy - 8);
+          const pillW = Math.round(tw + 8);
+          const pillH = Math.round(fontSize + 6);
+          const px = Math.round(cx - pillW / 2);
+          const py = Math.round(cy - pillH / 2);
 
           ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
-          ctx.fillRect(px, py, tw + 10, 16);
+          ctx.fillRect(px, py, pillW, pillH);
           ctx.strokeStyle = strokeColor;
           ctx.lineWidth = 1;
-          ctx.strokeRect(px, py, tw + 10, 16);
+          ctx.strokeRect(px, py, pillW, pillH);
 
           ctx.fillStyle = "#FFFFFF";
-          ctx.fillText(tag, px + 5, py + 12);
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(tag, cx, cy);
         });
 
         resolve(canvas.toDataURL("image/png"));
@@ -824,7 +827,11 @@ export default function PatwariPage() {
 
     setIsUploadStudioOpen(false);
     setIsCurtainSwipeActive(true);
-    toast.success("मानचित्र व निर्देशांक सत्यापित! (Coordinates saved)", { icon: "✅" });
+    if (!isAligned && oldMapFile && droneMapFile) {
+      runAlign();
+    } else {
+      toast.success("मानचित्र व निर्देशांक सत्यापित! (Coordinates saved)", { icon: "✅" });
+    }
   };
 
   const runFullHarmonizationPipeline = async () => {
@@ -1416,7 +1423,9 @@ export default function PatwariPage() {
       // If backend did not populate parcels (e.g. cold start or error), preserve 37 benchmark plots
       setParcels((prev) => (prev.length > 0 ? prev : BENCHMARK_37_PARCELS));
       setGeojson((prev) => (prev && prev.features?.length > 0 ? prev : getBenchmark37GeoJSON()));
-      setSelectedId((prev) => prev || "par-272-4");
+      setSelectedId("par-272-4");
+      setIsRosterOpen(true);
+      setIsDossierCollapsed(false);
 
       setAlignmentPipelineStage(3);
 

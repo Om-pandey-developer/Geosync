@@ -550,7 +550,7 @@ export default function MapViewer({
   }, []);
 
   // Dynamic Regional Legend State (Phase 4)
-  const [isLegendOpen, setIsLegendOpen] = useState(true);
+  const [isLegendOpen, setIsLegendOpen] = useState(false);
 
   // Task 2.1: Curtain Swipe Slider State (0% - 100%)
   const [isSwipeActive, setIsSwipeActive] = useState(enableCurtainSwipe);

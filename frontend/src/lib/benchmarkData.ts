@@ -700,53 +700,81 @@ export const BENCHMARK_MAP_FILES = {
 };
 
 export interface CadastralBlockCoord {
-  x: number;
-  y: number;
+  khasra_no: string;
+  nx: number;
+  ny: number;
+  nw: number;
+  nh: number;
+  x?: number;
+  y?: number;
   w?: number;
   h?: number;
-  khasra_no: string;
 }
 
 export const CADASTRAL_BENCHMARK_BLOCKS: CadastralBlockCoord[] = [
-  { x: 476, y: 92, khasra_no: "36475" },
-  { x: 669, y: 158, w: 90, h: 65, khasra_no: "1" },
-  { x: 921, y: 154, khasra_no: "57" },
-  { x: 27, y: 229, w: 40, h: 80, khasra_no: "5827269" },
-  { x: 323, y: 201, w: 35, h: 60, khasra_no: "272" },
-  { x: 407, y: 199, w: 75, h: 70, khasra_no: "656565" },
-  { x: 1094, y: 188, khasra_no: "45454" },
-  { x: 96, y: 343, khasra_no: "895" },
-  { x: 156, y: 323, khasra_no: "57360" },
-  { x: 642, y: 301, khasra_no: "12" },
-  { x: 711, y: 279, khasra_no: "345" },
-  { x: 825, y: 288, khasra_no: "123" },
-  { x: 930, y: 347, khasra_no: "610" },
-  { x: 1045, y: 346, khasra_no: "987" },
-  { x: 194, y: 366, khasra_no: "357" },
-  { x: 344, y: 362, khasra_no: "555" },
-  { x: 496, y: 362, khasra_no: "777" },
-  { x: 627, y: 421, khasra_no: "144" },
-  { x: 717, y: 409, khasra_no: "581" },
-  { x: 812, y: 414, khasra_no: "321" },
-  { x: 934, y: 427, khasra_no: "233" },
-  { x: 1023, y: 429, khasra_no: "6767" },
-  { x: 1143, y: 412, khasra_no: "25" },
-  { x: 1195, y: 404, khasra_no: "682" },
-  { x: 154, y: 432, khasra_no: "987" },
-  { x: 329, y: 426, khasra_no: "999" },
-  { x: 489, y: 425, khasra_no: "999" },
-  { x: 151, y: 483, khasra_no: "58627" },
-  { x: 326, y: 480, khasra_no: "69572" },
-  { x: 486, y: 495, khasra_no: "628" },
-  { x: 28, y: 543, khasra_no: "555" },
-  { x: 321, y: 550, khasra_no: "5927" },
-  { x: 736, y: 532, w: 160, h: 60, khasra_no: "0" },
-  { x: 965, y: 543, khasra_no: "377" },
-  { x: 1054, y: 517, khasra_no: "222" },
-  { x: 1057, y: 564, khasra_no: "2555" },
-  { x: 1166, y: 565, khasra_no: "888" },
+  // Top row
+  { khasra_no: "36475", nx: 0.3187, ny: 0.0074, nw: 0.1350, nh: 0.0889 },
+  { khasra_no: "1", nx: 0.4797, ny: 0.0556, nw: 0.1203, nh: 0.2296 },
+  { khasra_no: "57", nx: 0.7122, ny: 0.1222, nw: 0.0569, nh: 0.0778 },
+  { khasra_no: "45454", nx: 0.8488, ny: 0.1667, nw: 0.0569, nh: 0.1111 },
+
+  // Far west & playground
+  { khasra_no: "5827269", nx: 0.0049, ny: 0.1444, nw: 0.0504, nh: 0.3037 },
+  { khasra_no: "272", nx: 0.2472, ny: 0.1296, nw: 0.0374, nh: 0.2333 },
+  { khasra_no: "656565", nx: 0.2846, ny: 0.1074, nw: 0.0959, nh: 0.2741 },
+
+  // School complex
+  { khasra_no: "12", nx: 0.4813, ny: 0.3333, nw: 0.0683, nh: 0.1926 },
+  { khasra_no: "345", nx: 0.5528, ny: 0.2852, nw: 0.0699, nh: 0.2111 },
+  { khasra_no: "123", nx: 0.6260, ny: 0.3444, nw: 0.0602, nh: 0.1259 },
+
+  // Housing Row 1 (upper)
+  { khasra_no: "57360", nx: 0.1008, ny: 0.4259, nw: 0.0634, nh: 0.0815 },
+  { khasra_no: "895", nx: 0.0715, ny: 0.4444, nw: 0.0293, nh: 0.1185 },
+  { khasra_no: "357", nx: 0.1057, ny: 0.5111, nw: 0.1138, nh: 0.0704 },
+  { khasra_no: "555", nx: 0.2260, ny: 0.5000, nw: 0.1138, nh: 0.0778 },
+  { khasra_no: "777", nx: 0.3463, ny: 0.5037, nw: 0.1106, nh: 0.0667 },
+
+  // Mid-south building wings
+  { khasra_no: "144", nx: 0.4829, ny: 0.5667, nw: 0.0488, nh: 0.1556 },
+  { khasra_no: "581", nx: 0.5366, ny: 0.5407, nw: 0.0813, nh: 0.1667 },
+  { khasra_no: "321", nx: 0.6211, ny: 0.5852, nw: 0.0732, nh: 0.0852 },
+
+  // Eastern housing row 1
+  { khasra_no: "610", nx: 0.7073, ny: 0.4815, nw: 0.0797, nh: 0.0593 },
+  { khasra_no: "987", nx: 0.8016, ny: 0.4778, nw: 0.0764, nh: 0.0593 },
+
+  // Housing Row 2
+  { khasra_no: "987", nx: 0.0732, ny: 0.6296, nw: 0.1154, nh: 0.0667 },
+  { khasra_no: "399", nx: 0.2114, ny: 0.6185, nw: 0.1171, nh: 0.0741 },
+  { khasra_no: "999", nx: 0.3350, ny: 0.6074, nw: 0.1220, nh: 0.0852 },
+
+  // Housing Row 3
+  { khasra_no: "58627", nx: 0.0715, ny: 0.7185, nw: 0.1154, nh: 0.0778 },
+  { khasra_no: "69572", nx: 0.2130, ny: 0.7111, nw: 0.1089, nh: 0.0778 },
+  { khasra_no: "628", nx: 0.3398, ny: 0.7259, nw: 0.1106, nh: 0.1037 },
+
+  // Far bottom-left & lowest row
+  { khasra_no: "555", nx: 0.0049, ny: 0.7741, nw: 0.0504, nh: 0.1778 },
+  { khasra_no: "5927", nx: 0.2049, ny: 0.8185, nw: 0.1187, nh: 0.1111 },
+
+  // Bottom Center (Retention Pond)
+  { khasra_no: "0", nx: 0.4829, ny: 0.7333, nw: 0.2211, nh: 0.2222 },
+
+  // Eastern complex & residences
+  { khasra_no: "233", nx: 0.7041, ny: 0.5519, nw: 0.0927, nh: 0.2037 },
+  { khasra_no: "6767", nx: 0.8049, ny: 0.6000, nw: 0.0358, nh: 0.1185 },
+  { khasra_no: "25", nx: 0.8992, ny: 0.5333, nw: 0.0293, nh: 0.1889 },
+  { khasra_no: "682", nx: 0.9415, ny: 0.5148, nw: 0.0325, nh: 0.1926 },
+
+  // Southeast sports / playground blocks
+  { khasra_no: "377", nx: 0.7317, ny: 0.7667, nw: 0.0862, nh: 0.1926 },
+  { khasra_no: "222", nx: 0.8228, ny: 0.7778, nw: 0.0504, nh: 0.0556 },
+  { khasra_no: "2555", nx: 0.8228, ny: 0.8667, nw: 0.0504, nh: 0.0704 },
+  { khasra_no: "888", nx: 0.9106, ny: 0.8185, nw: 0.0488, nh: 0.1667 },
 ];
 
 export const RED_KHASRA_SET = new Set(["1", "36475", "57", "144", "45454", "895", "6767", "25"]);
 export const AMBER_KHASRA_SET = new Set(["272", "345", "581", "123", "12", "610", "357", "777", "321", "233", "682", "58627", "69572", "987"]);
+
 
