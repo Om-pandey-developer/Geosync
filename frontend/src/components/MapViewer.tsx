@@ -4033,9 +4033,10 @@ export default function MapViewer({
       )}
 
       {/* Phase 4: Collapsible Dynamic Regional Cadastral Legend */}
-      <div
-        style={{
-          position: "absolute",
+      {!isCustomRasterComparison && (
+        <div
+          style={{
+            position: "absolute",
             bottom: (isAligned && (alignedMapOverlayUrl || cadastralOverlayUrl || unifiedOverlayUrl)) ? 78 : 20,
             left: 20,
             zIndex: 1000,
@@ -4175,6 +4176,7 @@ export default function MapViewer({
           </div>
         )}
       </div>
+      )}
 
       {/* Inline empty banner removed — handled by the pre-mount guard above */}
 

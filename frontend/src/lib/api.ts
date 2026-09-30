@@ -11,13 +11,9 @@ export function getApiUrl(): string {
     return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
   }
   if (typeof window !== "undefined" && window.location.hostname) {
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      return "http://localhost:8000/api";
-    }
-    // Secure Production Live Backend fallback
-    return "https://geosync-backend-e9xu.onrender.com/api";
+    return `http://${window.location.hostname}:8000/api`;
   }
-  return "https://geosync-backend-e9xu.onrender.com/api";
+  return "http://localhost:8000/api";
 }
 
 export const API = {
