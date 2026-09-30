@@ -550,7 +550,7 @@ export default function MapViewer({
   }, []);
 
   // Dynamic Regional Legend State (Phase 4)
-  const [isLegendOpen, setIsLegendOpen] = useState(false);
+  const [isLegendOpen, setIsLegendOpen] = useState(true);
 
   // Task 2.1: Curtain Swipe Slider State (0% - 100%)
   const [isSwipeActive, setIsSwipeActive] = useState(enableCurtainSwipe);
@@ -4033,10 +4033,9 @@ export default function MapViewer({
       )}
 
       {/* Phase 4: Collapsible Dynamic Regional Cadastral Legend */}
-      {!isCustomRasterComparison && (
-        <div
-          style={{
-            position: "absolute",
+      <div
+        style={{
+          position: "absolute",
             bottom: (isAligned && (alignedMapOverlayUrl || cadastralOverlayUrl || unifiedOverlayUrl)) ? 78 : 20,
             left: 20,
             zIndex: 1000,
@@ -4176,7 +4175,6 @@ export default function MapViewer({
           </div>
         )}
       </div>
-      )}
 
       {/* Inline empty banner removed — handled by the pre-mount guard above */}
 

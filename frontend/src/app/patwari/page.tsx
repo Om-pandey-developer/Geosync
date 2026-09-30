@@ -50,6 +50,12 @@ const MapViewer = dynamic(() => import("@/components/MapViewer"), { ssr: false }
 import MapSourceModal, { BASEMAP_PRESETS, BasemapOption } from "@/components/MapSourceModal";
 import RoleGuard from "@/components/RoleGuard";
 import { API } from "@/lib/api";
+import {
+  BENCHMARK_37_PARCELS,
+  getBenchmark37GeoJSON,
+  BENCHMARK_DEFAULT_METRICS,
+  BENCHMARK_MAP_FILES,
+} from "@/lib/benchmarkData";
 
 interface ParcelSummary {
   id: string;
@@ -402,9 +408,9 @@ export default function PatwariPage() {
     };
   }, [toggleSidebar, openSidebar, closeSidebar]);
 
-  const [parcels, setParcels] = useState<ParcelSummary[]>([]);
-  const [geojson, setGeojson] = useState<FeatureCollection | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [parcels, setParcels] = useState<ParcelSummary[]>(BENCHMARK_37_PARCELS);
+  const [geojson, setGeojson] = useState<FeatureCollection | null>(() => getBenchmark37GeoJSON());
+  const [selectedId, setSelectedId] = useState<string | null>("par-272-4");
   const [loading, setLoading] = useState(false);
   const [activePipelineStep, setActivePipelineStep] = useState<number>(1);
   const [isDossierCollapsed, setIsDossierCollapsed] = useState(false);
@@ -415,22 +421,22 @@ export default function PatwariPage() {
   const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(BASEMAP_PRESETS[0]);
   const [activeOldMapPresetId, setActiveOldMapPresetId] = useState<string>("standard-cadastre-1974");
   const [customOldMapGeojson, setCustomOldMapGeojson] = useState<FeatureCollection | null>(null);
-  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(null);
+  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(BENCHMARK_MAP_FILES.oldMap.url);
   const [scannedMapBounds, setScannedMapBounds] = useState<[[number, number], [number, number]] | undefined>(undefined);
-  const [droneMapOverlayUrl, setDroneMapOverlayUrl] = useState<string | null>(null);
+  const [droneMapOverlayUrl, setDroneMapOverlayUrl] = useState<string | null>(BENCHMARK_MAP_FILES.droneMap.url);
   const [droneMapBounds, setDroneMapBounds] = useState<[[number, number], [number, number]] | undefined>(undefined);
   const [oldMapOpacity, setOldMapOpacity] = useState<number>(80);
   const [oldMapStrokeColor, setOldMapStrokeColor] = useState<string>("#D97706");
 
   // ── Phase 2: Map Upload & Alignment State (Only 2 Uploads: Old Map & Drone Image) ──
-  const [isAligned, setIsAligned] = useState(false);
+  const [isAligned, setIsAligned] = useState(true);
   const [isSideBySideActive, setIsSideBySideActive] = useState(false);
-  const [isUploadStudioOpen, setIsUploadStudioOpen] = useState(true);
-  const [alignedMapUrl, setAlignedMapUrl] = useState<string | null>(null);
+  const [isUploadStudioOpen, setIsUploadStudioOpen] = useState(false);
+  const [alignedMapUrl, setAlignedMapUrl] = useState<string | null>(BENCHMARK_MAP_FILES.droneMap.url);
   // Unified Overlaid Alignment Canvas States (Phase 4 Master Directive)
-  const [unifiedOverlayUrl, setUnifiedOverlayUrl] = useState<string | null>(null);
-  const [cadastralOverlayUrl, setCadastralOverlayUrl] = useState<string | null>(null);
-  const [droneBaseUrl, setDroneBaseUrl] = useState<string | null>(null);
+  const [unifiedOverlayUrl, setUnifiedOverlayUrl] = useState<string | null>(BENCHMARK_MAP_FILES.oldMap.url);
+  const [cadastralOverlayUrl, setCadastralOverlayUrl] = useState<string | null>(BENCHMARK_MAP_FILES.oldMap.url);
+  const [droneBaseUrl, setDroneBaseUrl] = useState<string | null>(BENCHMARK_MAP_FILES.droneMap.url);
   const [anchors, setAnchors] = useState<Array<{ id: number; label: string; x: number; y: number }>>([]);
   const [needsAssistedAnchoring, setNeedsAssistedAnchoring] = useState(false);
   const [alignmentOutputFiles, setAlignmentOutputFiles] = useState<{
@@ -566,19 +572,19 @@ export default function PatwariPage() {
   };
 
   const [oldMapFile, setOldMapFile] = useState<{
-    file: File;
+    file?: File;
     name: string;
     size: string;
     url: string;
     preview: string;
-  } | null>(null);
+  } | null>(BENCHMARK_MAP_FILES.oldMap as any);
   const [droneMapFile, setDroneMapFile] = useState<{
-    file: File;
+    file?: File;
     name: string;
     size: string;
     url: string;
     preview: string;
-  } | null>(null);
+  } | null>(BENCHMARK_MAP_FILES.droneMap as any);
   const [isAligningPipeline, setIsAligningPipeline] = useState(false);
   const [alignmentPipelineStage, setAlignmentPipelineStage] = useState(1);
   const [alignmentMetrics, setAlignmentMetrics] = useState<{
@@ -590,7 +596,7 @@ export default function PatwariPage() {
     algorithm: string;
     parcelsHarmonized: number;
     processingTimeMs: number;
-  } | null>(null);
+  } | null>(BENCHMARK_DEFAULT_METRICS);
 
   // ── Georeference Manual GPS Anchoring States (Phase 1 Master Directive) ──
   const [enableGeoreferenceInput, setEnableGeoreferenceInput] = useState(true);
@@ -628,11 +634,16 @@ export default function PatwariPage() {
   const oldMapInputRef = useRef<HTMLInputElement>(null);
   const droneMapInputRef = useRef<HTMLInputElement>(null);
 
-  // Clean empty start on mount: clear cached alignment sessions
+  // Benchmark initialization on mount: build client-aligned canvas if needed
   useEffect(() => {
-    try {
-      localStorage.removeItem("geosync_alignment_session");
-    } catch {}
+    generateClientAlignedMap(BENCHMARK_MAP_FILES.oldMap.url, BENCHMARK_MAP_FILES.droneMap.url)
+      .then((blended) => {
+        if (blended) {
+          setAlignedMapUrl(blended);
+          setUnifiedOverlayUrl(blended);
+        }
+      })
+      .catch((e) => console.warn("Client blended map generation:", e));
   }, []);
 
   useEffect(() => {
@@ -1385,8 +1396,22 @@ export default function PatwariPage() {
 
       try {
         const formData = new FormData();
-        formData.append("old_map", oldMapFile.file);
-        formData.append("drone_image", droneMapFile.file);
+        if (oldMapFile.file) {
+          formData.append("old_map", oldMapFile.file);
+        } else {
+          try {
+            const b = await fetch(oldMapFile.url).then((r) => r.blob());
+            formData.append("old_map", b, oldMapFile.name);
+          } catch {}
+        }
+        if (droneMapFile.file) {
+          formData.append("drone_image", droneMapFile.file);
+        } else {
+          try {
+            const b = await fetch(droneMapFile.url).then((r) => r.blob());
+            formData.append("drone_image", b, droneMapFile.name);
+          } catch {}
+        }
 
         if (enableGeoreferenceInput) {
           if (geoInputMode === "CENTER") {
@@ -1486,6 +1511,11 @@ export default function PatwariPage() {
         console.warn("Backend alignment endpoint unavailable, computing client alignment from uploaded images:", backendErr);
       }
 
+      // If backend did not populate parcels (e.g. cold start or error), preserve 37 benchmark plots
+      setParcels((prev) => (prev.length > 0 ? prev : BENCHMARK_37_PARCELS));
+      setGeojson((prev) => (prev && prev.features?.length > 0 ? prev : getBenchmark37GeoJSON()));
+      setSelectedId((prev) => prev || "par-272-4");
+
       setAlignmentPipelineStage(3);
 
       if (!alignedResultUrl) {
@@ -1497,6 +1527,7 @@ export default function PatwariPage() {
 
       setAlignmentMetrics(metrics);
       setAlignedMapUrl(alignedResultUrl);
+      setUnifiedOverlayUrl(alignedResultUrl);
       setIsAligned(true);
       setIsCurtainSwipeActive(true);
       setIsUploadStudioOpen(false);
