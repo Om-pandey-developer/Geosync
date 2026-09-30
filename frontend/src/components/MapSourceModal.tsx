@@ -38,7 +38,7 @@ export const BASEMAP_PRESETS: BasemapOption[] = [
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attribution: "© NAKSHA Drone Survey • DoLR • Survey of India",
     maxZoom: 20,
-    description: "Centimeter-level 5cm optical drone raster flying at 120m AGL for Mohanlalganj Ward 12.",
+    description: "Centimeter-level 5cm optical drone raster flying at 120m AGL for field cadastral survey.",
     badge: "5cm Drone Survey",
   },
   {
@@ -84,17 +84,17 @@ export interface OldMapPreset {
 
 export const OLD_MAP_PRESETS: OldMapPreset[] = [
   {
-    id: "mohanlalganj-1974",
-    name: "Mohanlalganj 1974 Settlement Cadastre (BhuNaksha)",
+    id: "standard-cadastre-1974",
+    name: "Standard 1974 Settlement Cadastre (BhuNaksha)",
     year: "1974 (50-yr Legacy)",
     description: "Hand-drafted paper cloth map with 2.5m - 4.8m non-linear moisture shrinkage and rotational drift.",
     type: "vector",
     parcelCount: 18,
   },
   {
-    id: "ward12-distorted",
-    name: "Ward 12 Extreme Paper Shrinkage Dataset",
-    year: "1982 Record",
+    id: "ward-paper-shrinkage",
+    name: "High Paper Shrinkage Cadastral Sheet",
+    year: "Historical Record",
     description: "High-displacement sample designed to stress-test Thin-Plate Spline (TPS) rubber-sheeting.",
     type: "vector",
     parcelCount: 18,

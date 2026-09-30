@@ -306,7 +306,7 @@ function LoginForm() {
               </span>
             </div>
             <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-              {isPatwari ? "Ward 12 Mohanlalganj" : "Revenue Court LKO"}
+              {isPatwari ? "Field Sector 1" : "Revenue Court LKO"}
             </span>
           </div>
 

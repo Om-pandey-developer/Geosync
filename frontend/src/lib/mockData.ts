@@ -23,7 +23,7 @@ export interface BoundaryParcel {
   reason?: string;
 }
 
-// Center reference around Mohanlalganj, Lucknow (Ward 12)
+// Center reference around Field Sector 1, Lucknow (Ward 12)
 export const MAP_CENTER: [number, number] = [26.7605, 80.901];
 export const MAP_ZOOM: number = 16;
 
@@ -32,8 +32,8 @@ export const INITIAL_PARCELS: BoundaryParcel[] = [
     id: "par-101",
     khasra_no: "101",
     owner_name: "Ram Prasad Verma",
-    village: "Mohanlalganj",
-    tehsil: "Mohanlalganj",
+    village: "Field Sector 1",
+    tehsil: "Field Sector 1",
     district: "Lucknow",
     state: "Uttar Pradesh",
     area_sqm: 11205.5,
@@ -63,8 +63,8 @@ export const INITIAL_PARCELS: BoundaryParcel[] = [
     id: "par-102",
     khasra_no: "102",
     owner_name: "Sita Devi",
-    village: "Mohanlalganj",
-    tehsil: "Mohanlalganj",
+    village: "Field Sector 1",
+    tehsil: "Field Sector 1",
     district: "Lucknow",
     state: "Uttar Pradesh",
     area_sqm: 9840.2,
@@ -96,8 +96,8 @@ export const INITIAL_PARCELS: BoundaryParcel[] = [
     id: "par-103",
     khasra_no: "103",
     owner_name: "Mohan Lal Yadav",
-    village: "Mohanlalganj",
-    tehsil: "Mohanlalganj",
+    village: "Field Sector 1",
+    tehsil: "Field Sector 1",
     district: "Lucknow",
     state: "Uttar Pradesh",
     area_sqm: 13420.0,
@@ -127,8 +127,8 @@ export const INITIAL_PARCELS: BoundaryParcel[] = [
     id: "par-104",
     khasra_no: "104",
     owner_name: "Geeta Singh",
-    village: "Mohanlalganj",
-    tehsil: "Mohanlalganj",
+    village: "Field Sector 1",
+    tehsil: "Field Sector 1",
     district: "Lucknow",
     state: "Uttar Pradesh",
     area_sqm: 8750.8,
@@ -158,8 +158,8 @@ export const INITIAL_PARCELS: BoundaryParcel[] = [
     id: "par-105",
     khasra_no: "105",
     owner_name: "Gram Sabha (Public Charagah)",
-    village: "Mohanlalganj",
-    tehsil: "Mohanlalganj",
+    village: "Field Sector 1",
+    tehsil: "Field Sector 1",
     district: "Lucknow",
     state: "Uttar Pradesh",
     area_sqm: 16800.0,
@@ -191,8 +191,8 @@ export const INITIAL_PARCELS: BoundaryParcel[] = [
     id: "par-106",
     khasra_no: "106",
     owner_name: "Pradeep Tiwari",
-    village: "Mohanlalganj",
-    tehsil: "Mohanlalganj",
+    village: "Field Sector 1",
+    tehsil: "Field Sector 1",
     district: "Lucknow",
     state: "Uttar Pradesh",
     area_sqm: 10450.0,

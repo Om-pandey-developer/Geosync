@@ -2,7 +2,7 @@
 GeoSync Database Seeder — Mock 1-Ward Spatial Dataset
 =====================================================
 
-Generates ~18 realistic land parcels for Ward 12, Mohanlalganj Tehsil, Lucknow.
+Generates ~18 realistic land parcels for Ward 12, Field Sector 1 Tehsil, Lucknow.
 Parcels are positioned around real coordinates near Lucknow (26.76°N, 80.90°E)
 with realistic Khasra numbers, owner names, and polygon geometries.
 
@@ -31,7 +31,7 @@ from shapely.geometry import Polygon, mapping
 from database import engine, Base, SessionLocal, IS_SQLITE
 from models import Parcel, ApprovalRequest
 
-# Base coordinates: Near Mohanlalganj, Lucknow (~26.76°N, 80.90°E)
+# Base coordinates: Near Field Sector 1, Lucknow (~26.76°N, 80.90°E)
 BASE_LAT = 26.7605
 BASE_LON = 80.9010
 
@@ -89,7 +89,7 @@ def seed_database(force: bool = False):
             db.query(Parcel).delete()
             db.commit()
 
-        print(f"🌱 Seeding {len(MOCK_PARCELS)} parcels for Ward 12, Mohanlalganj, Lucknow...")
+        print(f"🌱 Seeding {len(MOCK_PARCELS)} parcels for Ward 12, Field Sector 1, Lucknow...")
 
         for p in MOCK_PARCELS:
             poly = make_polygon(p["offset"][0], p["offset"][1])
@@ -108,8 +108,8 @@ def seed_database(force: bool = False):
                     id=parcel_id,
                     khasra_no=p["khasra"],
                     owner_name=p["owner"],
-                    village="Mohanlalganj",
-                    tehsil="Mohanlalganj",
+                    village="Field Sector 1",
+                    tehsil="Field Sector 1",
                     district="Lucknow",
                     state="Uttar Pradesh",
                     geometry=json.dumps(geo_dict),
@@ -133,8 +133,8 @@ def seed_database(force: bool = False):
                         "id": str(parcel_id),
                         "khasra": p["khasra"],
                         "owner": p["owner"],
-                        "village": "Mohanlalganj",
-                        "tehsil": "Mohanlalganj",
+                        "village": "Field Sector 1",
+                        "tehsil": "Field Sector 1",
                         "district": "Lucknow",
                         "state": "Uttar Pradesh",
                         "wkt": wkt_str,

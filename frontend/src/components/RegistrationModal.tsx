@@ -34,14 +34,14 @@ export default function RegistrationModal({
   const [officerName, setOfficerName] = useState("");
   const [officerPhone, setOfficerPhone] = useState("");
   const [designation, setDesignation] = useState("Patwari");
-  const [ward, setWard] = useState("Ward 12, Mohanlalganj");
+  const [ward, setWard] = useState("Field Sector 1");
 
   // Parcel Form State
   const [khasraNo, setKhasraNo] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
-  const [village, setVillage] = useState("Mohanlalganj");
-  const [tehsil, setTehsil] = useState("Mohanlalganj");
+  const [village, setVillage] = useState("Field Sector 1");
+  const [tehsil, setTehsil] = useState("Field Sector 1");
 
   if (!isOpen) return null;
 
@@ -142,7 +142,7 @@ export default function RegistrationModal({
     setLoading(true);
     const tId = toast.loading("Registering new cadastral parcel...");
 
-    // Generate a default polygon near Mohanlalganj base
+    // Generate a default polygon near Field Sector 1 base
     const baseLon = 80.9015 + Math.random() * 0.003;
     const baseLat = 26.7610 + Math.random() * 0.003;
     const s = 0.0008;

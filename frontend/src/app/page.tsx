@@ -262,7 +262,7 @@ export default function LandingPage() {
             onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "var(--accent-primary)")}
             onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "var(--text-secondary)")}
           >
-            Mohanlalganj Testbed
+            Cadastral Testbed
           </a>
           <Link
             href="/login"
@@ -339,7 +339,7 @@ export default function LandingPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div className="pulsing-dot" style={{ background: "#0D9488" }} />
           <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#0F766E", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Active Operational Testbed: Mohanlalganj Ward 12
+            Active Operational Testbed: Field Survey Sector 1
           </span>
         </div>
       </div>
@@ -1238,7 +1238,7 @@ export default function LandingPage() {
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <h3 style={{ fontSize: "1.3rem", fontWeight: 900, color: "var(--text-primary)" }}>
-                  Mohanlalganj Ward 12 &bull; Active Cadastral Parcel Testbed
+                  Field Survey Sector 1 &bull; Active Cadastral Parcel Testbed
                 </h3>
                 <span className="badge-pastel-teal">Live Database Roster</span>
               </div>
@@ -1378,7 +1378,7 @@ export default function LandingPage() {
         onClose={() => setIsSourceModalOpen(false)}
         activeBasemapId={activeBasemap.id}
         onSelectBasemap={(b) => setActiveBasemap(b)}
-        activeOldMapPresetId="mohanlalganj-1974"
+        activeOldMapPresetId="standard-cadastre-1974"
         onSelectOldMapPreset={() => {}}
         oldMapOpacity={80}
         onChangeOldMapOpacity={() => {}}

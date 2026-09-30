@@ -221,6 +221,8 @@ interface MapViewerProps {
   leftSlot?: React.ReactNode;
   toolbarOffsetLeft?: number | string;
   suppressEmptyBanner?: boolean;
+  alignedOnlyMode?: boolean;
+  hideComparisonControls?: boolean;
 }
 
 function FitBounds({ geojsonData }: { geojsonData: FeatureCollection }) {
@@ -470,6 +472,8 @@ export default function MapViewer({
   leftSlot,
   toolbarOffsetLeft,
   suppressEmptyBanner = false,
+  alignedOnlyMode = false,
+  hideComparisonControls = false,
 }: MapViewerProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [baseLayer, setBaseLayer] = useState<"drone" | "minimal" | "isolated">(defaultBaseLayer);
@@ -512,8 +516,8 @@ export default function MapViewer({
     return { pxX, pxY };
   }, [refCenterLat, refCenterLon, activeGsd]);
 
-  // Custom uploaded raster comparison mode: active when scanned old map, drone, or aligned map are provided
-  const isCustomRasterComparison = Boolean(
+  // Custom uploaded raster comparison mode: active when scanned old map, drone, or aligned map are provided (disabled in alignedOnlyMode)
+  const isCustomRasterComparison = !alignedOnlyMode && Boolean(
     scannedMapOverlayUrl || droneMapOverlayUrl || alignedMapOverlayUrl || droneBaseUrl || cadastralOverlayUrl || unifiedOverlayUrl
   );
 
@@ -1401,22 +1405,35 @@ export default function MapViewer({
 
   const styleFeature = (feature: Feature | undefined) => {
     if (!feature) return {};
-    const rawStatus = feature.properties?.alignment_status || "DRAFT";
+    const props = feature.properties || {};
+    const rawStatus = props.alignment_status || "DRAFT";
     const statusKey = String(rawStatus).toLowerCase();
-    const confidence = feature.properties?.alignment_confidence ?? 1.0;
-    const occluded = showOcclusionAlerts && confidence < 0.8;
-    const isSelected = feature.properties?.id === selectedParcelId;
+    const band = props.confidence_band;
+    const isSelected = props.id === selectedParcelId || props.khasra_no === selectedParcelId;
 
-    const palette = occluded ? STATUS_COLORS.occluded : STATUS_COLORS[statusKey] || STATUS_COLORS.draft;
-    const isDraft = statusKey === "raw" || statusKey === "draft";
+    let strokeColor = "#10B981";
+    let fillColor = "#A7F3D0";
+    let isOccluded = false;
+
+    if (band === "RED" || statusKey === "govt_illegal" || props.status_color === "#EF4444") {
+      strokeColor = "#EF4444";
+      fillColor = "#FCA5A5";
+    } else if (band === "AMBER" || statusKey === "occluded" || statusKey === "occlusion_shadow" || props.status_color === "#F59E0B") {
+      strokeColor = "#F59E0B";
+      fillColor = "#FDE68A";
+      isOccluded = true;
+    } else {
+      strokeColor = "#10B981";
+      fillColor = "#A7F3D0";
+    }
 
     return {
-      color: isSelected ? "#0F172A" : palette.stroke,
-      weight: isSelected ? 3.5 : 2.75,
+      color: isSelected ? "#0F172A" : strokeColor,
+      weight: isSelected ? 3.5 : 2.5,
       opacity: opacityRatio,
-      fillColor: isSelected ? "#38BDF8" : palette.fill,
-      fillOpacity: (isSelected ? 0.65 : 0.4) * opacityRatio,
-      dashArray: occluded ? "5, 5" : isDraft ? "6, 6" : undefined,
+      fillColor: isSelected ? "#38BDF8" : fillColor,
+      fillOpacity: (isSelected ? 0.65 : 0.45) * opacityRatio,
+      dashArray: isOccluded ? "5, 5" : undefined,
     };
   };
 
@@ -1425,47 +1442,49 @@ export default function MapViewer({
     if (!props) return;
 
     layer.on("click", () => {
-      if (onParcelClick) onParcelClick(props.id);
+      if (onParcelClick) onParcelClick(props.id || props.khasra_no);
     });
 
-    const occluded = showOcclusionAlerts && (props.alignment_confidence ?? 1.0) < 0.8;
-    const statusKey = String(props.alignment_status || "DRAFT").toLowerCase();
-    const palette = occluded ? STATUS_COLORS.occluded : STATUS_COLORS[statusKey] || STATUS_COLORS.draft;
+    const band = props.confidence_band;
+    const isRed = band === "RED" || props.status_color === "#EF4444";
+    const isAmber = band === "AMBER" || props.status_color === "#F59E0B";
+    const statusBadgeBg = isRed ? "#FEE2E2" : isAmber ? "#FEF3C7" : "#DCFCE7";
+    const statusBadgeColor = isRed ? "#991B1B" : isAmber ? "#92400E" : "#166534";
+    const statusLabel = props.situation || (isRed ? "सरकारी भूमि / अवैध कब्जा" : isAmber ? "ओकल्शन (पेड़ / छाया)" : "सही (Verified Clear)");
 
     const popupContent = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 230px; padding: 4px; color: #0F172A;">
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 250px; padding: 4px; color: #0F172A;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
           <span style="font-weight: 800; font-size: 1.05rem; color: #0F172A;">
             Khasra ${props.khasra_no}
           </span>
           <span style="
-            background: ${palette.fill};
-            color: ${palette.stroke};
-            border: 1px solid ${palette.stroke}40;
+            background: ${statusBadgeBg};
+            color: ${statusBadgeColor};
+            border: 1px solid ${statusBadgeColor}40;
             font-size: 0.72rem;
-            font-weight: 700;
+            font-weight: 800;
             padding: 2px 8px;
-            border-radius: 6px;
-            text-transform: uppercase;
+            borderRadius: 6px;
           ">
-            ${formatAlignmentStatus(props.alignment_status)}
+            ${statusLabel}
           </span>
         </div>
 
         ${
-          occluded
+          props.reason
             ? `
         <div style="
-          background: #FEF3C7; 
-          border: 1px solid #FDE68A; 
+          background: ${isRed ? "#FEF2F2" : isAmber ? "#FFFBEB" : "#F0FDF4"}; 
+          border: 1px solid ${isRed ? "#FECACA" : isAmber ? "#FDE68A" : "#BBF7D0"}; 
           border-radius: 6px; 
           padding: 6px 8px; 
           margin-bottom: 8px; 
           font-size: 0.75rem; 
-          color: #92400E;
+          color: ${statusBadgeColor};
           font-weight: 600;
         ">
-          ⚠️ <strong>Occlusion Alert:</strong> Low confidence (${Math.round((props.alignment_confidence || 0.65) * 100)}%). Tree canopy / shadow detected.
+          ${isRed ? "🔴" : isAmber ? "🟠" : "🟢"} <strong>Status Note:</strong> ${props.reason}
         </div>`
             : ""
         }
@@ -1550,8 +1569,8 @@ export default function MapViewer({
           </>
         )}
 
-        {/* Standard GIS controls (Completely hidden when viewing uploaded map comparison) */}
-        {!isCustomRasterComparison && (
+        {/* Standard GIS controls (Completely hidden when viewing uploaded map comparison or in alignedOnlyMode) */}
+        {!isCustomRasterComparison && !alignedOnlyMode && !hideComparisonControls && (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", flexShrink: 0 }}>
               <Layers size={16} style={{ color: "var(--accent-primary)" }} />
@@ -1682,8 +1701,39 @@ export default function MapViewer({
             </button>
 
             <div style={{ width: 1, height: 20, background: "var(--border-subtle)", flexShrink: 0 }} />
+          </>
+        )}
 
-            {/* Vectors Visibility Toggle */}
+        {/* When in alignedOnlyMode: display single title badge */}
+        {alignedOnlyMode && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "linear-gradient(135deg, #F0FDFA 0%, #E6FFFA 100%)",
+                  border: "1.5px solid #99F6E4",
+                  color: "#0F766E",
+                  padding: "5px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  fontWeight: 800,
+                  fontSize: "0.82rem",
+                  boxShadow: "0 1px 3px rgba(13, 148, 136, 0.1)",
+                }}
+              >
+                <Sparkles size={14} style={{ color: "#0D9488" }} />
+                <span>New Aligned Cadastral Map (Patwari Survey Approved)</span>
+              </div>
+            </div>
+            <div style={{ width: 1, height: 20, background: "var(--border-subtle)", flexShrink: 0 }} />
+          </>
+        )}
+
+        {/* Cadastre Vectors Visibility Toggle & Opacity Slider */}
+        {(!isCustomRasterComparison || alignedOnlyMode) && (
+          <>
             <button
               onClick={() => setShowVectors(!showVectors)}
               style={{
@@ -2347,27 +2397,27 @@ export default function MapViewer({
               </>
             )}
 
-            {/* ── Top HUD Control Ribbon ── */}
+            {/* ── Top HUD Control Ribbon (Centered Pill Matching Design Directive) ── */}
             <div
-              className="hud-deck"
+              className="hud-deck animate-fade-in-down"
               style={{
                 position: "absolute",
-                top: 12,
-                left: 14,
-                right: 14,
+                top: 14,
+                left: "50%",
+                transform: "translateX(-50%)",
                 zIndex: 600,
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                padding: "7px 14px",
-                background: "rgba(15, 23, 42, 0.94)",
-                backdropFilter: "blur(14px)",
-                borderRadius: 12,
-                border: "1.5px solid rgba(255, 255, 255, 0.12)",
-                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.45)",
+                gap: 14,
+                padding: "8px 18px",
+                background: "rgba(15, 23, 42, 0.95)",
+                backdropFilter: "blur(16px)",
+                borderRadius: 24,
+                border: "1.5px solid rgba(255, 255, 255, 0.16)",
+                boxShadow: "0 12px 35px rgba(0, 0, 0, 0.55)",
                 color: "#FFFFFF",
-                overflowX: "auto",
+                maxWidth: "calc(100% - 32px)",
+                whiteSpace: "nowrap",
               }}
             >
               {/* Left: Confidence & Status Pill */}
@@ -2520,50 +2570,6 @@ export default function MapViewer({
                   >
                     <Download size={11} />
                     <span>PNG</span>
-                  </button>
-                )}
-                {onExportGeoJson && (
-                  <button
-                    onClick={onExportGeoJson}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      padding: "4px 9px",
-                      borderRadius: 6,
-                      background: "#0D9488",
-                      color: "#FFFFFF",
-                      border: "none",
-                      fontSize: "0.7rem",
-                      fontWeight: 800,
-                      cursor: "pointer",
-                    }}
-                    title="Export Aligned Parcels GeoJSON"
-                  >
-                    <Download size={11} />
-                    <span>GeoJSON</span>
-                  </button>
-                )}
-                {onExportGeoTiff && (
-                  <button
-                    onClick={onExportGeoTiff}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      padding: "4px 9px",
-                      borderRadius: 6,
-                      background: "#0284C7",
-                      color: "#FFFFFF",
-                      border: "none",
-                      fontSize: "0.7rem",
-                      fontWeight: 800,
-                      cursor: "pointer",
-                    }}
-                    title="Export Georeferenced GeoTIFF Bundle"
-                  >
-                    <Download size={11} />
-                    <span>GeoTIFF</span>
                   </button>
                 )}
               </div>
@@ -2834,7 +2840,7 @@ export default function MapViewer({
               </button>
             </div>
           </div>
-        ) : isSwipeActive ? (
+        ) : (!alignedOnlyMode && isSwipeActive) ? (
           <>
             {/* ── LEFT MAP: Old Image / Old Map Reference Layer ── */}
             <div
@@ -3526,7 +3532,7 @@ export default function MapViewer({
               </>
             )}
           </>
-        ) : isSideBySide ? (
+        ) : (!alignedOnlyMode && isSideBySide) ? (
           /* ──────────────────────────────────────────────────────
              SIDE-BY-SIDE MODE: two flex-children, half width each
           ────────────────────────────────────────────────────── */
@@ -3721,6 +3727,15 @@ export default function MapViewer({
               />
             )}
 
+            {alignedMapOverlayUrl && (
+              <ImageOverlay
+                url={alignedMapOverlayUrl}
+                bounds={droneMapBounds || scannedMapBounds || [[26.840, 80.940], [26.852, 80.954]]}
+                opacity={1.0}
+                zIndex={310}
+              />
+            )}
+
             {showVectors && geojsonData && geojsonData.features.length > 0 && (
               <>
                 <GeoJSON
@@ -3835,27 +3850,36 @@ export default function MapViewer({
           className="cursor-coordinates-hud animate-fade-in-up"
           style={{
             position: "absolute",
-            bottom: isCustomRasterComparison ? (isSwipeActive ? 76 : (isNudgeOpen ? 210 : 24)) : 24,
-            right: 20,
+            bottom: enableVertexEdit ? 86 : 24,
+            left: "50%",
+            transform: "translateX(-50%)",
             zIndex: 680,
-            background: lockedGcp ? "rgba(30, 27, 75, 0.95)" : "rgba(15, 23, 42, 0.92)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
+            background: lockedGcp ? "rgba(30, 27, 75, 0.96)" : "rgba(15, 23, 42, 0.94)",
+            backdropFilter: "blur(14px)",
+            WebkitBackdropFilter: "blur(14px)",
             color: "#F8FAFC",
-            padding: "6px 14px",
+            padding: "7px 16px",
             borderRadius: "24px",
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
             fontSize: "0.75rem",
             fontWeight: 600,
             letterSpacing: "0.02em",
-            boxShadow: lockedGcp ? "0 8px 24px rgba(245, 158, 11, 0.35)" : "0 8px 24px rgba(0, 0, 0, 0.45)",
-            border: lockedGcp ? "1.5px solid #F59E0B" : "1px solid rgba(255, 255, 255, 0.18)",
+            boxShadow: lockedGcp
+              ? "0 10px 28px rgba(245, 158, 11, 0.4), 0 0 0 1px rgba(245, 158, 11, 0.3)"
+              : "0 10px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.12)",
+            border: lockedGcp
+              ? "1.5px solid #F59E0B"
+              : enableGcpPlacement
+              ? "1.5px solid #10B981"
+              : "1px solid rgba(255, 255, 255, 0.2)",
             display: "flex",
             alignItems: "center",
             gap: 10,
             pointerEvents: "auto",
             userSelect: "none",
-            transition: "bottom 0.2s ease, right 0.2s ease, border 0.2s ease",
+            maxWidth: "calc(100vw - 48px)",
+            whiteSpace: "nowrap",
+            transition: "bottom 0.2s ease, left 0.2s ease, border 0.2s ease",
           }}
         >
           {lockedGcp ? (
@@ -4013,8 +4037,8 @@ export default function MapViewer({
         <div
           style={{
             position: "absolute",
-            bottom: 16,
-            left: 16,
+            bottom: (isAligned && (alignedMapOverlayUrl || cadastralOverlayUrl || unifiedOverlayUrl)) ? 78 : 20,
+            left: 20,
             zIndex: 1000,
             fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
           }}

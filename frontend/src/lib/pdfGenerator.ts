@@ -142,8 +142,8 @@ export function generateFormIIPdf(data: FormIICertificateData) {
     y += rowHeight;
   };
 
-  renderRow("Khasra / Plot No:", `Khasra ${data.khasraNo}`, "Village / Ward:", data.village || "Mohanlalganj (Ward 12)");
-  renderRow("Recorded Owner:", data.ownerName, "Tehsil / Sub-Division:", data.tehsil || "Mohanlalganj");
+  renderRow("Khasra / Plot No:", `Khasra ${data.khasraNo}`, "Village / Ward:", data.village || "Field Survey Sector 1");
+  renderRow("Recorded Owner:", data.ownerName, "Tehsil / Sub-Division:", data.tehsil || "Field Sector 1");
   renderRow("District:", data.district || "Lucknow", "State:", data.state || "Uttar Pradesh");
 
   // ── Section 2: Drone Survey Metric Area Breakdown ──
@@ -218,7 +218,7 @@ export function generateFormIIPdf(data: FormIICertificateData) {
   doc.setFontSize(7);
   doc.setTextColor(71, 85, 105);
   doc.text(`Officer ID: ${data.officerId || "REV-TEH-3210 (Tehsildar)"}`, margin + 10, y + 12);
-  doc.text(`Jurisdiction: Mohanlalganj Sub-Division, Lucknow`, margin + 10, y + 17);
+  doc.text(`Jurisdiction: Central Revenue Sub-Division`, margin + 10, y + 17);
   doc.text(`Timestamp: ${data.approvalDate || new Date().toLocaleString("en-IN")}`, margin + 10, y + 22);
 
   doc.setFont("courier", "bold");
@@ -246,7 +246,7 @@ export function generateFormIIPdf(data: FormIICertificateData) {
   doc.setFontSize(6.5);
   doc.setTextColor(13, 148, 136);
   doc.text("TEHSILDAR COURT", rightBoxX + sealBoxWidth / 2, y + 12, { align: "center" });
-  doc.text("★ MOHANLALGANJ ★", rightBoxX + sealBoxWidth / 2, y + 17, { align: "center" });
+  doc.text("★ FIELD REVENUE ★", rightBoxX + sealBoxWidth / 2, y + 17, { align: "center" });
   doc.text("SANCTIONED", rightBoxX + sealBoxWidth / 2, y + 22, { align: "center" });
 
   // ── Footer Security Disclaimer ──

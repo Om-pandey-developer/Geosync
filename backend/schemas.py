@@ -212,9 +212,10 @@ class GenerateULPINResponse(BaseModel):
 
 class CommitParcelRequest(BaseModel):
     """Payload for POST /api/v1/commit-parcel"""
-    parcel_id: str = Field(..., description="UUID of the parcel to commit")
-    ulpin: str = Field(..., min_length=14, max_length=14)
-    officer_id: str = Field(..., description="ID of the officer committing the parcel")
+    parcel_id: Optional[str] = Field(default=None, description="UUID of the parcel to commit")
+    khasra_no: Optional[str] = Field(default=None, description="Khasra number if parcel_id is not known")
+    ulpin: Optional[str] = Field(default=None, description="ULPIN or Bhu-Aadhaar identifier")
+    officer_id: Optional[str] = Field(default="REV-TEH-3210 (Priya Sharma, PCS)", description="ID of the officer committing the parcel")
     audit_notes: Optional[str] = Field(default=None, description="Optional audit metadata")
 
 
@@ -226,6 +227,7 @@ class CommitParcelResponse(BaseModel):
     committed_at: datetime
     officer_id: str
     digital_signature: str = Field(..., description="Authoritative SHA-256 digital signature hash")
+    sha256_hash: Optional[str] = Field(default=None, description="SHA-256 hash alias")
 
 
 class CadastralAuditLogOut(BaseModel):
@@ -276,8 +278,16 @@ class BatchProgressResponse(BaseModel):
 # ──────────────────── Approval Schemas ────────────────────
 
 class ApprovalRequestCreate(BaseModel):
-    parcel_id: str
+    parcel_id: Optional[str] = None
     requested_by: str = Field(default="patwari_01", description="Patwari username")
+    khasra_no: Optional[str] = None
+    owner_name: Optional[str] = None
+    village: Optional[str] = None
+    tehsil: Optional[str] = None
+    district: Optional[str] = None
+    area_sqm: Optional[float] = None
+    alignment_confidence: Optional[float] = None
+    geometry: Optional[Dict[str, Any]] = None
 
 
 class ApprovalAction(BaseModel):
@@ -322,7 +332,7 @@ class BoundaryExtractionRequest(BaseModel):
     bbox: List[float] = Field(..., min_length=4, max_length=4, description="[min_lon, min_lat, max_lon, max_lat]")
     legacy_polygon: Optional[dict] = Field(default=None, description="Optional legacy polygon GeoJSON")
     image_path: Optional[str] = Field(default=None, description="Optional path to drone/orthomosaic GeoTIFF")
-    ward_name: Optional[str] = Field(default="Ward 12, Mohanlalganj", description="Ward identification")
+    ward_name: Optional[str] = Field(default="Ward 12, Field Sector 1", description="Ward identification")
 
 
 class BoundaryExtractionResponse(BaseModel):
