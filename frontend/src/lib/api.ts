@@ -15,9 +15,9 @@ export function getApiUrl(): string {
       return "http://localhost:8000/api";
     }
     // Secure Production Live Backend fallback
-    return "https://geosync-backend-e9xu.onrender.com/api";
+    return "https://anshika05-geosync-api.hf.space/api";
   }
-  return "https://geosync-backend-e9xu.onrender.com/api";
+  return "https://anshika05-geosync-api.hf.space/api";
 }
 
 export const API = {
