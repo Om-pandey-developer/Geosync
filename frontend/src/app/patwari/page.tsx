@@ -2885,7 +2885,7 @@ export default function PatwariPage() {
                   ) : (
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, fontSize: "0.74rem", color: "#059669", fontWeight: 800 }}>
                       <CheckCircle2 size={14} />
-                      <span>GPS Coordinates Valid — Ready for Side-by-Side comparison or alignment.</span>
+                      <span>GPS Coordinates Valid — Ready for AI alignment.</span>
                     </div>
                   )}
                 </div>
@@ -2919,33 +2919,7 @@ export default function PatwariPage() {
                     <span>Upload both Old Cadastral Map and Drone Image to proceed</span>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", gap: 12 }}>
-                    <button
-                      onClick={handleAttemptCloseUploadStudio}
-                      disabled={isAligningPipeline}
-                      style={{
-                        flex: 1,
-                        padding: "12px 18px",
-                        fontSize: "0.92rem",
-                        fontWeight: 800,
-                        background: "#FFFFFF",
-                        color: "#0F766E",
-                        border: "2px solid #0D9488",
-                        borderRadius: "var(--radius-md)",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 8,
-                        boxShadow: "0 4px 12px rgba(13, 148, 136, 0.15)",
-                        transition: "all 0.15s ease",
-                      }}
-                      title="Open 1st Screen: Side-by-Side comparison with Curtain Swiper"
-                    >
-                      <ArrowRightLeft size={18} />
-                      <span>1. Side-by-Side Comparison (Curtain Swiper) ➔</span>
-                    </button>
-
+                  <div>
                     <button
                       onClick={() => {
                         if (!isCoordinatesValid) {
@@ -2960,9 +2934,9 @@ export default function PatwariPage() {
                       disabled={isAligningPipeline}
                       className="btn-primary"
                       style={{
-                        flex: 1,
-                        padding: "12px 18px",
-                        fontSize: "0.92rem",
+                        width: "100%",
+                        padding: "14px 20px",
+                        fontSize: "0.95rem",
                         fontWeight: 800,
                         background: "linear-gradient(135deg, #0D9488 0%, #059669 100%)",
                         color: "#FFFFFF",
@@ -2982,8 +2956,8 @@ export default function PatwariPage() {
                         <>
                           <div
                             style={{
-                              width: 16,
-                              height: 16,
+                              width: 18,
+                              height: 18,
                               border: "2px solid #FFFFFF",
                               borderTopColor: "transparent",
                               borderRadius: "50%",
@@ -2995,7 +2969,7 @@ export default function PatwariPage() {
                       ) : (
                         <>
                           <Sparkles size={18} />
-                          <span>2. Direct Align & Harmonize</span>
+                          <span>Run AI Map Alignment ➔</span>
                         </>
                       )}
                     </button>
@@ -3664,100 +3638,6 @@ export default function PatwariPage() {
           }
         />
 
-                    {/* 1st Screen Pre-Alignment Helper Banner (Side-by-Side / Curtain Swiper) */}
-          {!isAligned && (isCurtainSwipeActive || isSideBySideActive) && oldMapFile && droneMapFile && !isVertexEditMode && (
-            <div
-              className="animate-fade-in-down"
-              style={{
-                position: "absolute",
-                top: 64,
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 420,
-                background: "rgba(15, 23, 42, 0.94)",
-                backdropFilter: "blur(12px)",
-                color: "#FFFFFF",
-                padding: "8px 18px",
-                borderRadius: 24,
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                border: "1.5px solid #0D9488",
-                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.45)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <ArrowRightLeft size={16} style={{ color: "#38BDF8" }} />
-                <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#E2E8F0" }}>
-                  {isSideBySideActive ? "1st Screen: Dual Side-by-Side View (Old Map vs Drone Image)" : "1st Screen: Drag the curtain slider to compare Old Map & Drone Image"}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  if (isSideBySideActive) {
-                    setIsSideBySideActive(false);
-                    setIsCurtainSwipeActive(true);
-                  } else {
-                    setIsCurtainSwipeActive(false);
-                    setIsSideBySideActive(true);
-                  }
-                }}
-                style={{
-                  background: "rgba(255, 255, 255, 0.12)",
-                  border: "1px solid rgba(255, 255, 255, 0.25)",
-                  color: "#FFFFFF",
-                  borderRadius: 14,
-                  padding: "4px 10px",
-                  fontSize: "0.72rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-                title="Switch between Curtain Swiper and Dual Side-by-Side"
-              >
-                {isSideBySideActive ? "↔ Switch to Curtain Swiper" : "⧉ Switch to Dual View"}
-              </button>
-              <button
-                onClick={runAlign}
-                disabled={isAligningPipeline}
-                style={{
-                  background: "linear-gradient(135deg, #0D9488 0%, #059669 100%)",
-                  border: "none",
-                  color: "#FFFFFF",
-                  borderRadius: 16,
-                  padding: "5px 14px",
-                  fontSize: "0.78rem",
-                  fontWeight: 800,
-                  cursor: isAligningPipeline ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  boxShadow: "0 2px 8px rgba(13, 148, 136, 0.4)",
-                }}
-              >
-                {isAligningPipeline ? (
-                  <>
-                    <div
-                      style={{
-                        width: 12,
-                        height: 12,
-                        border: "2px solid #FFFFFF",
-                        borderTopColor: "transparent",
-                        borderRadius: "50%",
-                        animation: "spin 0.8s linear infinite",
-                      }}
-                    />
-                    <span>Aligning...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={14} />
-                    <span>Align Map ➔</span>
-                  </>
-                )}
-              </button>
-            </div>
-          )}
 
           {/* Non-Obstructive Compact Floating Tool Dock during Vertex Editing */}
           {isVertexEditMode && selectedParcel && (
