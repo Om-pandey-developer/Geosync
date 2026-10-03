@@ -5,6 +5,23 @@ from database import engine, Base
 from sqlalchemy import text
 import models  # noqa - registers models with Base
 
+import sys
+import os
+
+env = os.getenv("GEOSYNC_ENV", os.getenv("ENVIRONMENT", "development")).lower()
+if env in ("production", "prod"):
+    print("❌ ERROR: fix_db.py cannot be executed in a PRODUCTION environment!")
+    print("This script drops all tables and cascades deletions. Exiting for safety.")
+    sys.exit(1)
+
+force = "--force" in sys.argv
+if not force:
+    print("⚠️  WARNING: This script will DROP and RECREATE all GeoSync database tables and enums!")
+    confirmation = input("Type 'CONFIRM_DROP' to proceed, or press Ctrl+C to cancel: ").strip()
+    if confirmation != "CONFIRM_DROP":
+        print("Aborted. Database was not modified.")
+        sys.exit(0)
+
 print("Dropping old tables...")
 with engine.connect() as conn:
     conn.execute(text("DROP TABLE IF EXISTS approval_requests CASCADE"))

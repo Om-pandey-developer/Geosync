@@ -40,6 +40,8 @@ import {
   Compass,
   Globe,
   Navigation,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import type { FeatureCollection } from "geojson";
 import type { GCPPoint, GCPPair } from "@/components/MapViewer";
@@ -49,7 +51,7 @@ import { useAuth } from "@/lib/authContext";
 const MapViewer = dynamic(() => import("@/components/MapViewer"), { ssr: false });
 import MapSourceModal, { BASEMAP_PRESETS, BasemapOption } from "@/components/MapSourceModal";
 import RoleGuard from "@/components/RoleGuard";
-import { API } from "@/lib/api";
+import { API, api } from "@/lib/api";
 import {
   BENCHMARK_37_PARCELS,
   getBenchmark37GeoJSON,
@@ -59,6 +61,7 @@ import {
   RED_KHASRA_SET,
   AMBER_KHASRA_SET,
 } from "@/lib/benchmarkData";
+import { INITIAL_PARCELS } from "@/lib/mockData";
 
 interface ParcelSummary {
   id: string;
@@ -269,6 +272,8 @@ export default function PatwariPage() {
   const router = useRouter();
   const [isCurtainSwipeActive, setIsCurtainSwipeActive] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [mapZoom, setMapZoom] = useState<number>(1.0);
+  const [resetViewTrigger, setResetViewTrigger] = useState<number>(0);
   const [isRosterOpen, setIsRosterOpen] = useState(true);
   const [rosterSearch, setRosterSearch] = useState("");
   const [rosterFilter, setRosterFilter] = useState("ALL");
@@ -364,9 +369,9 @@ export default function PatwariPage() {
   const [dossierRemarks, setDossierRemarks] = useState(
     "Spatial alignment verified against 5cm drone orthomosaic. Boundaries reconciled with zero statutory dispute under UP Revenue Code Section 30/38."
   );
-  const [isDossierChecklistOpen, setIsDossierChecklistOpen] = useState(false);
-  const [isDossierCoordsOpen, setIsDossierCoordsOpen] = useState(false);
-  const [isDossierNotesOpen, setIsDossierNotesOpen] = useState(false);
+  const [isDossierChecklistOpen, setIsDossierChecklistOpen] = useState(true);
+  const [isDossierCoordsOpen, setIsDossierCoordsOpen] = useState(true);
+  const [isDossierNotesOpen, setIsDossierNotesOpen] = useState(true);
 
   const handleDiscardVertexChanges = () => {
     setActiveVertexCoords(originalVertexCoords);
@@ -426,8 +431,8 @@ export default function PatwariPage() {
           alignment_status: "PENDING_APPROVAL",
           alignment_confidence: selectedParcel.alignment_confidence || 0.95,
           geometry: parcelFeature?.geometry,
-          alignedMapUrl: alignedMapUrl || unifiedOverlayUrl || scannedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png",
-          scannedMapOverlayUrl: scannedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png",
+          alignedMapUrl: alignedMapUrl || unifiedOverlayUrl || scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg",
+          scannedMapOverlayUrl: scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg",
           droneMapOverlayUrl: droneMapOverlayUrl || "/sample-drone-orthomosaic.svg",
           alignmentMetrics: alignmentMetrics || {
             confidence: 98.6,
@@ -448,9 +453,9 @@ export default function PatwariPage() {
           JSON.stringify({
             ...currentSession,
             isAligned: true,
-            scannedMapOverlayUrl: scannedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png",
+            scannedMapOverlayUrl: scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg",
             droneMapOverlayUrl: droneMapOverlayUrl || "/sample-drone-orthomosaic.svg",
-            alignedMapUrl: alignedMapUrl || unifiedOverlayUrl || scannedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png",
+            alignedMapUrl: alignedMapUrl || unifiedOverlayUrl || scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg",
             confidence: alignmentMetrics?.confidence || 98.6,
             rmse: alignmentMetrics?.rmseMeters || 0.08,
             keypoints: alignmentMetrics?.keypointsMatched || 142,
@@ -740,9 +745,6 @@ export default function PatwariPage() {
       setAlignmentOutputFiles({});
       setIsAligned(false);
       toast.success(`Uploaded Old Map: ${file.name}`, { icon: "📜" });
-      if (!isCoordinatesValid) {
-        toast("पुराना नक्शा लोड हुआ! अब कृपया नीचे अनिवार्य GPS निर्देशांक (Latitude / Longitude) दर्ज करें।", { icon: "📍", duration: 4000 });
-      }
     }
   };
 
@@ -768,35 +770,102 @@ export default function PatwariPage() {
       setAlignmentOutputFiles({});
       setIsAligned(false);
       toast.success(`Uploaded Drone Image: ${file.name}`, { icon: "🛰️" });
-      if (!isCoordinatesValid) {
-        toast("ड्रोन इमेज लोड हुई! अब कृपया नीचे अनिवार्य GPS निर्देशांक (Latitude / Longitude) दर्ज करें।", { icon: "📍", duration: 4000 });
-      }
     }
   };
 
+  // ── Demo Data Quick Loaders (One-Click Testing) ──
+  const handleLoadDemoCadastralMap = async () => {
+    try {
+      const res = await fetch("/demo_datasets/demo_cadastral_map.jpg");
+      const blob = await res.blob();
+      const file = new File([blob], "demo_cadastral_map.jpg", { type: "image/jpeg" });
+      const url = URL.createObjectURL(file);
+      setScannedMapOverlayUrl(url);
+      setOldMapFile({
+        file,
+        name: "demo_cadastral_map.jpg",
+        size: (file.size / (1024 * 1024)).toFixed(2) + " MB",
+        url,
+        preview: url,
+      });
+      // Reset previous alignment immediately so old results are not shown
+      setAlignedMapUrl(null);
+      setUnifiedOverlayUrl(null);
+      setCadastralOverlayUrl(null);
+      setDroneBaseUrl(null);
+      setAnchors([]);
+      setNeedsAssistedAnchoring(false);
+      setAlignmentOutputFiles({});
+      setIsAligned(false);
+      toast.success("Loaded Demo Cadastral Map", { icon: "📜" });
+    } catch (err) {
+      toast.error("Failed to load Demo Cadastral Map");
+    }
+  };
+
+  const handleLoadDemoDroneMap = async () => {
+    try {
+      const res = await fetch("/demo_datasets/demo_drone_map.jpg");
+      const blob = await res.blob();
+      const file = new File([blob], "demo_drone_map.jpg", { type: "image/jpeg" });
+      const url = URL.createObjectURL(file);
+      setDroneMapOverlayUrl(url);
+      setDroneMapFile({
+        file,
+        name: "demo_drone_map.jpg",
+        size: (file.size / (1024 * 1024)).toFixed(2) + " MB",
+        url,
+        preview: url,
+      });
+      // Reset previous alignment immediately so old results are not shown
+      setAlignedMapUrl(null);
+      setUnifiedOverlayUrl(null);
+      setCadastralOverlayUrl(null);
+      setDroneBaseUrl(null);
+      setAnchors([]);
+      setNeedsAssistedAnchoring(false);
+      setAlignmentOutputFiles({});
+      setIsAligned(false);
+      toast.success("Loaded Demo Drone Map", { icon: "🛰️" });
+    } catch (err) {
+      toast.error("Failed to load Demo Drone Map");
+    }
+  };
+
+  const handleLoadDemoCoordinates = () => {
+    setGeoInputMode("CENTER");
+    setGeoCenterLat("23.336309");
+    setGeoCenterLon("85.308354");
+    setGeoPixelScale("0.05");
+    toast.success("Demo Coordinates Loaded (23.336309, 85.308354)", { icon: "📍" });
+  };
+
   const handleAttemptCloseUploadStudio = () => {
-    if (!oldMapFile || !droneMapFile || !isCoordinatesValid) {
+    if (!oldMapFile || !droneMapFile) {
       if (!oldMapFile && !droneMapFile) {
-        toast.error("चेतावनी: पुराना कैडस्ट्रल नक्शा, ड्रोन इमेज और GPS निर्देशांक दर्ज करना अनिवार्य है! विंडो बंद नहीं हो सकती।", {
+        toast.error("Please upload both the Old Cadastral Map and the Drone Image first.", {
           icon: "⚠️",
-          duration: 5000,
+          duration: 4000,
         });
       } else if (!oldMapFile) {
-        toast.error("चेतावनी: पुराना कैडस्ट्रल नक्शा (Old Map) अपलोड करना अनिवार्य है! इसके बिना विंडो बंद नहीं हो सकती।", {
+        toast.error("Please upload the Old Cadastral Map to continue.", {
           icon: "⚠️",
-          duration: 5000,
-        });
-      } else if (!droneMapFile) {
-        toast.error("चेतावनी: ड्रोन इमेज (Drone Image) अपलोड करना अनिवार्य है! इसके बिना विंडो बंद नहीं हो सकती।", {
-          icon: "⚠️",
-          duration: 5000,
+          duration: 4000,
         });
       } else {
-        toast.error("चेतावनी: अक्षांश (Lat) और देशांतर (Lon) निर्देशांक दर्ज करना अनिवार्य है! इनके बिना विंडो बंद नहीं हो सकती।", {
+        toast.error("Please upload the Drone Image to continue.", {
           icon: "⚠️",
-          duration: 5000,
+          duration: 4000,
         });
       }
+      return;
+    }
+
+    if (!isCoordinatesValid) {
+      toast.error("Please enter GPS coordinates (Latitude & Longitude) before opening Side-by-Side comparison.", {
+        icon: "📍",
+        duration: 4000,
+      });
       return;
     }
 
@@ -916,9 +985,9 @@ export default function PatwariPage() {
     try {
       const sessionData = {
         isAligned: true,
-        scannedMapOverlayUrl: scannedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png",
+        scannedMapOverlayUrl: scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg",
         droneMapOverlayUrl: droneMapOverlayUrl || "/sample-drone-orthomosaic.svg",
-        alignedMapUrl: alignedMapUrl || unifiedOverlayUrl || scannedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png",
+        alignedMapUrl: alignedMapUrl || unifiedOverlayUrl || scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg",
         confidence: alignmentMetrics?.confidence || 98.6,
         rmse: alignmentMetrics?.rmseMeters || 0.08,
         keypoints: alignmentMetrics?.keypointsMatched || 142,
@@ -952,8 +1021,8 @@ export default function PatwariPage() {
           alignment_status: "PENDING_APPROVAL",
           alignment_confidence: p.alignment_confidence || 0.95,
           geometry: geojson?.features?.find((f: any) => String(f.properties?.khasra_no) === String(p.khasra_no) || f.id === p.id)?.geometry,
-          alignedMapUrl: alignedMapUrl || unifiedOverlayUrl || scannedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png",
-          scannedMapOverlayUrl: scannedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png",
+          alignedMapUrl: alignedMapUrl || unifiedOverlayUrl || scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg",
+          scannedMapOverlayUrl: scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg",
           droneMapOverlayUrl: droneMapOverlayUrl || "/sample-drone-orthomosaic.svg",
           alignmentMetrics: alignmentMetrics || {
             confidence: 98.6,
@@ -1095,6 +1164,68 @@ export default function PatwariPage() {
     }
   }, [selectedId, geojson, selectedParcel]);
 
+  // Handle Starting Vertex Edit (Task 2.2)
+  const handleStartVertexEdit = () => {
+    if (!selectedParcel) {
+      toast.error("Please select a Khasra parcel first.");
+      return;
+    }
+
+    let coords = activeVertexCoords;
+    if (!coords || coords.length < 3) {
+      // 1. Check geojson features
+      const feat = geojson?.features?.find(
+        (f: any) =>
+          f.properties?.id === selectedParcel.id ||
+          f.id === selectedParcel.id ||
+          String(f.properties?.khasra_no) === String(selectedParcel.khasra_no)
+      );
+      if (feat && feat.geometry && feat.geometry.type === "Polygon") {
+        const ring = (feat.geometry as any).coordinates[0] || [];
+        if (ring.length >= 3) {
+          coords = ring.map((pt: [number, number]) => [pt[1], pt[0]]);
+        }
+      }
+
+      // 2. Check INITIAL_PARCELS in mockData
+      if (!coords || coords.length < 3) {
+        const initP = INITIAL_PARCELS.find(
+          (p) => String(p.khasra_no) === String(selectedParcel.khasra_no) || p.id === selectedParcel.id
+        );
+        if (initP && initP.coordinates && initP.coordinates.length >= 3) {
+          coords = initP.coordinates;
+        }
+      }
+
+      // 3. Fallback: generate a realistic 4-corner cadastral boundary around centroid
+      if (!coords || coords.length < 3) {
+        const cLat = Number(selectedCentroid.lat) || (geoReference?.center_lat || 26.7605);
+        const cLon = Number(selectedCentroid.lon) || (geoReference?.center_lon || 80.9010);
+        const dLat = 0.00035;
+        const dLon = 0.00045;
+        coords = [
+          [cLat - dLat, cLon - dLon],
+          [cLat + dLat, cLon - dLon],
+          [cLat + dLat, cLon + dLon],
+          [cLat - dLat, cLon + dLon],
+          [cLat - dLat, cLon - dLon],
+        ];
+      }
+
+      setActiveVertexCoords(coords);
+      setOriginalVertexCoords(coords);
+      const existingArea = Number(selectedParcel?.area_sqm || 0);
+      const area = computePolygonAreaSqm(coords, existingArea);
+      setOriginalAreaSqm(area);
+      setCurrentAreaSqm(area);
+    }
+
+    setIsVertexEditMode(true);
+    toast.success(`Boundary edit activated for Khasra ${selectedParcel.khasra_no}. Drag to move or pull handles to resize.`, {
+      icon: "📐",
+    });
+  };
+
   // Handle Vertex Dragging (Task 2.2)
   const handleVertexChange = (coords: [number, number][]) => {
     setActiveVertexCoords(coords);
@@ -1112,10 +1243,33 @@ export default function PatwariPage() {
     setCurrentAreaSqm(newArea);
   };
 
-  const handleSaveVertexChanges = () => {
+  const handleSaveVertexChanges = async () => {
     if (!selectedId || !geojson) return;
     const delta = currentAreaSqm - originalAreaSqm;
-    // Update local geojson feature geometry
+    const khasraTarget = selectedParcel?.khasra_no || selectedId;
+    const newRingGeoJson = activeVertexCoords.map((pt) => [pt[1], pt[0]]);
+    if (
+      newRingGeoJson.length > 2 &&
+      (newRingGeoJson[0][0] !== newRingGeoJson[newRingGeoJson.length - 1][0] ||
+        newRingGeoJson[0][1] !== newRingGeoJson[newRingGeoJson.length - 1][1])
+    ) {
+      newRingGeoJson.push([...newRingGeoJson[0]]);
+    }
+
+    // 1. Persist to backend database (PATCH /api/parcels/:khasraId/boundary)
+    try {
+      await api.updateParcelBoundary(String(selectedParcel?.id || khasraTarget), {
+        coordinates: activeVertexCoords,
+        area_sqm: Number(currentAreaSqm.toFixed(1)),
+        area_bigha: Number((currentAreaSqm / 2529.28).toFixed(2)),
+        modified_by: officer?.name || "Ramesh Kumar Sharma (Patwari)",
+        notes: `Patwari manual boundary translation and vertex adjustment (UP Revenue Code 30/38). ΔArea: ${delta >= 0 ? "+" : ""}${delta.toFixed(1)} m²`,
+      });
+    } catch (apiErr) {
+      console.warn("Boundary update backend sync note:", apiErr);
+    }
+
+    // 2. Update local geojson feature geometry
     setGeojson((prev) => {
       if (!prev) return prev;
       const updated = { ...prev };
@@ -1125,17 +1279,17 @@ export default function PatwariPage() {
           f.id === selectedId ||
           (selectedParcel && String(f.properties?.khasra_no) === String(selectedParcel.khasra_no))
         ) {
-          const newRing = activeVertexCoords.map((pt) => [pt[1], pt[0]]);
           return {
             ...f,
             geometry: {
               ...f.geometry,
-              coordinates: [newRing],
+              coordinates: [newRingGeoJson],
             },
             properties: {
               ...f.properties,
               area_sqm: Number(currentAreaSqm.toFixed(1)),
               area_bigha: Number((currentAreaSqm / 2529.28).toFixed(2)),
+              alignment_status: "ALIGNED_DRAFT",
             },
           };
         }
@@ -1144,14 +1298,15 @@ export default function PatwariPage() {
       return updated;
     });
 
-    // Also update parcels list state
+    // 3. Also update parcels list state
     setParcels((prev) =>
       prev.map((p) =>
-        p.id === selectedId
+        p.id === selectedId || (selectedParcel && String(p.khasra_no) === String(selectedParcel.khasra_no))
           ? {
               ...p,
               area_sqm: Number(currentAreaSqm.toFixed(1)),
               area_bigha: Number((currentAreaSqm / 2529.28).toFixed(2)),
+              alignment_status: "ALIGNED_DRAFT",
             }
           : p
       )
@@ -1161,7 +1316,7 @@ export default function PatwariPage() {
     setOriginalAreaSqm(currentAreaSqm);
     setOriginalVertexCoords(activeVertexCoords);
     toast.success(
-      `Boundary locked! New Area: ${currentAreaSqm.toFixed(1)} m² (ΔArea: ${delta >= 0 ? "+" : ""}${delta.toFixed(1)} m²)`,
+      `Boundary locked for Khasra ${selectedParcel?.khasra_no || khasraTarget}! New Area: ${currentAreaSqm.toFixed(1)} m² (ΔArea: ${delta >= 0 ? "+" : ""}${delta.toFixed(1)} m²)`,
       { icon: "📐" }
     );
   };
@@ -1267,9 +1422,9 @@ export default function PatwariPage() {
       : (geoBboxNwLon && geoBboxSeLon ? String((parseFloat(geoBboxNwLon) + parseFloat(geoBboxSeLon)) / 2) : "");
 
     if (!isCoordinatesValid || !latStr || !lonStr || isNaN(Number(latStr)) || isNaN(Number(lonStr))) {
-      toast.error("चेतावनी: अक्षांश (Lat) और देशांतर (Lon) निर्देशांक दर्ज करना अनिवार्य है! इनके बिना विंडो बंद नहीं हो सकती।", {
-        icon: "⚠️",
-        duration: 5000,
+      toast.error("Please enter valid GPS coordinates (Latitude & Longitude) before executing alignment.", {
+        icon: "📍",
+        duration: 4000,
       });
       setIsUploadStudioOpen(true);
       return;
@@ -1440,7 +1595,7 @@ export default function PatwariPage() {
       setAlignedMapUrl(alignedResultUrl);
       setUnifiedOverlayUrl(alignedResultUrl);
       setIsAligned(true);
-      setIsCurtainSwipeActive(true);
+      setIsCurtainSwipeActive(false);
       setIsUploadStudioOpen(false);
 
       toast.success("Spatial Harmonization Complete! Aligned Map loaded on the right.", {
@@ -1696,21 +1851,7 @@ export default function PatwariPage() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {/* 1. Align (ORB) */}
-            <button
-              className="sidebar-tool-btn"
-              onClick={() => {
-                runAlign();
-                closeSidebar();
-              }}
-              disabled={loading}
-              title="1. Automated ORB feature detection & RANSAC homography"
-            >
-              <ScanLine size={15} style={{ color: "var(--accent-primary)" }} />
-              <span>Align (ORB)</span>
-            </button>
-
-            {/* 2. Drop GCP & Reset GCPs (Phase 5) */}
+            {/* Drop GCP & Reset GCPs (Phase 5) */}
             <div style={{ display: "flex", gap: 6 }}>
               <button
                 className={`sidebar-tool-btn ${enableGcpPlacement ? "active" : ""}`}
@@ -1760,64 +1901,168 @@ export default function PatwariPage() {
                 <RotateCcw size={14} />
               </button>
             </div>
+          </div>
 
-            {/* 3. 4-5 Clean & ULPIN */}
-            <button
-              className="sidebar-tool-btn"
-              onClick={() => {
-                runCleanupAndUlpin();
-                closeSidebar();
+          {/* ── Map Zoom Controls Section (Moved from Bottom-Left Corner) ── */}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border-subtle)" }}>
+            <div
+              style={{
+                fontSize: "0.72rem",
+                fontWeight: 800,
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                marginBottom: 8,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
-              disabled={loading || !selectedId}
-              title="3. PostGIS topology overlap removal & Base-14 ULPIN generation"
             >
-              <Layers size={15} style={{ color: "var(--accent-primary)" }} />
-              <span>4-5 Clean & ULPIN</span>
-            </button>
-
-            {/* 4. TPS Warping */}
-            <button
-              className="sidebar-tool-btn"
-              onClick={() => {
-                setShowCalibrationDrawer(true);
-                closeSidebar();
-              }}
-              title="4. Thin-Plate Spline non-linear rubber sheeting for paper distortions"
-            >
-              <Sliders size={15} style={{ color: "var(--accent-sky)" }} />
-              <span>TPS Warping ({pairedGcpMode ? `${gcpPairs.length} pairs` : `${gcpPoints.length} pts`})</span>
-            </button>
-
-            {/* 5. GEOSAM */}
-            <button
-              className="sidebar-tool-btn"
-              onClick={() => {
-                runGeoSamExtraction();
-                closeSidebar();
-              }}
-              disabled={loading || !selectedId}
-              title="5. Meta Segment Anything (GeoSAM) zero-shot boundary delineation"
-            >
-              <Sparkles size={15} style={{ color: "#7C3AED" }} />
-              <span>GEOSAM</span>
-            </button>
-
-
-            {/* 7. Batch Align */}
-            <button
-              className="sidebar-tool-btn"
-              onClick={() => {
-                startBatchAlignment();
-                closeSidebar();
-              }}
-              disabled={loading || batchProgress.isRunning}
-              title="7. Asynchronously align all draft parcels in Ward 12"
-            >
-              <Zap size={15} className={batchProgress.isRunning ? "animate-spin" : ""} style={{ color: "#D97706" }} />
-              <span>
-                Batch Align {batchProgress.isRunning ? `(${batchProgress.completed}/${batchProgress.total})` : ""}
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <ZoomIn size={13} style={{ color: "var(--accent-primary)" }} />
+                <span>Map Zoom Controls</span>
+              </div>
+              <span
+                style={{
+                  fontSize: "0.72rem",
+                  fontWeight: 800,
+                  color: "#0F766E",
+                  background: "#CCFBF1",
+                  border: "1px solid #99F6E4",
+                  padding: "1px 7px",
+                  borderRadius: 4,
+                  fontFamily: "monospace",
+                }}
+              >
+                {Math.round(mapZoom * 100)}%
               </span>
-            </button>
+            </div>
+
+            <div
+              style={{
+                background: "var(--bg-secondary)",
+                padding: "10px 12px",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              {/* Zoom Buttons and Slider */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setMapZoom((z) => Math.max(0.3, +(z / 1.2).toFixed(2)))}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    border: "1px solid var(--border-subtle)",
+                    background: "#FFFFFF",
+                    color: "var(--text-primary)",
+                    fontSize: "1.05rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    flexShrink: 0,
+                    transition: "all 0.15s ease",
+                  }}
+                  title="Zoom Out (−)"
+                  aria-label="Zoom Out"
+                >
+                  −
+                </button>
+                <input
+                  type="range"
+                  min="0.3"
+                  max="4.0"
+                  step="0.05"
+                  value={mapZoom}
+                  onChange={(e) => setMapZoom(parseFloat(e.target.value))}
+                  style={{ flex: 1, accentColor: "#0D9488", cursor: "pointer" }}
+                  title={`Map Zoom: ${Math.round(mapZoom * 100)}%`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setMapZoom((z) => Math.min(4.0, +(z * 1.2).toFixed(2)))}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    border: "1px solid var(--border-subtle)",
+                    background: "#FFFFFF",
+                    color: "var(--text-primary)",
+                    fontSize: "1.05rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    flexShrink: 0,
+                    transition: "all 0.15s ease",
+                  }}
+                  title="Zoom In (+)"
+                  aria-label="Zoom In"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* Quick Presets and Reset Fit */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {[0.5, 1.0, 1.5, 2.0].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setMapZoom(preset)}
+                      style={{
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        fontSize: "0.68rem",
+                        fontWeight: Math.abs(mapZoom - preset) < 0.05 ? 800 : 600,
+                        border: Math.abs(mapZoom - preset) < 0.05 ? "1.5px solid #0D9488" : "1px solid var(--border-subtle)",
+                        background: Math.abs(mapZoom - preset) < 0.05 ? "#CCFBF1" : "#FFFFFF",
+                        color: Math.abs(mapZoom - preset) < 0.05 ? "#0F766E" : "var(--text-secondary)",
+                        cursor: "pointer",
+                        transition: "all 0.12s ease",
+                      }}
+                      title={`Zoom to ${Math.round(preset * 100)}%`}
+                    >
+                      {Math.round(preset * 100)}%
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMapZoom(1.0);
+                    setResetViewTrigger((t) => t + 1);
+                  }}
+                  style={{
+                    padding: "3px 8px",
+                    borderRadius: 4,
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                    border: "1px solid var(--border-subtle)",
+                    background: "#FFFFFF",
+                    color: "var(--text-primary)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 3,
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                  }}
+                  title="Reset Map View to 100% Fit"
+                >
+                  <RotateCcw size={10} />
+                  <span>Fit</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* 5. Special Feature: Curtain Swipe (Split-View Slider) */}
@@ -1897,42 +2142,52 @@ export default function PatwariPage() {
         </>
       )}
 
-      {/* ═══════════════ MAIN 3-ZONE GIS LAYOUT ═══════════════ */}
-      <div style={{ width: "100%", height: "calc(100vh - 68px)", position: "absolute", top: 68, left: 0, zIndex: 10, display: "flex", overflow: "hidden" }}>
-        {/* ───── Map Alignment & Upload Studio (Active when isUploadStudioOpen) ───── */}
-        {isUploadStudioOpen && (
+      {/* ───── Map Alignment & Upload Studio (Active when isUploadStudioOpen) ───── */}
+      {isUploadStudioOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            width: "100vw",
+            height: "100vh",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflowY: "auto",
+            background: "rgba(15, 23, 42, 0.72)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            padding: "24px 16px",
+            boxSizing: "border-box",
+          }}
+        >
           <div
+            className="glass-card animate-fade-in-up"
             style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              width: "100vw",
-              height: "100vh",
-              zIndex: 850,
+              width: "100%",
+              maxWidth: 960,
+              maxHeight: "min(92vh, 860px)",
+              margin: "auto",
+              background: "#FFFFFF",
+              borderRadius: "var(--radius-xl)",
+              boxShadow: "0 25px 60px -15px rgba(15, 23, 42, 0.45)",
+              border: "1.5px solid var(--border-glass)",
+              position: "relative",
               display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "rgba(15, 23, 42, 0.65)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              padding: "16px",
-              boxSizing: "border-box",
+              flexDirection: "column",
+              overflow: "hidden",
             }}
           >
+            {/* Studio Header (Pinned Top Bar) */}
             <div
-              className="glass-card animate-fade-in-up"
               style={{
-                width: "100%",
-                maxWidth: 960,
-                maxHeight: "min(92vh, 760px)",
-                background: "#FFFFFF",
-                borderRadius: "var(--radius-xl)",
-                boxShadow: "0 25px 60px -15px rgba(15, 23, 42, 0.35)",
-                border: "1.5px solid var(--border-glass)",
+                padding: "22px 28px 14px 28px",
+                textAlign: "center",
+                borderBottom: "1px solid var(--border-subtle)",
+                background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)",
                 position: "relative",
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
+                flexShrink: 0,
               }}
             >
               {/* Close Button guarded by complete validation */}
@@ -1940,77 +2195,76 @@ export default function PatwariPage() {
                 onClick={handleAttemptCloseUploadStudio}
                 style={{
                   position: "absolute",
-                  top: 18,
-                  right: 20,
+                  top: 16,
+                  right: 18,
                   background: isCoordinatesValid && oldMapFile && droneMapFile ? "#F0FDF4" : "#F8FAFC",
                   border: isCoordinatesValid && oldMapFile && droneMapFile ? "1.5px solid #10B981" : "1.5px solid #CBD5E1",
                   cursor: "pointer",
                   color: isCoordinatesValid && oldMapFile && droneMapFile ? "#047857" : "#64748B",
-                  padding: 6,
+                  padding: 7,
                   borderRadius: "50%",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   boxShadow: "0 2px 6px rgba(0, 0, 0, 0.05)",
                   transition: "all 0.2s ease",
+                  zIndex: 10,
                 }}
                 title={
                   isCoordinatesValid && oldMapFile && droneMapFile
                     ? "Close Upload Studio to View Full-Screen Comparison"
-                    : "चेतावनी: अनिवार्य विवरण (Files व GPS Coordinates) दिए बिना विंडो बंद नहीं हो सकती"
+                    : "Please upload maps and enter GPS coordinates to proceed"
                 }
               >
                 <X size={18} />
               </button>
 
-              
-              {/* Scrollable Modal Content */}
-              <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
-              {/* Studio Header */}
-              <div style={{ textAlign: "center", marginBottom: 16 }}>
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    background: "#F0FDFA",
-                    border: "1px solid #99F6E4",
-                    color: "#0F766E",
-                    padding: "4px 14px",
-                    borderRadius: 20,
-                    fontSize: "0.78rem",
-                    fontWeight: 800,
-                    letterSpacing: "0.05em",
-                    textTransform: "uppercase",
-                    marginBottom: 10,
-                  }}
-                >
-                  <Sparkles size={14} style={{ color: "#0D9488" }} />
-                  <span>Patwari Geospatial Alignment Workspace</span>
-                </div>
-                <h2
-                  style={{
-                    fontSize: "1.45rem",
-                    fontWeight: 900,
-                    color: "var(--text-primary)",
-                    margin: "0 0 6px 0",
-                    letterSpacing: "-0.02em",
-                  }}
-                >
-                  Upload Maps to Begin Comparison
-                </h2>
-                <p
-                  style={{
-                    fontSize: "0.875rem",
-                    color: "var(--text-secondary)",
-                    maxWidth: 620,
-                    margin: "0 auto",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Upload your Old Map and Drone Image to compare and align in the full-screen comparison viewer.
-                </p>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: "#F0FDFA",
+                  border: "1px solid #99F6E4",
+                  color: "#0F766E",
+                  padding: "4px 14px",
+                  borderRadius: 20,
+                  fontSize: "0.72rem",
+                  fontWeight: 800,
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                  marginBottom: 6,
+                }}
+              >
+                <Sparkles size={13} style={{ color: "#0D9488" }} />
+                <span>Patwari Geospatial Alignment Workspace</span>
               </div>
+              <h2
+                style={{
+                  fontSize: "1.35rem",
+                  fontWeight: 900,
+                  color: "var(--text-primary)",
+                  margin: "0 0 4px 0",
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                Upload Maps to Begin Comparison
+              </h2>
+              <p
+                style={{
+                  fontSize: "0.82rem",
+                  color: "var(--text-secondary)",
+                  maxWidth: 620,
+                  margin: "0 auto",
+                  lineHeight: 1.4,
+                }}
+              >
+                Upload your Old Cadastral Map and Drone Image to compare and align in the full-screen comparison viewer.
+              </p>
+            </div>
+
+            {/* Scrollable Modal Content (Uploads & GPS Coordinates) */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
 
               {/* ONLY TWO UPLOAD OPTIONS: 1. Old Map Upload, 2. Drone Image Upload */}
               <div
@@ -2161,6 +2415,31 @@ export default function PatwariPage() {
                     <UploadCloud size={16} />
                     <span>{oldMapFile ? "Replace Old Map" : "Upload Old Map"}</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={handleLoadDemoCadastralMap}
+                    style={{
+                      width: "100%",
+                      marginTop: 8,
+                      padding: "8px 12px",
+                      fontSize: "0.8125rem",
+                      fontWeight: 700,
+                      borderRadius: "var(--radius-md)",
+                      border: "1.5px solid #F59E0B",
+                      background: "#FEF3C7",
+                      color: "#B45309",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <Sparkles size={15} />
+                    <span>Demo Cadastral Map</span>
+                  </button>
                 </div>
 
                 {/* 2. Drone Image Upload */}
@@ -2303,6 +2582,31 @@ export default function PatwariPage() {
                     <UploadCloud size={16} />
                     <span>{droneMapFile ? "Replace Drone Image" : "Upload Drone Image"}</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={handleLoadDemoDroneMap}
+                    style={{
+                      width: "100%",
+                      marginTop: 8,
+                      padding: "8px 12px",
+                      fontSize: "0.8125rem",
+                      fontWeight: 700,
+                      borderRadius: "var(--radius-md)",
+                      border: "1.5px solid #0284C7",
+                      background: "#E0F2FE",
+                      color: "#0369A1",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <Sparkles size={15} />
+                    <span>Demo Drone Map</span>
+                  </button>
                 </div>
               </div>
 
@@ -2342,7 +2646,7 @@ export default function PatwariPage() {
                     <div>
                       <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 6 }}>
                         <span>Geo-Coordinates & GPS Anchoring</span>
-                        <span style={{ fontSize: "0.72rem", color: "#DC2626", fontWeight: 900 }}>* MANDATORY / अनिवार्य</span>
+                        <span style={{ fontSize: "0.72rem", color: "#DC2626", fontWeight: 900 }}>* REQUIRED</span>
                       </div>
                       <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)" }}>
                         Ground-truth GPS coordinates required for georeferencing and 1-to-1 cadastral alignment
@@ -2363,7 +2667,7 @@ export default function PatwariPage() {
                       gap: 4,
                     }}
                   >
-                    {isCoordinatesValid ? "🟢 COORDINATES READY / मान्य" : "🔴 REQUIRED / अनिवार्य"}
+                    {isCoordinatesValid ? "🟢 COORDINATES READY" : "🔴 REQUIRED"}
                   </span>
                 </div>
 
@@ -2548,15 +2852,43 @@ export default function PatwariPage() {
                     </div>
                   )}
 
+                  {/* Demo Coordinates Quick Button */}
+                  <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={handleLoadDemoCoordinates}
+                      style={{
+                        padding: "6px 14px",
+                        fontSize: "0.8125rem",
+                        fontWeight: 700,
+                        borderRadius: 6,
+                        border: "1.5px solid #0D9488",
+                        background: "#CCFBF1",
+                        color: "#0F766E",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <Compass size={14} />
+                      <span>Demo Coordinates</span>
+                    </button>
+                    <span style={{ fontSize: "0.75rem", color: "#64748B", fontWeight: 600 }}>
+                      Lat: 23.336309, Lon: 85.308354
+                    </span>
+                  </div>
+
                   {!isCoordinatesValid ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, fontSize: "0.74rem", color: "#DC2626", fontWeight: 700 }}>
-                      <AlertTriangle size={14} />
-                      <span>Latitude and Longitude are strictly mandatory for georeferencing and alignment execution.</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, fontSize: "0.74rem", color: "#64748B", fontWeight: 600 }}>
+                      <AlertTriangle size={14} style={{ color: "#F59E0B" }} />
+                      <span>Enter center Latitude & Longitude or NW/SE bounding box to anchor maps.</span>
                     </div>
                   ) : (
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, fontSize: "0.74rem", color: "#059669", fontWeight: 800 }}>
                       <CheckCircle2 size={14} />
-                      <span>GPS Coordinates Valid (निर्देशांक मान्य) — Press Enter ↵ or Confirm below to close and view map.</span>
+                      <span>GPS Coordinates Valid — Ready for Side-by-Side comparison or alignment.</span>
                     </div>
                   )}
                 </div>
@@ -2565,13 +2897,13 @@ export default function PatwariPage() {
               </div>
 
               {/* Action Button & Alignment Trigger (Pinned Bottom Bar) */}
-              <div style={{ padding: "14px 28px", borderTop: "1px solid var(--border-subtle)", background: "#F8FAFC", display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ padding: "14px 24px", borderTop: "1px solid var(--border-subtle)", background: "#F8FAFC", display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
                 {!oldMapFile || !droneMapFile ? (
                   <div
                     onClick={handleAttemptCloseUploadStudio}
                     style={{
                       width: "100%",
-                      padding: "14px 20px",
+                      padding: "12px 20px",
                       borderRadius: "var(--radius-md)",
                       background: "#F1F5F9",
                       border: "1.5px dashed #CBD5E1",
@@ -2589,30 +2921,6 @@ export default function PatwariPage() {
                     <AlertTriangle size={16} style={{ color: "#F59E0B" }} />
                     <span>Upload both Old Cadastral Map and Drone Image to proceed</span>
                   </div>
-                ) : !isCoordinatesValid ? (
-                  <button
-                    onClick={handleAttemptCloseUploadStudio}
-                    style={{
-                      width: "100%",
-                      padding: "14px 20px",
-                      borderRadius: "var(--radius-md)",
-                      background: "#FEF2F2",
-                      border: "1.5px solid #FCA5A5",
-                      color: "#991B1B",
-                      fontSize: "0.875rem",
-                      fontWeight: 800,
-                      textAlign: "center",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      cursor: "pointer",
-                      boxShadow: "0 4px 12px rgba(239, 68, 68, 0.15)",
-                    }}
-                  >
-                    <AlertTriangle size={16} style={{ color: "#DC2626" }} />
-                    <span>⚠️ GPS निर्देशांक दर्ज करें — इनके बिना विंडो बंद नहीं हो सकती (Enter Coordinates)</span>
-                  </button>
                 ) : (
                   <div style={{ display: "flex", gap: 12 }}>
                     <button
@@ -2620,7 +2928,7 @@ export default function PatwariPage() {
                       disabled={isAligningPipeline}
                       style={{
                         flex: 1,
-                        padding: "13px 20px",
+                        padding: "12px 18px",
                         fontSize: "0.92rem",
                         fontWeight: 800,
                         background: "#FFFFFF",
@@ -2642,12 +2950,21 @@ export default function PatwariPage() {
                     </button>
 
                     <button
-                      onClick={runAlign}
+                      onClick={() => {
+                        if (!isCoordinatesValid) {
+                          toast.error("Please enter GPS coordinates (Latitude & Longitude) before executing alignment.", {
+                            icon: "📍",
+                            duration: 4000,
+                          });
+                          return;
+                        }
+                        runAlign();
+                      }}
                       disabled={isAligningPipeline}
                       className="btn-primary"
                       style={{
                         flex: 1,
-                        padding: "13px 20px",
+                        padding: "12px 18px",
                         fontSize: "0.92rem",
                         fontWeight: 800,
                         background: "linear-gradient(135deg, #0D9488 0%, #059669 100%)",
@@ -2690,8 +3007,10 @@ export default function PatwariPage() {
               </div>
             </div>
           </div>
-        )}
+      )}
 
+      {/* ═══════════════ MAIN 3-ZONE GIS LAYOUT ═══════════════ */}
+      <div style={{ width: "100%", height: "calc(100vh - 68px)", position: "absolute", top: 68, left: 0, zIndex: 10, display: "flex", overflow: "hidden" }}>
         {/* ───── AI Alignment Pipeline Processing Progress Modal ───── */}
         {isAligningPipeline && (
           <div
@@ -2992,6 +3311,9 @@ export default function PatwariPage() {
                         setSelectedId(p.id);
                         setGeosamResult(null);
                         setIsVertexEditMode(false);
+                        setIsDossierChecklistOpen(true);
+                        setIsDossierCoordsOpen(true);
+                        setIsDossierNotesOpen(true);
                       }}
                       style={{
                         padding: "10px 12px",
@@ -3060,43 +3382,16 @@ export default function PatwariPage() {
 
         {/* ──── ZONE 2: CENTER MAP CANVAS ──── */}
         <main style={{ flex: 1, height: "100%", position: "relative", overflow: "hidden" }}>
-          {/* Sidebar Toggle Button on top-left of map */}
-          {!isRosterOpen && (
-            <button
-              onClick={() => setIsRosterOpen(true)}
-              style={{
-                position: "absolute",
-                top: 14,
-                left: 14,
-                zIndex: 400,
-                background: "rgba(255, 255, 255, 0.95)",
-                backdropFilter: "blur(6px)",
-                border: "1.5px solid var(--border-glass)",
-                borderRadius: "var(--radius-md)",
-                padding: "6px 12px",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                boxShadow: "0 4px 14px rgba(15, 23, 42, 0.12)",
-                cursor: "pointer",
-                fontSize: "0.78rem",
-                fontWeight: 800,
-                color: "#0F766E",
-              }}
-              title="Open Khasra Roster"
-            >
-              <Building2 size={15} />
-              <span>Khasra List ({parcels.length})</span>
-            </button>
-          )}
-
-        <MapViewer
+          <MapViewer
           geojsonData={geojson}
           selectedParcelId={selectedId}
           onParcelClick={(id) => {
             setSelectedId(id);
             setGeosamResult(null);
             setIsDossierCollapsed(false);
+            setIsDossierChecklistOpen(true);
+            setIsDossierCoordsOpen(true);
+            setIsDossierNotesOpen(true);
           }}
           enableGcpPlacement={enableGcpPlacement}
           gcpPoints={gcpPoints}
@@ -3112,6 +3407,9 @@ export default function PatwariPage() {
           enableCurtainSwipe={isCurtainSwipeActive}
           enableSideBySide={isSideBySideActive}
           onToggleSideBySide={setIsSideBySideActive}
+          mapZoom={mapZoom}
+          onMapZoomChange={setMapZoom}
+          resetViewTrigger={resetViewTrigger}
           suppressEmptyBanner={true}
           isAligned={isAligned}
           alignedMapOverlayUrl={alignedMapUrl || undefined}
@@ -3132,10 +3430,14 @@ export default function PatwariPage() {
           centerLon={geoReference?.center_lon || (geoCenterLon ? parseFloat(geoCenterLon) : 80.9010)}
           pixelScale={geoReference?.gsd_m || (geoPixelScale ? parseFloat(geoPixelScale) : 0.05)}
           geoBounds={geoReference?.bounds}
-          // Task 2.2: Vertex Editing
+          // Task 2.2: Vertex Editing & Whole Boundary Drag
           enableVertexEdit={isVertexEditMode}
           activePolygonCoords={activeVertexCoords}
           onVertexChange={handleVertexChange}
+          selectedKhasraNo={selectedParcel?.khasra_no}
+          onSaveVertexChanges={handleSaveVertexChanges}
+          onDiscardVertexChanges={handleDiscardVertexChanges}
+          baselineAreaSqm={originalAreaSqm}
           aiTracedFeature={aiTracedFeature}
           aiTraceConfidence={geosamResult?.confidence}
           isOccluded={geosamResult?.isOccluded}
@@ -3154,6 +3456,46 @@ export default function PatwariPage() {
           onOpenMapSourceModal={() => setIsMapSourceModalOpen(true)}
           leftSlot={
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Khasra Roster Toggle Button */}
+              <button
+                onClick={() => setIsRosterOpen(!isRosterOpen)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "5px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  background: isRosterOpen ? "#CCFBF1" : "#FFFFFF",
+                  border: isRosterOpen ? "1.5px solid #0D9488" : "1px solid var(--border-glass)",
+                  color: "#0F766E",
+                  fontSize: "0.8125rem",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+                  transition: "all 0.15s ease",
+                  flexShrink: 0,
+                }}
+                title={isRosterOpen ? "Collapse Khasra Roster Sidebar" : "Open Khasra Roster Sidebar"}
+              >
+                <Building2 size={15} style={{ color: "#0D9488" }} />
+                <span>Khasra List ({parcels.length})</span>
+                <span
+                  style={{
+                    background: isRosterOpen ? "#0D9488" : "#F0FDFA",
+                    color: isRosterOpen ? "#FFFFFF" : "#0D9488",
+                    padding: "1px 6px",
+                    borderRadius: 10,
+                    fontSize: "0.68rem",
+                    fontWeight: 800,
+                  }}
+                >
+                  {isRosterOpen ? "Hide" : "Show"}
+                </span>
+              </button>
+
+              <div style={{ width: 1, height: 20, background: "var(--border-subtle)", flexShrink: 0 }} />
+
               {/* Patwari Name Box (Single Dropdown Arrow) */}
               <button
                 onClick={toggleSidebar}
@@ -3264,35 +3606,7 @@ export default function PatwariPage() {
                 </div>
               )}
 
-              {!isAligned && oldMapFile && droneMapFile && isCoordinatesValid && (
-                <>
-                  <div style={{ width: 1, height: 20, background: "var(--border-subtle)", flexShrink: 0 }} />
-                  <button
-                    onClick={runAlign}
-                    disabled={isAligningPipeline}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 7,
-                      padding: "6px 16px",
-                      borderRadius: "var(--radius-sm)",
-                      background: "linear-gradient(135deg, #0D9488 0%, #059669 100%)",
-                      color: "#FFFFFF",
-                      fontSize: "0.8125rem",
-                      fontWeight: 800,
-                      cursor: isAligningPipeline ? "not-allowed" : "pointer",
-                      border: "none",
-                      boxShadow: "0 4px 14px rgba(13, 148, 136, 0.4)",
-                      animation: "pulse 2s infinite",
-                      whiteSpace: "nowrap",
-                    }}
-                    title="Align Cadastral Map with Drone Image (ORB + RANSAC)"
-                  >
-                    <Sparkles size={15} />
-                    <span>Align Maps (ORB + RANSAC)</span>
-                  </button>
-                </>
-              )}
+
 
               {!isUploadStudioOpen && (
                 <>
@@ -3392,15 +3706,33 @@ export default function PatwariPage() {
                   padding: "5px 14px",
                   fontSize: "0.78rem",
                   fontWeight: 800,
-                  cursor: "pointer",
+                  cursor: isAligningPipeline ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
                   boxShadow: "0 2px 8px rgba(13, 148, 136, 0.4)",
                 }}
               >
-                <Sparkles size={14} />
-                <span>Align Map (अलाइन करें) ➔</span>
+                {isAligningPipeline ? (
+                  <>
+                    <div
+                      style={{
+                        width: 12,
+                        height: 12,
+                        border: "2px solid #FFFFFF",
+                        borderTopColor: "transparent",
+                        borderRadius: "50%",
+                        animation: "spin 0.8s linear infinite",
+                      }}
+                    />
+                    <span>Aligning...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    <span>Align Map ➔</span>
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -3461,8 +3793,9 @@ export default function PatwariPage() {
 
               <div style={{ width: 1, height: 22, background: "rgba(255, 255, 255, 0.2)" }} />
 
-              <div style={{ fontSize: "0.75rem", color: "#FDE68A", fontWeight: 700 }}>
-                {activeVertexCoords.length} Nodes (Drag handles on map)
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "#FDE68A", fontWeight: 700 }}>
+                <Move size={13} style={{ color: "#38BDF8" }} />
+                <span>Drag inside to Move • Pull handles to Resize (Badi / Chhoti)</span>
               </div>
 
               <div style={{ display: "flex", gap: 8 }}>
@@ -3516,7 +3849,7 @@ export default function PatwariPage() {
           <aside
             className="animate-fade-in-left"
             style={{
-              width: 380,
+              width: 395,
               height: "100%",
               flexShrink: 0,
               background: "#FFFFFF",
@@ -3659,7 +3992,7 @@ export default function PatwariPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
                 {/* Action 1: Manual Boundary Drag / Adjust */}
                 <button
-                  onClick={() => setIsVertexEditMode(true)}
+                  onClick={handleStartVertexEdit}
                   style={{
                     width: "100%",
                     padding: "12px 16px",
@@ -3774,76 +4107,6 @@ export default function PatwariPage() {
                   )}
                 </div>
 
-                {/* Accordion 2: Boundary Node Coordinates (GPS) */}
-                <div style={{ border: "1px solid var(--border-glass)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
-                  <button
-                    onClick={() => setIsDossierCoordsOpen(!isDossierCoordsOpen)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      background: "#F8FAFC",
-                      border: "none",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                      fontSize: "0.8125rem",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <MapPin size={15} style={{ color: "#0D9488" }} />
-                      <span>Boundary Node Coordinates ({activeVertexCoords.length})</span>
-                    </div>
-                    <ChevronDown
-                      size={16}
-                      style={{
-                        color: "#64748B",
-                        transform: isDossierCoordsOpen ? "rotate(180deg)" : "rotate(0deg)",
-                        transition: "transform 0.2s ease",
-                      }}
-                    />
-                  </button>
-                  {isDossierCoordsOpen && (
-                    <div style={{ padding: "10px 14px", background: "#FFFFFF", borderTop: "1px solid var(--border-subtle)", maxHeight: 180, overflowY: "auto" }}>
-                      <table style={{ width: "100%", fontSize: "0.72rem", borderCollapse: "collapse" }}>
-                        <thead>
-                          <tr style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-subtle)" }}>
-                            <th style={{ textAlign: "left", padding: "4px 0" }}>Node</th>
-                            <th style={{ textAlign: "right", padding: "4px 0" }}>Latitude (°N)</th>
-                            <th style={{ textAlign: "right", padding: "4px 0" }}>Longitude (°E)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {activeVertexCoords.map((pt, idx) => {
-                            const isPixelSpace = Math.abs(pt[0]) > 90 || Math.abs(pt[1]) > 180;
-                            let displayLat = pt[0];
-                            let displayLon = pt[1];
-                            if (isPixelSpace) {
-                              const refLat = geoReference?.center_lat || (geoCenterLat && !isNaN(parseFloat(geoCenterLat)) ? parseFloat(geoCenterLat) : 26.760500);
-                              const refLon = geoReference?.center_lon || (geoCenterLon && !isNaN(parseFloat(geoCenterLon)) ? parseFloat(geoCenterLon) : 80.901000);
-                              const gsd = geoReference?.gsd_m || 0.05;
-                              const offX = pt[1] - 600;
-                              const offY = 400 - pt[0];
-                              const dy_m = offY * gsd;
-                              const dx_m = offX * gsd;
-                              displayLat = refLat + (dy_m / 111320.0);
-                              displayLon = refLon + (dx_m / (111320.0 * Math.cos((refLat * Math.PI) / 180.0)));
-                            }
-                            return (
-                              <tr key={idx} style={{ borderBottom: "1px dashed var(--border-subtle)", fontFamily: "monospace" }}>
-                                <td style={{ padding: "4px 0", color: "#0D9488", fontWeight: 700 }}>#{idx + 1}</td>
-                                <td style={{ textAlign: "right", padding: "4px 0" }}>{displayLat.toFixed(6)}</td>
-                                <td style={{ textAlign: "right", padding: "4px 0" }}>{displayLon.toFixed(6)}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
 
                 {/* Accordion 3: Field Observations & Notes */}
                 <div style={{ border: "1px solid var(--border-glass)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>

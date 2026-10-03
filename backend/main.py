@@ -80,12 +80,24 @@ app = FastAPI(
 )
 
 
-# ── CORS — Allow frontend dev server & common origins (including network IPs) ──
+# ── CORS — Support configurable origins for production and local development ──
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+if cors_origins_env:
+    allowed_origins = [orig.strip() for orig in cors_origins_env.split(",") if orig.strip()]
+else:
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+# If wildcard is explicitly used, allow_credentials must be False according to CORS specification
+allow_credentials = "*" not in allowed_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_origin_regex=r"https?://.*",
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_origin_regex=os.getenv("CORS_ORIGIN_REGEX", r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*\.pages\.dev|https://.*\.hf\.space"),
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["X-Process-Time"],

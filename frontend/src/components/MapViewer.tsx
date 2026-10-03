@@ -43,6 +43,8 @@ import {
   Save,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { ParcelBoundaryEditor } from "@/components/ParcelBoundaryEditor";
+import { UnifiedParcelBoundaryEditor } from "@/components/UnifiedParcelBoundaryEditor";
 
 // Fix Leaflet marker icon URLs for Next.js client rendering
 const DefaultIcon = L.icon({
@@ -155,10 +157,14 @@ interface MapViewerProps {
   // Task 2.1: Split-screen Curtain Swipe Slider
   enableCurtainSwipe?: boolean;
 
-  // Task 2.2: Manual Polygon Corner (Vertex) Drag Handles
+  // Task 2.2: Manual Polygon Corner (Vertex) Drag Handles & Whole-Polygon Translation
   enableVertexEdit?: boolean;
   activePolygonCoords?: [number, number][]; // [lat, lng][]
   onVertexChange?: (coords: [number, number][]) => void;
+  selectedKhasraNo?: string;
+  onSaveVertexChanges?: () => void;
+  onDiscardVertexChanges?: () => void;
+  baselineAreaSqm?: number;
 
   // Task 2.3: GeoSAM Prompt Bounding Box & GeoAI Trace
   enableBboxPrompt?: boolean;
@@ -223,6 +229,9 @@ interface MapViewerProps {
   suppressEmptyBanner?: boolean;
   alignedOnlyMode?: boolean;
   hideComparisonControls?: boolean;
+  mapZoom?: number;
+  onMapZoomChange?: (z: number) => void;
+  resetViewTrigger?: number;
 }
 
 function FitBounds({ geojsonData }: { geojsonData: FeatureCollection }) {
@@ -428,6 +437,10 @@ export default function MapViewer({
   enableVertexEdit = false,
   activePolygonCoords,
   onVertexChange,
+  selectedKhasraNo,
+  onSaveVertexChanges,
+  onDiscardVertexChanges,
+  baselineAreaSqm,
   enableBboxPrompt = false,
   onBboxSelected,
   aiTracedFeature,
@@ -474,6 +487,9 @@ export default function MapViewer({
   suppressEmptyBanner = false,
   alignedOnlyMode = false,
   hideComparisonControls = false,
+  mapZoom,
+  onMapZoomChange,
+  resetViewTrigger,
 }: MapViewerProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [baseLayer, setBaseLayer] = useState<"drone" | "minimal" | "isolated">(defaultBaseLayer);
@@ -601,6 +617,35 @@ export default function MapViewer({
     }
   }, [selectedParcelId, enableVertexEdit]);
 
+  // Vertex Drag Handler (Task 2.2) - decoupled from state updater to prevent cross-component setState during render
+  const handleVertexDrag = useCallback(
+    (index: number, newPos: [number, number]) => {
+      const current = coordsRef.current;
+      if (!current || current.length === 0) return;
+      const updated = [...current];
+      updated[index] = newPos;
+      // If it's a closed ring and we drag the first point, sync the last point
+      if (index === 0 && updated.length > 1) {
+        updated[updated.length - 1] = newPos;
+      }
+      coordsRef.current = updated;
+
+      // Update local state if parent is not controlling coordinates directly
+      if (!activePolygonCoords || activePolygonCoords.length === 0) {
+        setEditableCoords(updated);
+      }
+
+      // Schedule parent notification asynchronously to avoid calling setState during render/reconciliation
+      if (onVertexChange) {
+        if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
+        dragRafRef.current = requestAnimationFrame(() => {
+          onVertexChange(updated);
+        });
+      }
+    },
+    [activePolygonCoords, onVertexChange]
+  );
+
   // ─── Separate Independent Zoom & Pan for Left (Old Map) and Right (Drone/Aligned Map) ───
   // Left: Cadastral / Old Map
   const [leftZoom, setLeftZoom] = useState<number>(1.0);
@@ -615,21 +660,45 @@ export default function MapViewer({
   const rightPanStartRef = useRef<{ startX: number; startY: number; initPanX: number; initPanY: number } | null>(null);
 
   // ─── Unified Overlaid Map Viewport State (Phase 4 Master Directive) ───
-  const [unifiedZoom, setUnifiedZoom] = useState<number>(1.0);
+  const [unifiedZoom, setUnifiedZoom] = useState<number>(mapZoom ?? 1.0);
   const [unifiedPan, setUnifiedPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isPanningUnified, setIsPanningUnified] = useState<boolean>(false);
   const unifiedPanStartRef = useRef<{ startX: number; startY: number; initPanX: number; initPanY: number } | null>(null);
 
+  // Synchronize external mapZoom from dropdown menu
+  useEffect(() => {
+    if (typeof mapZoom === "number" && !isNaN(mapZoom) && mapZoom > 0) {
+      setUnifiedZoom(mapZoom);
+      setLeftZoom(mapZoom);
+      setRightZoom(mapZoom);
+    }
+  }, [mapZoom]);
+
+  // Synchronize external view reset from dropdown menu
+  useEffect(() => {
+    if (resetViewTrigger && resetViewTrigger > 0) {
+      setUnifiedZoom(1.0);
+      setUnifiedPan({ x: 0, y: 0 });
+      setLeftZoom(1.0);
+      setLeftPan({ x: 0, y: 0 });
+      setRightZoom(1.0);
+      setRightPan({ x: 0, y: 0 });
+    }
+  }, [resetViewTrigger]);
+
   // Overlay Opacity, Toggle, and Split View
   const [cadastralOpacity, setCadastralOpacity] = useState<number>(85);
   const [showCadastral, setShowCadastral] = useState<boolean>(true);
-  const [isCurtainActive, setIsCurtainActive] = useState<boolean>(false);
+  const [isCurtainActive, setIsCurtainActive] = useState<boolean>(enableCurtainSwipe || false);
   const [curtainPos, setCurtainPos] = useState<number>(50);
   const [isDraggingCurtain, setIsDraggingCurtain] = useState<boolean>(false);
 
+  useEffect(() => {
+    setIsCurtainActive(Boolean(enableCurtainSwipe));
+  }, [enableCurtainSwipe]);
+
   // Nudge state (Translation ±1px, Rotation ±0.1°)
   const [nudge, setNudge] = useState<{ x: number; y: number; rot: number }>({ x: 0, y: 0, rot: 0 });
-  const [isNudgeOpen, setIsNudgeOpen] = useState<boolean>(false);
 
   // Assisted Anchor Pins (Sector 1 NW, 2 NE, 3 SE, 4 SW)
   const [showAnchorPins, setShowAnchorPins] = useState<boolean>(needsAssistedAnchoring || false);
@@ -711,6 +780,135 @@ export default function MapViewer({
     };
   }, []);
 
+  // Task 2.2: Unified Canvas Draggable Vertex State & Handlers
+  const [draggedVertexIdx, setDraggedVertexIdx] = useState<number | null>(null);
+  const vertexDragStartRef = useRef<{
+    idx: number;
+    startX: number;
+    startY: number;
+    initCanvasOffX: number; // canvas-space offset at drag start
+    initCanvasOffY: number;
+  } | null>(null);
+
+  // Helper: convert lat/lon → canvas-space offset (pixels from center of canvas)
+  const latLonToCanvasOff = useCallback((lat: number, lon: number) => {
+    const dy_m = (lat - refCenterLat) * 111320.0;
+    const dx_m = (lon - refCenterLon) * (111320.0 * Math.cos((refCenterLat * Math.PI) / 180.0));
+    return { offX: dx_m / activeGsd, offY: -dy_m / activeGsd };
+  }, [refCenterLat, refCenterLon, activeGsd]);
+
+  // Helper: convert canvas-space offset → screen-space position (pixels from top-left of containerRef)
+  const canvasOffToScreen = useCallback((offX: number, offY: number) => {
+    if (!containerRef.current) return { sx: 0, sy: 0 };
+    const rect = containerRef.current.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    return {
+      sx: cx + unifiedPan.x + offX * unifiedZoom,
+      sy: cy + unifiedPan.y + offY * unifiedZoom,
+    };
+  }, [unifiedPan, unifiedZoom]);
+
+  const handleUnifiedVertexDragStart = useCallback((idx: number, e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setDraggedVertexIdx(idx);
+    const coord = displayCoords[idx];
+    if (!coord) return;
+    const { offX, offY } = latLonToCanvasOff(coord[0], coord[1]);
+    vertexDragStartRef.current = {
+      idx,
+      startX: e.clientX,
+      startY: e.clientY,
+      initCanvasOffX: offX,
+      initCanvasOffY: offY,
+    };
+  }, [displayCoords, latLonToCanvasOff]);
+
+  const handleUnifiedVertexTouchStart = useCallback((idx: number, e: React.TouchEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    if (e.touches.length === 0) return;
+    const touch = e.touches[0];
+    setDraggedVertexIdx(idx);
+    const coord = displayCoords[idx];
+    if (!coord) return;
+    const { offX, offY } = latLonToCanvasOff(coord[0], coord[1]);
+    vertexDragStartRef.current = {
+      idx,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      initCanvasOffX: offX,
+      initCanvasOffY: offY,
+    };
+  }, [displayCoords, latLonToCanvasOff]);
+
+  useEffect(() => {
+    if (draggedVertexIdx === null) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!vertexDragStartRef.current) return;
+      const { idx, startX, startY, initCanvasOffX, initCanvasOffY } = vertexDragStartRef.current;
+      // screen delta → canvas delta (divide by zoom)
+      const deltaX = (e.clientX - startX) / unifiedZoom;
+      const deltaY = (e.clientY - startY) / unifiedZoom;
+
+      const newCanvasOffX = initCanvasOffX + deltaX;
+      const newCanvasOffY = initCanvasOffY + deltaY;
+
+      const dx_m = newCanvasOffX * activeGsd;
+      const dy_m = -newCanvasOffY * activeGsd;
+      const lat = Number((refCenterLat + (dy_m / 111320.0)).toFixed(7));
+      const lon = Number((refCenterLon + (dx_m / (111320.0 * Math.cos((refCenterLat * Math.PI) / 180.0)))).toFixed(7));
+
+      handleVertexDrag(idx, [lat, lon]);
+
+      if (cursorRafRef.current) cancelAnimationFrame(cursorRafRef.current);
+      cursorRafRef.current = requestAnimationFrame(() => {
+        setCursorCoords({
+          lat,
+          lon,
+          pxX: Math.round(1000 / 2 + newCanvasOffX),
+          pxY: Math.round(1000 / 2 + newCanvasOffY),
+        });
+      });
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!vertexDragStartRef.current || e.touches.length === 0) return;
+      const touch = e.touches[0];
+      const { idx, startX, startY, initCanvasOffX, initCanvasOffY } = vertexDragStartRef.current;
+      const deltaX = (touch.clientX - startX) / unifiedZoom;
+      const deltaY = (touch.clientY - startY) / unifiedZoom;
+
+      const newCanvasOffX = initCanvasOffX + deltaX;
+      const newCanvasOffY = initCanvasOffY + deltaY;
+
+      const dx_m = newCanvasOffX * activeGsd;
+      const dy_m = -newCanvasOffY * activeGsd;
+      const lat = Number((refCenterLat + (dy_m / 111320.0)).toFixed(7));
+      const lon = Number((refCenterLon + (dx_m / (111320.0 * Math.cos((refCenterLat * Math.PI) / 180.0)))).toFixed(7));
+
+      handleVertexDrag(idx, [lat, lon]);
+    };
+
+    const handleMouseUp = () => {
+      setDraggedVertexIdx(null);
+      vertexDragStartRef.current = null;
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleMouseUp);
+    };
+  }, [draggedVertexIdx, unifiedZoom, activeGsd, refCenterLat, refCenterLon, handleVertexDrag]);
+
   // Unified Mouse & Pan handlers
   const handleUnifiedMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -721,6 +919,7 @@ export default function MapViewer({
       target.closest(".anchor-pin-marker") ||
       target.closest(".anchor-pin-dialog") ||
       target.closest(".gcp-point-marker") ||
+      target.closest(".unified-vertex-handle") ||
       target.closest(".cursor-coordinates-hud") ||
       target.closest("button") ||
       target.closest("input")
@@ -787,6 +986,7 @@ export default function MapViewer({
       target.closest(".anchor-pin-marker") ||
       target.closest(".anchor-pin-dialog") ||
       target.closest(".gcp-point-marker") ||
+      target.closest(".unified-vertex-handle") ||
       target.closest(".cursor-coordinates-hud") ||
       target.closest("button") ||
       target.closest("input")
@@ -958,7 +1158,11 @@ export default function MapViewer({
   const handleUnifiedWheel = (e: React.WheelEvent) => {
     e.stopPropagation();
     const factor = e.deltaY < 0 ? 1.12 : 0.89;
-    setUnifiedZoom((prev) => Math.min(5.0, Math.max(0.3, Number((prev * factor).toFixed(2)))));
+    setUnifiedZoom((prev) => {
+      const next = Math.min(5.0, Math.max(0.3, Number((prev * factor).toFixed(2))));
+      if (onMapZoomChange) onMapZoomChange(next);
+      return next;
+    });
   };
 
   // Curtain Dragging for Unified Viewport
@@ -1236,35 +1440,6 @@ export default function MapViewer({
   }, [isDraggingSlider, handleMouseMove, handleMouseUp, handleTouchMove]);
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Vertex Drag Handler (Task 2.2) - decoupled from state updater to prevent cross-component setState during render
-  const handleVertexDrag = useCallback(
-    (index: number, newPos: [number, number]) => {
-      const current = coordsRef.current;
-      if (!current || current.length === 0) return;
-      const updated = [...current];
-      updated[index] = newPos;
-      // If it's a closed ring and we drag the first point, sync the last point
-      if (index === 0 && updated.length > 1) {
-        updated[updated.length - 1] = newPos;
-      }
-      coordsRef.current = updated;
-
-      // Update local state if parent is not controlling coordinates directly
-      if (!activePolygonCoords || activePolygonCoords.length === 0) {
-        setEditableCoords(updated);
-      }
-
-      // Schedule parent notification asynchronously to avoid calling setState during render/reconciliation
-      if (onVertexChange) {
-        if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
-        dragRafRef.current = requestAnimationFrame(() => {
-          onVertexChange(updated);
-        });
-      }
-    },
-    [activePolygonCoords, onVertexChange]
-  );
-
   useEffect(() => {
     return () => {
       if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
@@ -1427,6 +1602,25 @@ export default function MapViewer({
       fillColor = "#A7F3D0";
     }
 
+    if (enableVertexEdit) {
+      if (isSelected) {
+        return {
+          opacity: 0,
+          fillOpacity: 0,
+        };
+      } else {
+        // Dim non-selected parcels to focus Patwari attention
+        return {
+          color: strokeColor,
+          weight: 1.5,
+          opacity: 0.25 * opacityRatio,
+          fillColor: fillColor,
+          fillOpacity: 0.08 * opacityRatio,
+          dashArray: isOccluded ? "5, 5" : undefined,
+        };
+      }
+    }
+
     return {
       color: isSelected ? "#0F172A" : strokeColor,
       weight: isSelected ? 3.5 : 2.5,
@@ -1441,7 +1635,12 @@ export default function MapViewer({
     const props = feature.properties;
     if (!props) return;
 
-    layer.on("click", () => {
+    layer.on("click", (e) => {
+      // Locked during manual boundary editing to prevent accidental selection switch
+      if (enableVertexEdit) {
+        L.DomEvent.stopPropagation(e);
+        return;
+      }
       if (onParcelClick) onParcelClick(props.id || props.khasra_no);
     });
 
@@ -1731,52 +1930,7 @@ export default function MapViewer({
           </>
         )}
 
-        {/* Cadastre Vectors Visibility Toggle & Opacity Slider */}
-        {(!isCustomRasterComparison || alignedOnlyMode) && (
-          <>
-            <button
-              onClick={() => setShowVectors(!showVectors)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "5px 12px",
-                borderRadius: "var(--radius-sm)",
-                border: "1px solid var(--border-glass)",
-                background: showVectors ? "var(--accent-primary-bg)" : "#FFFFFF",
-                color: showVectors ? "var(--accent-primary)" : "var(--text-secondary)",
-                fontSize: "0.8125rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                flexShrink: 0,
-              }}
-            >
-              <Eye size={14} />
-              <span>{showVectors ? "Cadastre ON" : "Cadastre OFF"}</span>
-            </button>
 
-            {/* Task 2.5: Glassmorphic Vector Opacity Slider */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 8px", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", flexShrink: 0 }}>
-              <Sliders size={13} style={{ color: "var(--text-secondary)" }} />
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)" }}>
-                Opacity: {vectorOpacity}%
-              </span>
-              <input
-                type="range"
-                min="10"
-                max="100"
-                value={vectorOpacity}
-                onChange={(e) => setVectorOpacity(Number(e.target.value))}
-                style={{
-                  width: 70,
-                  height: 4,
-                  cursor: "pointer",
-                  accentColor: "var(--accent-primary)",
-                }}
-              />
-            </div>
-          </>
-        )}
       </div>
 
       {/* ───── Pure Leaflet Map Canvas (Fills Remaining Height) ───── */}
@@ -1829,23 +1983,28 @@ export default function MapViewer({
               }}
             >
               {/* 1. Base Layer: Drone Orthophoto */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                id="unified-base-drone-img"
-                src={droneBaseUrl || droneMapOverlayUrl || alignedMapOverlayUrl || ""}
-                alt="Drone Orthomosaic Base Map"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                  userSelect: "none",
-                  pointerEvents: "none",
-                  display: "block",
-                }}
-              />
+              {Boolean(droneBaseUrl || droneMapOverlayUrl || alignedMapOverlayUrl) && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  id="unified-base-drone-img"
+                  src={(droneBaseUrl || droneMapOverlayUrl || alignedMapOverlayUrl) || undefined}
+                  alt="Drone Orthomosaic Base Map"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    userSelect: "none",
+                    pointerEvents: "none",
+                    display: "block",
+                  }}
+                />
+              )}
 
               {/* 2. Overlay Layer: Aligned Cadastre (Neon green lines, 25% fill, khasra badges) */}
-              {showCadastral && (
+              {showCadastral && Boolean(cadastralOverlayUrl || unifiedOverlayUrl || alignedMapOverlayUrl) && (
                 <div
                   style={{
                     position: "absolute",
@@ -1862,8 +2021,11 @@ export default function MapViewer({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={cadastralOverlayUrl || unifiedOverlayUrl || alignedMapOverlayUrl || ""}
+                    src={(cadastralOverlayUrl || unifiedOverlayUrl || alignedMapOverlayUrl) || undefined}
                     alt="Aligned Cadastral Boundaries"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
                     style={{
                       width: "100%",
                       height: "100%",
@@ -2089,6 +2251,36 @@ export default function MapViewer({
                   </div>
                 );
               })}
+
+              {/* 5. Unified Parcel Boundary Editor (Direct Khasra Boundary Drag & Resize) */}
+              {enableVertexEdit && displayCoords.length > 2 && (
+                <UnifiedParcelBoundaryEditor
+                  coordinates={displayCoords}
+                  onChange={(updatedCoords, areaSqm) => {
+                    coordsRef.current = updatedCoords;
+                    setEditableCoords(updatedCoords);
+                    if (onVertexChange) onVertexChange(updatedCoords);
+                  }}
+                  khasraNo={selectedKhasraNo || (selectedParcelId ? String(selectedParcelId) : "656565")}
+                  isActive={enableVertexEdit}
+                  refCenterLat={refCenterLat}
+                  refCenterLon={refCenterLon}
+                  activeGsd={activeGsd}
+                  imageWidth={(geoReference as any)?.image_width_px || 1558}
+                  imageHeight={(geoReference as any)?.image_height_px || 778}
+                  nudge={nudge}
+                  baselineAreaSqm={baselineAreaSqm}
+                  statusColor={
+                    geojsonData?.features?.find(
+                      (f: any) =>
+                        f.properties?.id === selectedParcelId ||
+                        f.id === selectedParcelId ||
+                        String(f.properties?.khasra_no) === String(selectedKhasraNo)
+                    )?.properties?.status_color ||
+                    (selectedKhasraNo === "36475" ? "#EF4444" : "#10B981")
+                  }
+                />
+              )}
             </div>
 
             {/* ── Phase 3: Assisted GCP Pin Details & DGPS Modal Dialog ── */}
@@ -2447,84 +2639,7 @@ export default function MapViewer({
 
               {/* Center: Interactive Sliders & Toggles */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                {/* Opacity Slider */}
-                <div style={{ display: "flex", alignItems: "center", gap: 7, background: "rgba(255, 255, 255, 0.08)", padding: "3px 9px", borderRadius: 7 }}>
-                  <Sliders size={13} style={{ color: "#00FF66" }} />
-                  <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#E2E8F0" }}>
-                    Opacity: {cadastralOpacity}%
-                  </span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={cadastralOpacity}
-                    onChange={(e) => setCadastralOpacity(Number(e.target.value))}
-                    style={{ width: 70, accentColor: "#00FF66", cursor: "pointer" }}
-                  />
-                </div>
 
-                {/* Curtain Swipe Toggle */}
-                <button
-                  onClick={() => setIsCurtainActive(!isCurtainActive)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "4px 10px",
-                    borderRadius: 7,
-                    background: isCurtainActive ? "rgba(0, 255, 102, 0.2)" : "rgba(255, 255, 255, 0.08)",
-                    border: isCurtainActive ? "1.5px solid #00FF66" : "1px solid rgba(255, 255, 255, 0.15)",
-                    color: isCurtainActive ? "#00FF66" : "#E2E8F0",
-                    fontSize: "0.72rem",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                >
-                  <ArrowRightLeft size={12} />
-                  <span>Curtain Split {isCurtainActive ? "ON" : "OFF"}</span>
-                </button>
-
-                {/* Boundaries ON/OFF */}
-                <button
-                  onClick={() => setShowCadastral(!showCadastral)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "4px 10px",
-                    borderRadius: 7,
-                    background: showCadastral ? "rgba(56, 189, 248, 0.2)" : "rgba(255, 255, 255, 0.08)",
-                    border: showCadastral ? "1.5px solid #38BDF8" : "1px solid rgba(255, 255, 255, 0.15)",
-                    color: showCadastral ? "#38BDF8" : "#E2E8F0",
-                    fontSize: "0.72rem",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Eye size={12} />
-                  <span>Boundaries {showCadastral ? "ON" : "OFF"}</span>
-                </button>
-
-                {/* Fine-Tune Nudge Toggle */}
-                <button
-                  onClick={() => setIsNudgeOpen(!isNudgeOpen)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "4px 10px",
-                    borderRadius: 7,
-                    background: isNudgeOpen ? "rgba(234, 179, 8, 0.25)" : "rgba(255, 255, 255, 0.08)",
-                    border: isNudgeOpen ? "1.5px solid #EAB308" : "1px solid rgba(255, 255, 255, 0.15)",
-                    color: isNudgeOpen ? "#FACC15" : "#E2E8F0",
-                    fontSize: "0.72rem",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Move size={12} />
-                  <span>Nudge Controls</span>
-                </button>
 
                 {/* Assisted Pins Toggle */}
                 <button
@@ -2575,270 +2690,7 @@ export default function MapViewer({
               </div>
             </div>
 
-            {/* ── Floating Nudge Panel (when isNudgeOpen is true) ── */}
-            {isNudgeOpen && (
-              <div
-                className="nudge-panel animate-fade-in-up"
-                style={{
-                  position: "absolute",
-                  bottom: 24,
-                  right: 20,
-                  zIndex: 650,
-                  background: "rgba(15, 23, 42, 0.96)",
-                  backdropFilter: "blur(14px)",
-                  border: "1.5px solid #EAB308",
-                  borderRadius: 14,
-                  padding: "12px 16px",
-                  color: "#FFFFFF",
-                  boxShadow: "0 12px 35px rgba(0, 0, 0, 0.6)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  width: 240,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid rgba(255, 255, 255, 0.15)", paddingBottom: 6 }}>
-                  <span style={{ fontSize: "0.76rem", fontWeight: 800, color: "#FACC15", display: "flex", alignItems: "center", gap: 6 }}>
-                    <Move size={14} /> Sub-Pixel Nudge (±1px)
-                  </span>
-                  <button
-                    onClick={() => setNudge({ x: 0, y: 0, rot: 0 })}
-                    style={{
-                      background: "transparent",
-                      border: "1px solid rgba(255, 255, 255, 0.3)",
-                      color: "#E2E8F0",
-                      fontSize: "0.68rem",
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      cursor: "pointer",
-                    }}
-                    title="Reset all offsets to 0"
-                  >
-                    Reset
-                  </button>
-                </div>
 
-                {/* Directional Pad */}
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <button
-                    onClick={() => setNudge((prev) => ({ ...prev, y: prev.y - 1 }))}
-                    style={{
-                      width: 32,
-                      height: 28,
-                      background: "rgba(255, 255, 255, 0.15)",
-                      border: "1px solid rgba(255, 255, 255, 0.25)",
-                      borderRadius: 4,
-                      color: "#FFFFFF",
-                      fontWeight: 800,
-                      cursor: "pointer",
-                    }}
-                    title="Nudge Up (Arrow Up)"
-                  >
-                    ▲
-                  </button>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <button
-                      onClick={() => setNudge((prev) => ({ ...prev, x: prev.x - 1 }))}
-                      style={{
-                        width: 32,
-                        height: 28,
-                        background: "rgba(255, 255, 255, 0.15)",
-                        border: "1px solid rgba(255, 255, 255, 0.25)",
-                        borderRadius: 4,
-                        color: "#FFFFFF",
-                        fontWeight: 800,
-                        cursor: "pointer",
-                      }}
-                      title="Nudge Left (Arrow Left)"
-                    >
-                      ◀
-                    </button>
-                    <div
-                      style={{
-                        width: 32,
-                        height: 28,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "0.68rem",
-                        color: "#94A3B8",
-                      }}
-                    >
-                      ●
-                    </div>
-                    <button
-                      onClick={() => setNudge((prev) => ({ ...prev, x: prev.x + 1 }))}
-                      style={{
-                        width: 32,
-                        height: 28,
-                        background: "rgba(255, 255, 255, 0.15)",
-                        border: "1px solid rgba(255, 255, 255, 0.25)",
-                        borderRadius: 4,
-                        color: "#FFFFFF",
-                        fontWeight: 800,
-                        cursor: "pointer",
-                      }}
-                      title="Nudge Right (Arrow Right)"
-                    >
-                      ▶
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => setNudge((prev) => ({ ...prev, y: prev.y + 1 }))}
-                    style={{
-                      width: 32,
-                      height: 28,
-                      background: "rgba(255, 255, 255, 0.15)",
-                      border: "1px solid rgba(255, 255, 255, 0.25)",
-                      borderRadius: 4,
-                      color: "#FFFFFF",
-                      fontWeight: 800,
-                      cursor: "pointer",
-                    }}
-                    title="Nudge Down (Arrow Down)"
-                  >
-                    ▼
-                  </button>
-                </div>
-
-                {/* Rotation Buttons */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                  <button
-                    onClick={() => setNudge((prev) => ({ ...prev, rot: +(prev.rot - 0.1).toFixed(2) }))}
-                    style={{
-                      flex: 1,
-                      padding: "4px 8px",
-                      background: "rgba(255, 255, 255, 0.12)",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                      borderRadius: 4,
-                      color: "#FFFFFF",
-                      fontSize: "0.7rem",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                    title="Rotate Counter-Clockwise 0.1° (Press Q / [)"
-                  >
-                    ⟲ -0.1°
-                  </button>
-                  <button
-                    onClick={() => setNudge((prev) => ({ ...prev, rot: +(prev.rot + 0.1).toFixed(2) }))}
-                    style={{
-                      flex: 1,
-                      padding: "4px 8px",
-                      background: "rgba(255, 255, 255, 0.12)",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                      borderRadius: 4,
-                      color: "#FFFFFF",
-                      fontSize: "0.7rem",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                    title="Rotate Clockwise 0.1° (Press E / ])"
-                  >
-                    ⟳ +0.1°
-                  </button>
-                </div>
-
-                {/* Readout */}
-                <div style={{ fontSize: "0.68rem", color: "#94A3B8", textAlign: "center", background: "rgba(0, 0, 0, 0.3)", padding: "3px 6px", borderRadius: 4 }}>
-                  Offset: ΔX: <strong>{nudge.x}px</strong> | ΔY: <strong>{nudge.y}px</strong> | Rot: <strong>{nudge.rot}°</strong>
-                </div>
-              </div>
-            )}
-
-            {/* ── Zoom Deck (Bottom-Left) ── */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: 24,
-                left: 20,
-                zIndex: 650,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                background: "rgba(15, 23, 42, 0.94)",
-                backdropFilter: "blur(14px)",
-                border: "1.5px solid rgba(255, 255, 255, 0.15)",
-                padding: "6px 14px",
-                borderRadius: 36,
-                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
-                color: "#FFFFFF",
-                userSelect: "none",
-              }}
-            >
-              <button
-                onClick={() => setUnifiedZoom((z) => Math.max(0.3, +(z / 1.2).toFixed(2)))}
-                style={{
-                  background: "rgba(255, 255, 255, 0.12)",
-                  border: "1px solid rgba(255, 255, 255, 0.16)",
-                  borderRadius: "50%",
-                  width: 28,
-                  height: 28,
-                  color: "#FFFFFF",
-                  fontSize: "1.1rem",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                title="Zoom Out (-)"
-              >
-                −
-              </button>
-              <input
-                type="range"
-                min="0.3"
-                max="4.0"
-                step="0.05"
-                value={unifiedZoom}
-                onChange={(e) => setUnifiedZoom(parseFloat(e.target.value))}
-                style={{ width: 75, accentColor: "#00FF66", cursor: "pointer" }}
-                title={`Zoom: ${Math.round(unifiedZoom * 100)}%`}
-              />
-              <button
-                onClick={() => setUnifiedZoom((z) => Math.min(4.0, +(z * 1.2).toFixed(2)))}
-                style={{
-                  background: "rgba(255, 255, 255, 0.12)",
-                  border: "1px solid rgba(255, 255, 255, 0.16)",
-                  borderRadius: "50%",
-                  width: 28,
-                  height: 28,
-                  color: "#FFFFFF",
-                  fontSize: "1.1rem",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                title="Zoom In (+)"
-              >
-                +
-              </button>
-              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#00FF66", minWidth: 42, textAlign: "center", fontFamily: "monospace" }}>
-                {Math.round(unifiedZoom * 100)}%
-              </span>
-              <button
-                onClick={() => {
-                  setUnifiedZoom(1.0);
-                  setUnifiedPan({ x: 0, y: 0 });
-                }}
-                style={{
-                  background: "rgba(255, 255, 255, 0.10)",
-                  border: "1px solid rgba(255, 255, 255, 0.16)",
-                  borderRadius: 12,
-                  padding: "2px 8px",
-                  color: "#FFFFFF",
-                  fontSize: "0.68rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-                title="Reset View to 100%"
-              >
-                ⟲ Fit
-              </button>
-            </div>
           </div>
         ) : (!alignedOnlyMode && isSwipeActive) ? (
           <>
@@ -2877,18 +2729,23 @@ export default function MapViewer({
                   }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={scannedMapOverlayUrl}
-                    alt="Old Image / Old Map"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "contain",
-                      userSelect: "none",
-                      pointerEvents: "none",
-                      display: "block",
-                    }}
-                  />
+                  {scannedMapOverlayUrl && (
+                    <img
+                      src={scannedMapOverlayUrl}
+                      alt="Old Image / Old Map"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        userSelect: "none",
+                        pointerEvents: "none",
+                        display: "block",
+                      }}
+                    />
+                  )}
                 </div>
               ) : (
                 <MapContainer
@@ -2976,18 +2833,23 @@ export default function MapViewer({
                   }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={alignedMapOverlayUrl || ""}
-                    alt="Aligned Map"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "contain",
-                      userSelect: "none",
-                      pointerEvents: "none",
-                      display: "block",
-                    }}
-                  />
+                  {alignedMapOverlayUrl && (
+                    <img
+                      src={alignedMapOverlayUrl}
+                      alt="Aligned Map"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        userSelect: "none",
+                        pointerEvents: "none",
+                        display: "block",
+                      }}
+                    />
+                  )}
                 </div>
               ) : droneMapOverlayUrl ? (
                 <div
@@ -3008,6 +2870,9 @@ export default function MapViewer({
                   <img
                     src={droneMapOverlayUrl}
                     alt="Drone Image"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
                     style={{
                       width: "100%",
                       height: "100%",
@@ -3288,126 +3153,7 @@ export default function MapViewer({
             {/* ── Separate Independent Floating Control Decks for Left & Right Maps ── */}
             {isCustomRasterComparison && (
               <>
-                {/* 1. LEFT DECK: Cadastral Map Zoom & Pan (Bottom-Left) */}
-                <div
-                  className="curtain-drag-deck animate-fade-in-up"
-                  style={{
-                    position: "absolute",
-                    bottom: 24,
-                    left: 20,
-                    zIndex: 650,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    background: "rgba(15, 23, 42, 0.94)",
-                    backdropFilter: "blur(14px)",
-                    WebkitBackdropFilter: "blur(14px)",
-                    border: "1.5px solid rgba(250, 204, 21, 0.4)",
-                    padding: "6px 14px",
-                    borderRadius: 36,
-                    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
-                    color: "#FFFFFF",
-                    userSelect: "none",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "0.74rem",
-                      fontWeight: 800,
-                      color: "#FACC15",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      paddingRight: 6,
-                      borderRight: "1px solid rgba(255, 255, 255, 0.18)",
-                    }}
-                  >
-                    📜 Old Map
-                  </span>
 
-                  <button
-                    onClick={zoomOutLeft}
-                    style={{
-                      background: "rgba(255, 255, 255, 0.12)",
-                      border: "1px solid rgba(255, 255, 255, 0.16)",
-                      borderRadius: "50%",
-                      width: 28,
-                      height: 28,
-                      color: "#FFFFFF",
-                      fontSize: "1.1rem",
-                      fontWeight: 800,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                    title="Zoom Out Left Map (-)"
-                  >
-                    −
-                  </button>
-
-                  <input
-                    type="range"
-                    min="0.2"
-                    max="3.5"
-                    step="0.05"
-                    value={leftZoom}
-                    onChange={(e) => setLeftZoom(parseFloat(e.target.value))}
-                    style={{ width: 75, accentColor: "#FACC15", cursor: "pointer" }}
-                    title={`Old Map Zoom: ${Math.round(leftZoom * 100)}%`}
-                  />
-
-                  <button
-                    onClick={zoomInLeft}
-                    style={{
-                      background: "rgba(255, 255, 255, 0.12)",
-                      border: "1px solid rgba(255, 255, 255, 0.16)",
-                      borderRadius: "50%",
-                      width: 28,
-                      height: 28,
-                      color: "#FFFFFF",
-                      fontSize: "1.1rem",
-                      fontWeight: 800,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                    title="Zoom In Left Map (+)"
-                  >
-                    +
-                  </button>
-
-                  <span
-                    style={{
-                      fontSize: "0.72rem",
-                      fontWeight: 800,
-                      color: "#FACC15",
-                      minWidth: 42,
-                      textAlign: "center",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {Math.round(leftZoom * 100)}%
-                  </span>
-
-                  <button
-                    onClick={resetLeftView}
-                    style={{
-                      background: "rgba(255, 255, 255, 0.10)",
-                      border: "1px solid rgba(255, 255, 255, 0.16)",
-                      borderRadius: 12,
-                      padding: "2px 8px",
-                      color: "#FFFFFF",
-                      fontSize: "0.68rem",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                    title="Reset Old Map to Full Screen"
-                  >
-                    ⟲ Fit
-                  </button>
-                </div>
 
                 {/* 2. RIGHT DECK: Drone / Aligned Map Zoom & Pan (Bottom-Right) */}
                 <div
@@ -3749,26 +3495,21 @@ export default function MapViewer({
             )}
 
             {enableVertexEdit && displayCoords.length > 2 && (
-              <>
-                <LeafletPolygon
-                  positions={displayCoords}
-                  pathOptions={{ color: "#0284C7", weight: 3.5, fillColor: "#38BDF8", fillOpacity: 0.5, dashArray: "6, 4" }}
-                />
-                {displayCoords.map((coord, idx) => (
-                  <Marker
-                    key={`vertex-${idx}`}
-                    position={coord}
-                    draggable={true}
-                    icon={VertexHandleIcon}
-                    eventHandlers={{
-                      drag(e) { handleVertexDrag(idx, [e.target.getLatLng().lat, e.target.getLatLng().lng]); },
-                      dragend(e) { handleVertexDrag(idx, [e.target.getLatLng().lat, e.target.getLatLng().lng]); },
-                    }}
-                  >
-                    <Tooltip direction="top" offset={[0, -10]}>Corner #{idx + 1} (Drag to adjust)</Tooltip>
-                  </Marker>
-                ))}
-              </>
+              <ParcelBoundaryEditor
+                coordinates={displayCoords}
+                onChange={(updatedCoords) => {
+                  coordsRef.current = updatedCoords;
+                  setEditableCoords(updatedCoords);
+                  if (onVertexChange) onVertexChange(updatedCoords);
+                }}
+                khasraNo={selectedKhasraNo || (selectedParcelId ? String(selectedParcelId) : "36475")}
+                isActive={enableVertexEdit}
+                adjacentGeoJson={geojsonData}
+                currentParcelId={selectedParcelId}
+                onSave={onSaveVertexChanges}
+                onDiscard={onDiscardVertexChanges}
+                baselineAreaSqm={baselineAreaSqm}
+              />
             )}
 
             {aiTracedFeature && (
@@ -3850,151 +3591,132 @@ export default function MapViewer({
           className="cursor-coordinates-hud animate-fade-in-up"
           style={{
             position: "absolute",
-            bottom: enableVertexEdit ? 86 : 24,
-            left: "50%",
-            transform: "translateX(-50%)",
+            bottom: 12,
+            right: 16,
             zIndex: 680,
-            background: lockedGcp ? "rgba(30, 27, 75, 0.96)" : "rgba(15, 23, 42, 0.94)",
-            backdropFilter: "blur(14px)",
-            WebkitBackdropFilter: "blur(14px)",
+            background: lockedGcp ? "rgba(30, 27, 75, 0.95)" : "rgba(15, 23, 42, 0.92)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
             color: "#F8FAFC",
-            padding: "7px 16px",
-            borderRadius: "24px",
+            padding: "4px 10px",
+            borderRadius: "8px",
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-            fontSize: "0.75rem",
+            fontSize: "0.68rem",
             fontWeight: 600,
-            letterSpacing: "0.02em",
+            letterSpacing: "0.01em",
             boxShadow: lockedGcp
-              ? "0 10px 28px rgba(245, 158, 11, 0.4), 0 0 0 1px rgba(245, 158, 11, 0.3)"
-              : "0 10px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.12)",
+              ? "0 4px 16px rgba(245, 158, 11, 0.35)"
+              : "0 4px 16px rgba(0, 0, 0, 0.45)",
             border: lockedGcp
               ? "1.5px solid #F59E0B"
               : enableGcpPlacement
               ? "1.5px solid #10B981"
-              : "1px solid rgba(255, 255, 255, 0.2)",
+              : "1px solid rgba(255, 255, 255, 0.16)",
             display: "flex",
             alignItems: "center",
-            gap: 10,
+            gap: 7,
             pointerEvents: "auto",
             userSelect: "none",
-            maxWidth: "calc(100vw - 48px)",
             whiteSpace: "nowrap",
-            transition: "bottom 0.2s ease, left 0.2s ease, border 0.2s ease",
+            transition: "all 0.2s ease",
           }}
         >
           {lockedGcp ? (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <span
                   style={{
                     display: "inline-block",
-                    width: 8,
-                    height: 8,
+                    width: 6,
+                    height: 6,
                     borderRadius: "50%",
                     background: "#F59E0B",
-                    boxShadow: "0 0 10px #F59E0B",
+                    boxShadow: "0 0 8px #F59E0B",
                   }}
                 />
-                <span style={{ color: "#FBBF24", fontWeight: 800, fontSize: "0.72rem", letterSpacing: "0.06em" }}>
+                <span style={{ color: "#FBBF24", fontWeight: 800, fontSize: "0.65rem" }}>
                   LOCKED GCP #{lockedGcp.id}
                 </span>
               </div>
-              <span style={{ opacity: 0.35 }}>|</span>
+              <span style={{ opacity: 0.3 }}>|</span>
               <span>
-                Lat: <strong style={{ color: "#FACC15" }}>{lockedGcp.lat >= 0 ? `${lockedGcp.lat.toFixed(6)}° N` : `${Math.abs(lockedGcp.lat).toFixed(6)}° S`}</strong>
+                Lat: <strong style={{ color: "#FACC15" }}>{lockedGcp.lat >= 0 ? `${lockedGcp.lat.toFixed(5)}°N` : `${Math.abs(lockedGcp.lat).toFixed(5)}°S`}</strong>
               </span>
-              <span style={{ opacity: 0.35 }}>|</span>
               <span>
-                Lon: <strong style={{ color: "#FACC15" }}>{lockedGcp.lng >= 0 ? `${lockedGcp.lng.toFixed(6)}° E` : `${Math.abs(lockedGcp.lng).toFixed(6)}° W`}</strong>
+                Lon: <strong style={{ color: "#FACC15" }}>{lockedGcp.lng >= 0 ? `${lockedGcp.lng.toFixed(5)}°E` : `${Math.abs(lockedGcp.lng).toFixed(5)}°W`}</strong>
               </span>
-              <span style={{ opacity: 0.35 }}>|</span>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setLockedGcp(null);
-                  toast("Resumed Live GPS Tracking", { icon: "🛰️" });
+                  toast("Resumed Live GPS", { icon: "🛰️" });
                 }}
-                title="Dismiss locked coordinates (Resume Live GPS)"
+                title="Dismiss locked coordinates"
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
                   background: "rgba(239, 68, 68, 0.25)",
                   border: "1px solid rgba(239, 68, 68, 0.5)",
-                  borderRadius: "14px",
-                  padding: "3px 9px",
+                  borderRadius: "4px",
+                  padding: "1px 6px",
                   color: "#FCA5A5",
-                  fontSize: "0.68rem",
+                  fontSize: "0.62rem",
                   fontWeight: 800,
                   cursor: "pointer",
-                  transition: "all 0.15s ease",
                 }}
               >
-                ✕ Dismiss
+                ✕
               </button>
             </>
           ) : cursorCoords ? (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <span
                   style={{
                     display: "inline-block",
-                    width: 8,
-                    height: 8,
+                    width: 6,
+                    height: 6,
                     borderRadius: "50%",
                     background: "#10B981",
-                    boxShadow: "0 0 10px #10B981",
+                    boxShadow: "0 0 6px #10B981",
                   }}
                 />
-                <span style={{ color: "#38BDF8", fontWeight: 800, fontSize: "0.7rem", letterSpacing: "0.06em" }}>
-                  LIVE GPS
+                <span style={{ color: "#38BDF8", fontWeight: 800, fontSize: "0.65rem" }}>
+                  GPS
                 </span>
               </div>
-              <span style={{ opacity: 0.35 }}>|</span>
+              <span style={{ opacity: 0.3 }}>|</span>
               <span>
-                Lat: <strong style={{ color: "#FACC15" }}>{cursorCoords.lat >= 0 ? `${cursorCoords.lat.toFixed(6)}° N` : `${Math.abs(cursorCoords.lat).toFixed(6)}° S`}</strong>
+                Lat: <strong style={{ color: "#FACC15" }}>{cursorCoords.lat >= 0 ? `${cursorCoords.lat.toFixed(5)}°N` : `${Math.abs(cursorCoords.lat).toFixed(5)}°S`}</strong>
               </span>
-              <span style={{ opacity: 0.35 }}>|</span>
               <span>
-                Lon: <strong style={{ color: "#FACC15" }}>{cursorCoords.lon >= 0 ? `${cursorCoords.lon.toFixed(6)}° E` : `${Math.abs(cursorCoords.lon).toFixed(6)}° W`}</strong>
+                Lon: <strong style={{ color: "#FACC15" }}>{cursorCoords.lon >= 0 ? `${cursorCoords.lon.toFixed(5)}°E` : `${Math.abs(cursorCoords.lon).toFixed(5)}°W`}</strong>
               </span>
             </>
           ) : null}
 
-          <span style={{ opacity: 0.35 }}>|</span>
+          <span style={{ opacity: 0.3 }}>|</span>
           <span style={{ color: "#94A3B8" }}>
-            Zoom:{" "}
-            <strong style={{ color: "#FFFFFF" }}>
-              {isCustomRasterComparison
-                ? isSwipeActive
-                  ? `${Math.round(rightZoom * 100)}%`
-                  : `${Math.round(unifiedZoom * 100)}%`
-                : `${zoom}x`}
-            </strong>
+            {isCustomRasterComparison
+              ? isSwipeActive
+                ? `${Math.round(rightZoom * 100)}%`
+                : `${Math.round(unifiedZoom * 100)}%`
+              : `${zoom}x`}
           </span>
 
           {enableGcpPlacement && (
-            <>
-              <span style={{ opacity: 0.35 }}>|</span>
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  background: "rgba(16, 185, 129, 0.25)",
-                  border: "1px solid #10B981",
-                  color: "#6EE7B7",
-                  padding: "2px 8px",
-                  borderRadius: "12px",
-                  fontWeight: 800,
-                  fontSize: "0.68rem",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                🎯 DROP GCP ACTIVE
-              </span>
-            </>
+            <span
+              style={{
+                background: "rgba(16, 185, 129, 0.2)",
+                border: "1px solid #10B981",
+                color: "#6EE7B7",
+                padding: "1px 5px",
+                borderRadius: "4px",
+                fontWeight: 800,
+                fontSize: "0.62rem",
+              }}
+            >
+              DROP GCP
+            </span>
           )}
 
           <button
@@ -4008,26 +3730,24 @@ export default function MapViewer({
                 : "";
               if (!text) return;
               navigator.clipboard.writeText(text);
-              toast.success(`Copied to Clipboard: ${text}`, { icon: "📋" });
+              toast.success(`Copied: ${text}`, { icon: "📋" });
             }}
-            title="Copy Latitude, Longitude to clipboard"
+            title="Copy coordinates"
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: 4,
-              background: "rgba(255, 255, 255, 0.12)",
-              border: "1px solid rgba(255, 255, 255, 0.22)",
-              borderRadius: "14px",
-              padding: "3px 9px",
+              gap: 3,
+              background: "rgba(255, 255, 255, 0.1)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              borderRadius: "4px",
+              padding: "2px 5px",
               color: "#FFFFFF",
-              fontSize: "0.68rem",
+              fontSize: "0.62rem",
               fontWeight: 700,
               cursor: "pointer",
-              transition: "all 0.15s ease",
             }}
           >
-            <Copy size={11} />
-            <span>Copy</span>
+            <Copy size={10} />
           </button>
         </div>
       )}

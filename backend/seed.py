@@ -29,7 +29,7 @@ from sqlalchemy import text
 from shapely.geometry import Polygon, mapping
 
 from database import engine, Base, SessionLocal, IS_SQLITE
-from models import Parcel, ApprovalRequest
+from models import Parcel, ApprovalRequest, CadastralAuditLog
 
 # Base coordinates: Near Field Sector 1, Lucknow (~26.76°N, 80.90°E)
 BASE_LAT = 26.7605
@@ -85,6 +85,7 @@ def seed_database(force: bool = False):
 
         if force and count > 0:
             print("   --force flag detected. Clearing existing data...")
+            db.query(CadastralAuditLog).delete()
             db.query(ApprovalRequest).delete()
             db.query(Parcel).delete()
             db.commit()

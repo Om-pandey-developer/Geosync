@@ -9,6 +9,7 @@ export interface BoundaryParcel {
   district: string;
   state: string;
   area_sqm: number;
+  area_bigha?: number;
   legacy_area_sqm: number;
   ulpin: string;
   status: BoundaryStatus;

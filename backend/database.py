@@ -16,13 +16,13 @@ DATABASE_URL = os.getenv(
     "postgresql://postgres:postgres@localhost:5432/geosync_db"
 )
 
-# Convert postgresql:// to postgresql+psycopg:// if psycopg3 is installed
+# Convert postgresql:// to postgresql+psycopg:// if psycopg3 is installed, else postgresql+psycopg2://
 if DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+"):
     try:
         import psycopg
         DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
     except ImportError:
-        pass
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 IS_SQLITE = False
 
@@ -36,7 +36,7 @@ def create_resilient_engine():
     
     # Try connecting to PostgreSQL
     try:
-        eng = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=20, connect_args={"connect_timeout": 2})
+        eng = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=20, connect_args={"connect_timeout": 15})
         with eng.connect() as conn:
             conn.execute(text("SELECT 1"))
         logger.info(" Connected to PostgreSQL + PostGIS database successfully!")

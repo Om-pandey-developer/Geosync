@@ -105,10 +105,10 @@ export default function TehsildarPage() {
   const [activeOldMapPresetId, setActiveOldMapPresetId] = useState<string>("standard-cadastre-1974");
   const [customOldMapGeojson, setCustomOldMapGeojson] = useState<FeatureCollection | null>(null);
   const [alignedMapOverlayUrl, setAlignedMapOverlayUrl] = useState<string | null>(
-    "/demo_datasets/legacy_cadastral_cloth_map.png"
+    "/demo_datasets/demo_cadastral_map.jpg"
   );
   const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(
-    "/demo_datasets/legacy_cadastral_cloth_map.png"
+    "/demo_datasets/demo_cadastral_map.jpg"
   );
   const [droneMapOverlayUrl, setDroneMapOverlayUrl] = useState<string | null>(
     "/sample-drone-orthomosaic.svg"
@@ -140,9 +140,9 @@ export default function TehsildarPage() {
             session.alignedMapUrl ||
             session.scannedMapOverlayUrl ||
             session.droneMapOverlayUrl ||
-            "/demo_datasets/legacy_cadastral_cloth_map.png";
+            "/demo_datasets/demo_cadastral_map.jpg";
           const droneUrl = session.droneMapOverlayUrl || "/sample-drone-orthomosaic.svg";
-          const scannedUrl = session.scannedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png";
+          const scannedUrl = session.scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg";
           setAlignedMapOverlayUrl(alignedUrl);
           setDroneMapOverlayUrl(droneUrl);
           setScannedMapOverlayUrl(scannedUrl);
@@ -153,9 +153,9 @@ export default function TehsildarPage() {
         }
       } else {
         setIsAligned(true);
-        setAlignedMapOverlayUrl("/demo_datasets/legacy_cadastral_cloth_map.png");
+        setAlignedMapOverlayUrl("/demo_datasets/demo_cadastral_map.jpg");
         setDroneMapOverlayUrl("/sample-drone-orthomosaic.svg");
-        setScannedMapOverlayUrl("/demo_datasets/legacy_cadastral_cloth_map.png");
+        setScannedMapOverlayUrl("/demo_datasets/demo_cadastral_map.jpg");
       }
     } catch (e) {
       console.error("Session restore note:", e);
@@ -993,11 +993,11 @@ export default function TehsildarPage() {
               onToggleSideBySide={() => {}}
               suppressEmptyBanner={false}
               isAligned={isAligned}
-              alignedMapOverlayUrl={alignedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png"}
+              alignedMapOverlayUrl={alignedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg"}
               droneMapOverlayUrl={droneMapOverlayUrl || "/sample-drone-orthomosaic.svg"}
-              scannedMapOverlayUrl={scannedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png"}
+              scannedMapOverlayUrl={scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg"}
               droneBaseUrl={droneMapOverlayUrl || "/sample-drone-orthomosaic.svg"}
-              cadastralOverlayUrl={alignedMapOverlayUrl || scannedMapOverlayUrl || "/demo_datasets/legacy_cadastral_cloth_map.png"}
+              cadastralOverlayUrl={alignedMapOverlayUrl || scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg"}
               alignmentConfidence={
                 selectedApproval?.alignment_confidence
                   ? (selectedApproval.alignment_confidence > 1 ? selectedApproval.alignment_confidence : Math.round(selectedApproval.alignment_confidence * 100))

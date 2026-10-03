@@ -82,6 +82,49 @@ export const apiClient = {
     return parcels.find((p) => p.id === id) || null;
   },
 
+  // 2.5 Update parcel boundary coordinates (Manual Drag & Vertex Adjustment)
+  async updateParcelBoundary(
+    id: string,
+    payload: {
+      coordinates: [number, number][];
+      area_sqm?: number;
+      area_bigha?: number;
+      modified_by?: string;
+      notes?: string;
+    }
+  ): Promise<any> {
+    try {
+      const res = await fetch(`${getApiUrl()}/parcels/${id}/boundary`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(4000),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.warn("Backend boundary update note:", err);
+    }
+
+    // Local state fallback update
+    localParcels = localParcels.map((p) => {
+      if (p.id === id || String(p.khasra_no) === String(id)) {
+        return {
+          ...p,
+          coordinates: payload.coordinates,
+          area_sqm: payload.area_sqm || p.area_sqm,
+          area_bigha: payload.area_bigha || p.area_bigha,
+          last_updated_at: new Date().toISOString(),
+          last_updated_by: payload.modified_by || "Ramesh Kumar Sharma (Patwari)",
+        };
+      }
+      return p;
+    });
+
+    return { status: "success", local: true };
+  },
+
   // 3. Approve and publish a parcel (Statutory Human-in-the-Loop sanction)
   async approveParcel(id: string, officerName: string): Promise<BoundaryParcel> {
     const timestamp = new Date().toISOString();
@@ -171,3 +214,6 @@ export const apiClient = {
     };
   },
 };
+
+export const api = apiClient;
+export default apiClient;

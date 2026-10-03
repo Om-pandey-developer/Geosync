@@ -28,10 +28,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy backend application source
 COPY . .
 
-# Ensure storage directories exist
-RUN mkdir -p storage/uploads storage/sam_cache
+# Ensure all required storage directories exist
+RUN mkdir -p storage/uploads storage/sam_cache storage/alignment_reports
 
 EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
