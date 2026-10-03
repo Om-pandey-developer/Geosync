@@ -55,4 +55,5 @@ backend/storage/sam_cache/*.npz
 backend/storage/alignment_reports/
 demo_datasets/output_test/
 hf_space/
+*.zip
 

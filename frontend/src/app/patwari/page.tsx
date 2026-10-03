@@ -896,11 +896,8 @@ export default function PatwariPage() {
 
     setIsUploadStudioOpen(false);
     setIsCurtainSwipeActive(true);
-    if (!isAligned && oldMapFile && droneMapFile) {
-      runAlign();
-    } else {
-      toast.success("मानचित्र व निर्देशांक सत्यापित! (Coordinates saved)", { icon: "✅" });
-    }
+    setIsSideBySideActive(false);
+    toast.success("मानचित्र व निर्देशांक सत्यापित! Opening Side-by-Side comparison.", { icon: "✅" });
   };
 
   const runFullHarmonizationPipeline = async () => {
@@ -3405,6 +3402,7 @@ export default function PatwariPage() {
           onAddGcpPair={handleAddGcpPair}
           showOcclusionAlerts={true}
           enableCurtainSwipe={isCurtainSwipeActive}
+          onToggleCurtainSwipe={setIsCurtainSwipeActive}
           enableSideBySide={isSideBySideActive}
           onToggleSideBySide={setIsSideBySideActive}
           mapZoom={mapZoom}
@@ -3666,8 +3664,8 @@ export default function PatwariPage() {
           }
         />
 
-                    {/* 1st Screen Pre-Alignment Helper Banner (Side-by-Side Curtain Swiper) */}
-          {!isAligned && isCurtainSwipeActive && oldMapFile && droneMapFile && !isVertexEditMode && (
+                    {/* 1st Screen Pre-Alignment Helper Banner (Side-by-Side / Curtain Swiper) */}
+          {!isAligned && (isCurtainSwipeActive || isSideBySideActive) && oldMapFile && droneMapFile && !isVertexEditMode && (
             <div
               className="animate-fade-in-down"
               style={{
@@ -3692,9 +3690,33 @@ export default function PatwariPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <ArrowRightLeft size={16} style={{ color: "#38BDF8" }} />
                 <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#E2E8F0" }}>
-                  1st Screen: Drag the curtain slider to compare Old Map & Drone Image
+                  {isSideBySideActive ? "1st Screen: Dual Side-by-Side View (Old Map vs Drone Image)" : "1st Screen: Drag the curtain slider to compare Old Map & Drone Image"}
                 </span>
               </div>
+              <button
+                onClick={() => {
+                  if (isSideBySideActive) {
+                    setIsSideBySideActive(false);
+                    setIsCurtainSwipeActive(true);
+                  } else {
+                    setIsCurtainSwipeActive(false);
+                    setIsSideBySideActive(true);
+                  }
+                }}
+                style={{
+                  background: "rgba(255, 255, 255, 0.12)",
+                  border: "1px solid rgba(255, 255, 255, 0.25)",
+                  color: "#FFFFFF",
+                  borderRadius: 14,
+                  padding: "4px 10px",
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+                title="Switch between Curtain Swiper and Dual Side-by-Side"
+              >
+                {isSideBySideActive ? "↔ Switch to Curtain Swiper" : "⧉ Switch to Dual View"}
+              </button>
               <button
                 onClick={runAlign}
                 disabled={isAligningPipeline}

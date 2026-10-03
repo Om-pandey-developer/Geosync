@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -196,6 +196,7 @@ interface MapViewerProps {
   onOpenMapSourceModal?: () => void;
   enableSideBySide?: boolean;
   onToggleSideBySide?: (active: boolean) => void;
+  onToggleCurtainSwipe?: (active: boolean) => void;
   // Unified Overlaid Alignment Canvas Props (Phase 4 Master Directive)
   unifiedOverlayUrl?: string | null;
   cadastralOverlayUrl?: string | null;
@@ -434,6 +435,7 @@ export default function MapViewer({
   onRemoveGcp,
   showOcclusionAlerts = true,
   enableCurtainSwipe = false,
+  onToggleCurtainSwipe,
   enableVertexEdit = false,
   activePolygonCoords,
   onVertexChange,
@@ -570,12 +572,32 @@ export default function MapViewer({
 
   // Task 2.1: Curtain Swipe Slider State (0% - 100%)
   const [isSwipeActive, setIsSwipeActive] = useState(enableCurtainSwipe);
+  const [curtainCompareTarget, setCurtainCompareTarget] = useState<"aligned" | "rawDrone">("aligned");
   const [swipePosition, setSwipePosition] = useState(50);
   const [isDraggingSlider, setIsDraggingSlider] = useState(false);
   // Ref keeps the latest position for RAF callbacks to read without stale closures
   const swipePositionRef = useRef(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const sliderRafRef = useRef<number | null>(null);
+
+  // Fallback bounds computed from center lat/lon and GSD so raster overlays always render in MapContainers
+  const fallbackBounds: [[number, number], [number, number]] = useMemo(() => {
+    if (geoReference?.bounds) {
+      return [
+        [geoReference.bounds.south ?? (refCenterLat - 0.005), geoReference.bounds.west ?? (refCenterLon - 0.005)],
+        [geoReference.bounds.north ?? (refCenterLat + 0.005), geoReference.bounds.east ?? (refCenterLon + 0.005)],
+      ];
+    }
+    const dLat = (500 * activeGsd) / 111320.0;
+    const dLon = (500 * activeGsd) / (111320.0 * Math.cos((refCenterLat * Math.PI) / 180.0));
+    return [
+      [refCenterLat - dLat, refCenterLon - dLon],
+      [refCenterLat + dLat, refCenterLon + dLon],
+    ];
+  }, [geoReference, refCenterLat, refCenterLon, activeGsd]);
+
+  const activeScannedBounds = scannedMapBounds || fallbackBounds;
+  const activeDroneBounds = droneMapBounds || fallbackBounds;
 
   // Sync enableCurtainSwipe prop → state (deduplicated — single effect)
   useEffect(() => {
@@ -1768,7 +1790,7 @@ export default function MapViewer({
           </>
         )}
 
-        {/* Standard GIS controls (Completely hidden when viewing uploaded map comparison or in alignedOnlyMode) */}
+        {/* Standard GIS base layer controls (hidden when viewing custom raster or alignedOnlyMode) */}
         {!isCustomRasterComparison && !alignedOnlyMode && !hideComparisonControls && (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", flexShrink: 0 }}>
@@ -1776,12 +1798,13 @@ export default function MapViewer({
               <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>Map View:</span>
             </div>
 
-            {/* Base Layer Switchers & Curtain Swipe (Phase 1 & Phase 2) */}
+            {/* Base Layer Switchers (Phase 1 & Phase 2) */}
             <div style={{ display: "flex", gap: 6, background: "var(--bg-secondary)", padding: 3, borderRadius: "var(--radius-sm)", flexShrink: 0 }}>
               <button
                 onClick={() => {
                   setBaseLayer("drone");
                   setIsSwipeActive(false);
+                  if (onToggleCurtainSwipe) onToggleCurtainSwipe(false);
                 }}
                 style={{
                   padding: "5px 12px",
@@ -1802,6 +1825,7 @@ export default function MapViewer({
                 onClick={() => {
                   setBaseLayer("minimal");
                   setIsSwipeActive(false);
+                  if (onToggleCurtainSwipe) onToggleCurtainSwipe(false);
                 }}
                 style={{
                   padding: "5px 12px",
@@ -1822,6 +1846,7 @@ export default function MapViewer({
                 onClick={() => {
                   setBaseLayer("isolated");
                   setIsSwipeActive(false);
+                  if (onToggleCurtainSwipe) onToggleCurtainSwipe(false);
                 }}
                 style={{
                   padding: "5px 12px",
@@ -1841,13 +1866,21 @@ export default function MapViewer({
             </div>
 
             <div style={{ width: 1, height: 20, background: "var(--border-subtle)", flexShrink: 0 }} />
+          </>
+        )}
 
+        {/* Comparison Controls: Available whenever not alignedOnlyMode and not hidden */}
+        {!alignedOnlyMode && !hideComparisonControls && (
+          <>
             {/* Phase 2: Side-by-Side Dual Comparison Toggle */}
             <button
               onClick={() => {
                 const next = !isSideBySide;
                 setIsSideBySide(next);
-                if (next) setIsSwipeActive(false);
+                if (next) {
+                  setIsSwipeActive(false);
+                  if (onToggleCurtainSwipe) onToggleCurtainSwipe(false);
+                }
                 if (onToggleSideBySide) onToggleSideBySide(next);
               }}
               style={{
@@ -1865,7 +1898,7 @@ export default function MapViewer({
                 transition: "all 0.15s ease",
                 flexShrink: 0,
               }}
-              title="Toggle Side-by-Side Dual Map Comparison (Old Cadastre on Left, Aligned Drone on Right)"
+              title="Toggle Side-by-Side Dual Map Comparison (Old Cadastre on Left, Drone on Right)"
             >
               <ArrowRightLeft size={14} />
               <span>{isSideBySide ? "Side-by-Side: ON" : "Side-by-Side"}</span>
@@ -1876,7 +1909,11 @@ export default function MapViewer({
               onClick={() => {
                 const next = !isSwipeActive;
                 setIsSwipeActive(next);
-                if (next) setIsSideBySide(false);
+                if (next) {
+                  setIsSideBySide(false);
+                  if (onToggleSideBySide) onToggleSideBySide(false);
+                }
+                if (onToggleCurtainSwipe) onToggleCurtainSwipe(next);
               }}
               style={{
                 display: "inline-flex",
@@ -1898,6 +1935,37 @@ export default function MapViewer({
               <SplitSquareVertical size={14} />
               <span>{isSwipeActive ? `Curtain Swipe (${swipePosition}%)` : "Curtain Swipe"}</span>
             </button>
+
+            {/* Quick return button to full aligned view when currently in comparison */}
+            {isAligned && (isSideBySide || isSwipeActive) && (
+              <button
+                onClick={() => {
+                  setIsSideBySide(false);
+                  setIsSwipeActive(false);
+                  if (onToggleSideBySide) onToggleSideBySide(false);
+                  if (onToggleCurtainSwipe) onToggleCurtainSwipe(false);
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "5px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1.5px solid #0D9488",
+                  background: "linear-gradient(135deg, #0D9488 0%, #059669 100%)",
+                  color: "#FFFFFF",
+                  fontSize: "0.8125rem",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 8px rgba(13, 148, 136, 0.3)",
+                  flexShrink: 0,
+                }}
+                title="Return to Aligned Map Canvas"
+              >
+                <Sparkles size={14} />
+                <span>✨ View Aligned Map</span>
+              </button>
+            )}
 
             <div style={{ width: 1, height: 20, background: "var(--border-subtle)", flexShrink: 0 }} />
           </>
@@ -1944,7 +2012,7 @@ export default function MapViewer({
           cursor: isDraggingSlider ? "ew-resize" : undefined,
         }}
       >
-        {isAligned && (alignedMapOverlayUrl || cadastralOverlayUrl || unifiedOverlayUrl) ? (
+        {(!isSideBySide && !isSwipeActive && isAligned && (alignedMapOverlayUrl || cadastralOverlayUrl || unifiedOverlayUrl)) ? (
           /* ──────────────────────────────────────────────────────
              UNIFIED OVERLAID ALIGNMENT CANVAS (PHASE 4 OVERHAUL)
              Single viewport: Base Drone + Neon Aligned Cadastre
@@ -2639,7 +2707,58 @@ export default function MapViewer({
 
               {/* Center: Interactive Sliders & Toggles */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                {/* Comparison View Quick Toggles */}
+                <button
+                  onClick={() => {
+                    setIsSwipeActive(true);
+                    setIsSideBySide(false);
+                    if (onToggleCurtainSwipe) onToggleCurtainSwipe(true);
+                    if (onToggleSideBySide) onToggleSideBySide(false);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "4px 10px",
+                    borderRadius: 7,
+                    background: "rgba(13, 148, 136, 0.25)",
+                    border: "1.5px solid #0D9488",
+                    color: "#5EEAD4",
+                    fontSize: "0.72rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                  title="Switch to Curtain Swipe Comparison View"
+                >
+                  <SplitSquareVertical size={12} />
+                  <span>Curtain Swipe</span>
+                </button>
 
+                <button
+                  onClick={() => {
+                    setIsSideBySide(true);
+                    setIsSwipeActive(false);
+                    if (onToggleSideBySide) onToggleSideBySide(true);
+                    if (onToggleCurtainSwipe) onToggleCurtainSwipe(false);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "4px 10px",
+                    borderRadius: 7,
+                    background: "rgba(13, 148, 136, 0.25)",
+                    border: "1.5px solid #0D9488",
+                    color: "#5EEAD4",
+                    fontSize: "0.72rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                  title="Switch to Dual Side-by-Side Comparison View"
+                >
+                  <ArrowRightLeft size={12} />
+                  <span>Side-by-Side</span>
+                </button>
 
                 {/* Assisted Pins Toggle */}
                 <button
@@ -2798,6 +2917,64 @@ export default function MapViewer({
               )}
             </div>
 
+            {/* ── Optional Aligned Mode Ribbon in Curtain Swipe ── */}
+            {isAligned && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 14,
+                  right: 14,
+                  zIndex: 510,
+                  display: "flex",
+                  gap: 8,
+                }}
+              >
+                {droneMapOverlayUrl && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurtainCompareTarget((prev) => (prev === "aligned" ? "rawDrone" : "aligned"));
+                    }}
+                    style={{
+                      background: "rgba(15, 23, 42, 0.9)",
+                      color: "#FFFFFF",
+                      border: "1.5px solid #0D9488",
+                      padding: "5px 12px",
+                      borderRadius: 16,
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      backdropFilter: "blur(8px)",
+                    }}
+                  >
+                    {curtainCompareTarget === "aligned" ? "Showing: Aligned Map (Click for Pre-Align Drone)" : "Showing: Pre-Align Drone (Click for Aligned)"}
+                  </button>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsSwipeActive(false);
+                    setIsSideBySide(false);
+                    if (onToggleCurtainSwipe) onToggleCurtainSwipe(false);
+                    if (onToggleSideBySide) onToggleSideBySide(false);
+                  }}
+                  style={{
+                    background: "#0D9488",
+                    color: "#FFFFFF",
+                    border: "none",
+                    padding: "5px 12px",
+                    borderRadius: 16,
+                    fontSize: "0.75rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    boxShadow: "0 2px 8px rgba(13, 148, 136, 0.4)",
+                  }}
+                >
+                  ✨ View Aligned Map ➔
+                </button>
+              </div>
+            )}
+
             {/* ── RIGHT MAP: Drone Image (Before Align) or Aligned/New Map (After Align) ── */}
             <div
               onMouseDown={isCustomRasterComparison ? handleRightMouseDown : undefined}
@@ -2817,7 +2994,7 @@ export default function MapViewer({
                 cursor: enableGcpPlacement ? "crosshair" : (isPanningRight ? "grabbing" : isCustomRasterComparison ? "grab" : undefined),
               }}
             >
-              {isAligned ? (
+              {(isAligned && curtainCompareTarget === "aligned") ? (
                 <div
                   style={{
                     position: "absolute",
@@ -3310,8 +3487,8 @@ export default function MapViewer({
                 scrollWheelZoom={true} zoomControl={false}
               >
                 <MapSyncController onMove={handleMap1Move} setMapRef={(m) => { map1Ref.current = m; }} />
-                {scannedMapOverlayUrl && scannedMapBounds && (
-                  <ImageOverlay url={scannedMapOverlayUrl} bounds={scannedMapBounds} opacity={0.92} zIndex={320} />
+                {scannedMapOverlayUrl && (
+                  <ImageOverlay url={scannedMapOverlayUrl} bounds={activeScannedBounds} opacity={0.92} zIndex={320} />
                 )}
                 {customOldMapGeojson && customOldMapGeojson.features && customOldMapGeojson.features.length > 0 && (
                   <GeoJSON
@@ -3345,14 +3522,14 @@ export default function MapViewer({
               <ArrowRightLeft size={16} />
             </div>
 
-            {/* RIGHT MAP: NEW ALIGNED MAP */}
+            {/* RIGHT MAP: NEW ALIGNED MAP OR RAW DRONE MAP */}
             <div style={{ flex: 1, height: "100%", position: "relative" }}>
               <div
                 style={{
                   position: "absolute",
                   top: 14, left: 14,
                   zIndex: 500,
-                  background: "rgba(13,148,136,0.95)",
+                  background: isAligned ? "rgba(13,148,136,0.95)" : "rgba(30,58,138,0.92)",
                   color: "#FFFFFF",
                   padding: "6px 14px",
                   borderRadius: 8,
@@ -3360,11 +3537,36 @@ export default function MapViewer({
                   fontWeight: 800,
                   letterSpacing: "0.04em",
                   backdropFilter: "blur(8px)",
-                  pointerEvents: "none",
                   border: "1px solid rgba(255,255,255,0.25)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
                 }}
               >
-                ✨ NEW ALIGNED MAP (DRONE + GEOSAM)
+                <span>{isAligned ? "✨ NEW ALIGNED MAP (DRONE + GEOSAM)" : "🛰️ DRONE IMAGE (PRE-ALIGNMENT)"}</span>
+                {isAligned && (
+                  <button
+                    onClick={() => {
+                      setIsSideBySide(false);
+                      setIsSwipeActive(false);
+                      if (onToggleSideBySide) onToggleSideBySide(false);
+                      if (onToggleCurtainSwipe) onToggleCurtainSwipe(false);
+                    }}
+                    style={{
+                      background: "#FFFFFF",
+                      color: "#0F766E",
+                      border: "none",
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      fontSize: "0.68rem",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      marginLeft: 6,
+                    }}
+                  >
+                    View Full Aligned ➔
+                  </button>
+                )}
               </div>
               <MapContainer
                 center={center} zoom={zoom}
@@ -3379,10 +3581,10 @@ export default function MapViewer({
                     maxZoom={20}
                   />
                 )}
-                {droneMapOverlayUrl && droneMapBounds && (
-                  <ImageOverlay url={droneMapOverlayUrl} bounds={droneMapBounds} opacity={1.0} zIndex={305} />
+                {droneMapOverlayUrl && (
+                  <ImageOverlay url={droneMapOverlayUrl} bounds={activeDroneBounds} opacity={1.0} zIndex={305} />
                 )}
-                {showVectors && geojsonData && geojsonData.features.length > 0 && (
+                {isAligned && showVectors && geojsonData && geojsonData.features.length > 0 && (
                   <>
                     <GeoJSON
                       key={`sbs-geojson-${JSON.stringify(geojsonData)}-${selectedParcelId}-${vectorOpacity}`}
