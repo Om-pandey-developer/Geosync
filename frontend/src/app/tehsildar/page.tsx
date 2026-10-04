@@ -120,6 +120,8 @@ export default function TehsildarPage() {
     parcelsCount?: number;
     transmittedAt?: string;
     transmittedBy?: string;
+    alignedMapUrl?: string;
+    droneMapOverlayUrl?: string;
   } | null>(null);
   const [oldMapOpacity, setOldMapOpacity] = useState<number>(80);
   const [oldMapStrokeColor, setOldMapStrokeColor] = useState<string>("#D97706");
@@ -334,20 +336,50 @@ export default function TehsildarPage() {
 
   useEffect(() => {
     if (!selectedApproval) return;
-    if (
+    let alignedUrl =
       selectedApproval.alignedMapUrl &&
       !selectedApproval.alignedMapUrl.includes("demo_cadastral_map") &&
       !selectedApproval.alignedMapUrl.includes("sample-aligned-cadastre")
-    ) {
-      setAlignedMapOverlayUrl(selectedApproval.alignedMapUrl);
-    } else {
-      setAlignedMapOverlayUrl(null);
+        ? selectedApproval.alignedMapUrl
+        : null;
+
+    if (!alignedUrl) {
+      try {
+        const savedSession = typeof window !== "undefined" ? localStorage.getItem("geosync_alignment_session") : null;
+        if (savedSession) {
+          const sessionObj = JSON.parse(savedSession);
+          const raw = sessionObj.alignedMapUrl || sessionObj.unifiedOverlayUrl;
+          if (raw && !raw.includes("demo_cadastral_map") && !raw.includes("sample-aligned-cadastre")) {
+            alignedUrl = raw;
+          }
+        }
+      } catch (e) {
+        console.warn("Session align fallback note:", e);
+      }
     }
-    if (selectedApproval.droneMapOverlayUrl && !selectedApproval.droneMapOverlayUrl.includes("demo_cadastral_map")) {
-      setDroneMapOverlayUrl(selectedApproval.droneMapOverlayUrl);
-    } else {
-      setDroneMapOverlayUrl("/demo_datasets/demo_drone_map.jpg");
+
+    setAlignedMapOverlayUrl(alignedUrl);
+
+    let droneUrl =
+      selectedApproval.droneMapOverlayUrl && !selectedApproval.droneMapOverlayUrl.includes("demo_cadastral_map")
+        ? selectedApproval.droneMapOverlayUrl
+        : null;
+
+    if (!droneUrl) {
+      try {
+        const savedSession = typeof window !== "undefined" ? localStorage.getItem("geosync_alignment_session") : null;
+        if (savedSession) {
+          const sessionObj = JSON.parse(savedSession);
+          if (sessionObj.droneMapOverlayUrl && !sessionObj.droneMapOverlayUrl.includes("demo_cadastral_map")) {
+            droneUrl = sessionObj.droneMapOverlayUrl;
+          }
+        }
+      } catch (e) {
+        console.warn("Session drone fallback note:", e);
+      }
     }
+
+    setDroneMapOverlayUrl(droneUrl || "/demo_datasets/demo_drone_map.jpg");
     setScannedMapOverlayUrl(null);
     setIsAligned(true);
   }, [selectedApproval]);
@@ -918,7 +950,7 @@ export default function TehsildarPage() {
                         key={a.approval_id}
                         onClick={() => {
                           setSelectedApproval(a);
-                          const aligned =
+                          let aligned =
                             a.alignedMapUrl &&
                             !a.alignedMapUrl.includes("demo_cadastral_map") &&
                             !a.alignedMapUrl.includes("sample-aligned-cadastre")
@@ -927,10 +959,18 @@ export default function TehsildarPage() {
                                  !alignedMapOverlayUrl.includes("demo_cadastral_map") &&
                                  !alignedMapOverlayUrl.includes("sample-aligned-cadastre"))
                                 ? alignedMapOverlayUrl
-                                : null;
+                                : (alignmentSession?.alignedMapUrl &&
+                                   !alignmentSession.alignedMapUrl.includes("demo_cadastral_map") &&
+                                   !alignmentSession.alignedMapUrl.includes("sample-aligned-cadastre"))
+                                  ? alignmentSession.alignedMapUrl
+                                  : null;
                           setAlignedMapOverlayUrl(aligned);
                           if (a.droneMapOverlayUrl && !a.droneMapOverlayUrl.includes("demo_cadastral_map")) {
                             setDroneMapOverlayUrl(a.droneMapOverlayUrl);
+                          } else if (alignmentSession?.droneMapOverlayUrl && !alignmentSession.droneMapOverlayUrl.includes("demo_cadastral_map")) {
+                            setDroneMapOverlayUrl(alignmentSession.droneMapOverlayUrl);
+                          } else {
+                            setDroneMapOverlayUrl("/demo_datasets/demo_drone_map.jpg");
                           }
                           setScannedMapOverlayUrl(null);
                           setIsAligned(true);
@@ -1093,6 +1133,7 @@ export default function TehsildarPage() {
               }}
               showOcclusionAlerts={false}
               alignedOnlyMode={true}
+              defaultBaseLayer="drone"
               hideComparisonControls={true}
               enableCurtainSwipe={false}
               enableSideBySide={false}
