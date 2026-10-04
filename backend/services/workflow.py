@@ -285,6 +285,8 @@ def get_pending_approvals(db: Session, include_approved: bool = True) -> list:
             "area_sqm": p.area_sqm,
             "alignment_status": p.alignment_status.value if hasattr(p.alignment_status, "value") else str(p.alignment_status),
             "alignment_confidence": p.alignment_confidence,
+            "droneMapOverlayUrl": "/demo_datasets/demo_drone_map.jpg",
+            "alignedMapUrl": "/demo_datasets/demo_drone_map.jpg",
             "geometry": geo_dict,
             "parcel": {
                 "id": str(p.id),

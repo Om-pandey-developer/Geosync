@@ -499,12 +499,6 @@ export default function MapViewer({
 }: MapViewerProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [baseLayer, setBaseLayer] = useState<"drone" | "minimal" | "isolated">(defaultBaseLayer);
-
-  useEffect(() => {
-    if (defaultBaseLayer) {
-      setBaseLayer(defaultBaseLayer);
-    }
-  }, [defaultBaseLayer]);
   const [showVectors, setShowVectors] = useState(true);
 
   // ─── Georeference Coordinates & Live Tracker State (Phases 1-3) ───
@@ -1922,7 +1916,7 @@ export default function MapViewer({
           cursor: isDraggingSlider ? "ew-resize" : undefined,
         }}
       >
-        {(!isSideBySide && !isSwipeActive && isAligned && (alignedMapOverlayUrl || cadastralOverlayUrl || unifiedOverlayUrl)) ? (
+        {(!isSideBySide && !isSwipeActive && isAligned && (alignedMapOverlayUrl || cadastralOverlayUrl || unifiedOverlayUrl || droneBaseUrl || droneMapOverlayUrl)) ? (
           /* ──────────────────────────────────────────────────────
              UNIFIED OVERLAID ALIGNMENT CANVAS (PHASE 4 OVERHAUL)
              Single viewport: Base Drone + Neon Aligned Cadastre
@@ -2934,11 +2928,11 @@ export default function MapViewer({
                       maxZoom={20}
                     />
                   )}
-                  {/* Render image overlay with active drone bounds */}
-                  {droneMapOverlayUrl && activeDroneBounds && (
+                  {/* Only render image overlay when both url AND bounds are set */}
+                  {droneMapOverlayUrl && droneMapBounds && (
                     <ImageOverlay
                       url={droneMapOverlayUrl}
-                      bounds={activeDroneBounds}
+                      bounds={droneMapBounds}
                       opacity={1.0}
                       zIndex={305}
                     />
@@ -3710,10 +3704,10 @@ export default function MapViewer({
               />
             )}
 
-            {droneMapOverlayUrl && activeDroneBounds && (
+            {droneMapOverlayUrl && droneMapBounds && (
               <ImageOverlay
                 url={droneMapOverlayUrl}
-                bounds={activeDroneBounds}
+                bounds={droneMapBounds}
                 opacity={1.0}
                 zIndex={305}
               />
@@ -3722,7 +3716,7 @@ export default function MapViewer({
             {alignedMapOverlayUrl && (
               <ImageOverlay
                 url={alignedMapOverlayUrl}
-                bounds={activeDroneBounds || activeScannedBounds || [[26.840, 80.940], [26.852, 80.954]]}
+                bounds={droneMapBounds || scannedMapBounds || [[26.840, 80.940], [26.852, 80.954]]}
                 opacity={1.0}
                 zIndex={310}
               />
