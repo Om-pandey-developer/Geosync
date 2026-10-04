@@ -74,6 +74,8 @@ interface PendingApproval {
   scannedMapOverlayUrl?: string;
   droneMapOverlayUrl?: string;
   alignmentMetrics?: any;
+  reviewed_by?: string;
+  reviewed_at?: string;
 }
 
 export default function TehsildarPage() {
@@ -94,7 +96,7 @@ export default function TehsildarPage() {
       return new Set();
     }
   });
-  const [docketFilter, setDocketFilter] = useState<"ALL" | "PENDING" | "OCCLUDED">("ALL");
+  const [docketFilter, setDocketFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "OCCLUDED">("ALL");
   const [docketSearch, setDocketSearch] = useState("");
   const [isCurtainSwipeActive, setIsCurtainSwipeActive] = useState(false);
   const [isAligned, setIsAligned] = useState<boolean>(true);
@@ -104,9 +106,7 @@ export default function TehsildarPage() {
   const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(BASEMAP_PRESETS[0]);
   const [activeOldMapPresetId, setActiveOldMapPresetId] = useState<string>("standard-cadastre-1974");
   const [customOldMapGeojson, setCustomOldMapGeojson] = useState<FeatureCollection | null>(null);
-  const [alignedMapOverlayUrl, setAlignedMapOverlayUrl] = useState<string | null>(
-    "/sample-aligned-cadastre.svg"
-  );
+  const [alignedMapOverlayUrl, setAlignedMapOverlayUrl] = useState<string | null>(null);
   const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(null);
   const [droneMapOverlayUrl, setDroneMapOverlayUrl] = useState<string | null>(
     "/demo_datasets/demo_drone_map.jpg"
@@ -136,9 +136,11 @@ export default function TehsildarPage() {
           setIsAligned(true);
           const rawAlignedUrl = session.alignedMapUrl || session.unifiedOverlayUrl;
           const alignedUrl =
-            rawAlignedUrl && !rawAlignedUrl.includes("demo_cadastral_map")
+            rawAlignedUrl &&
+            !rawAlignedUrl.includes("demo_cadastral_map") &&
+            !rawAlignedUrl.includes("sample-aligned-cadastre")
               ? rawAlignedUrl
-              : "/sample-aligned-cadastre.svg";
+              : null;
           const droneUrl =
             session.droneMapOverlayUrl && !session.droneMapOverlayUrl.includes("demo_cadastral_map")
               ? session.droneMapOverlayUrl
@@ -153,7 +155,7 @@ export default function TehsildarPage() {
         }
       } else {
         setIsAligned(true);
-        setAlignedMapOverlayUrl("/sample-aligned-cadastre.svg");
+        setAlignedMapOverlayUrl(null);
         setDroneMapOverlayUrl("/demo_datasets/demo_drone_map.jpg");
         setScannedMapOverlayUrl(null);
       }
@@ -233,19 +235,24 @@ export default function TehsildarPage() {
           alignmentMetrics: item.alignmentMetrics,
         }));
 
-        // Merge with locally submitted approvals for instant cross-tab / live sync
+        // Merge with locally submitted & retained approvals for instant cross-tab & approved retention
         let merged: PendingApproval[] = mapped;
         try {
           const localCustom = JSON.parse(localStorage.getItem("geosync_custom_approvals") || "[]");
-          if (Array.isArray(localCustom) && localCustom.length > 0) {
-            const sanitizedCustom = localCustom.map((c: any) => ({
+          const retainedApprovals = JSON.parse(localStorage.getItem("geosync_retained_approvals") || "[]");
+          const localList = [...retainedApprovals, ...localCustom];
+
+          if (Array.isArray(localList) && localList.length > 0) {
+            const sanitizedCustom = localList.map((c: any) => ({
               ...c,
               alignedMapUrl:
-                c.alignedMapUrl && !c.alignedMapUrl.includes("demo_cadastral_map")
+                c.alignedMapUrl &&
+                !c.alignedMapUrl.includes("demo_cadastral_map") &&
+                !c.alignedMapUrl.includes("sample-aligned-cadastre")
                   ? c.alignedMapUrl
                   : (c.droneMapOverlayUrl && !c.droneMapOverlayUrl.includes("demo_cadastral_map"))
                     ? c.droneMapOverlayUrl
-                    : "/sample-aligned-cadastre.svg",
+                    : undefined,
               scannedMapOverlayUrl: undefined,
               droneMapOverlayUrl:
                 c.droneMapOverlayUrl && !c.droneMapOverlayUrl.includes("demo_cadastral_map")
@@ -260,7 +267,7 @@ export default function TehsildarPage() {
           console.warn("Local storage merge note:", e);
         }
 
-        // Apply any saved approvals from localStorage
+        // Apply any saved approvals from localStorage (so approved status is preserved)
         try {
           const savedIds = localStorage.getItem("geosync_approved_parcel_ids");
           if (savedIds) {
@@ -281,16 +288,23 @@ export default function TehsildarPage() {
         setPendingApprovals(merged);
         if (merged.length > 0) {
           setSelectedApproval((prev) => {
-            const chosen =
-              !prev || prev.khasra_no === "N/A"
-                ? merged[0]
-                : (merged.find(
-                    (m) =>
-                      m.parcel_id === prev.parcel_id ||
-                      m.approval_id === prev.approval_id ||
-                      String(m.khasra_no) === String(prev.khasra_no)
-                  ) || merged[0]);
-            if (chosen?.alignedMapUrl && !chosen.alignedMapUrl.includes("demo_cadastral_map")) {
+            // If already selecting an item, keep that exact item selected in merged!
+            if (prev && prev.khasra_no !== "N/A") {
+              const match = merged.find(
+                (m) =>
+                  m.parcel_id === prev.parcel_id ||
+                  m.approval_id === prev.approval_id ||
+                  String(m.khasra_no) === String(prev.khasra_no)
+              );
+              if (match) {
+                if (match.alignedMapUrl && !match.alignedMapUrl.includes("sample-aligned-cadastre") && !match.alignedMapUrl.includes("demo_cadastral_map")) {
+                  setAlignedMapOverlayUrl(match.alignedMapUrl);
+                }
+                return match;
+              }
+            }
+            const chosen = merged[0];
+            if (chosen?.alignedMapUrl && !chosen.alignedMapUrl.includes("sample-aligned-cadastre") && !chosen.alignedMapUrl.includes("demo_cadastral_map")) {
               setAlignedMapOverlayUrl(chosen.alignedMapUrl);
             }
             return chosen;
@@ -320,12 +334,14 @@ export default function TehsildarPage() {
 
   useEffect(() => {
     if (!selectedApproval) return;
-    if (selectedApproval.alignedMapUrl && !selectedApproval.alignedMapUrl.includes("demo_cadastral_map")) {
+    if (
+      selectedApproval.alignedMapUrl &&
+      !selectedApproval.alignedMapUrl.includes("demo_cadastral_map") &&
+      !selectedApproval.alignedMapUrl.includes("sample-aligned-cadastre")
+    ) {
       setAlignedMapOverlayUrl(selectedApproval.alignedMapUrl);
     } else {
-      setAlignedMapOverlayUrl((prev) =>
-        prev && !prev.includes("demo_cadastral_map") ? prev : "/sample-aligned-cadastre.svg"
-      );
+      setAlignedMapOverlayUrl(null);
     }
     if (selectedApproval.droneMapOverlayUrl && !selectedApproval.droneMapOverlayUrl.includes("demo_cadastral_map")) {
       setDroneMapOverlayUrl(selectedApproval.droneMapOverlayUrl);
@@ -416,6 +432,14 @@ export default function TehsildarPage() {
       }
     }
 
+    const approvedItem: PendingApproval = {
+      ...selectedApproval,
+      status: "approved",
+      alignment_status: "approved",
+      reviewed_by: officerId,
+      reviewed_at: new Date().toISOString(),
+    };
+
     // Update committed signatures
     setCommittedSignatures((prev) => ({
       ...prev,
@@ -423,17 +447,6 @@ export default function TehsildarPage() {
       [selectedApproval.approval_id]: shaSig,
       [khasraStr]: shaSig,
     }));
-
-    // Update local storage so multi-tab reflects approved
-    try {
-      const localCustom = JSON.parse(localStorage.getItem("geosync_custom_approvals") || "[]");
-      const updatedCustom = localCustom.map((c: any) =>
-        String(c.khasra_no) === khasraStr || c.parcel_id === parcelId || c.approval_id === selectedApproval.approval_id
-          ? { ...c, status: "approved", alignment_status: "approved" }
-          : c
-      );
-      localStorage.setItem("geosync_custom_approvals", JSON.stringify(updatedCustom));
-    } catch {}
 
     // Add to approved parcel IDs set and persist to localStorage
     setApprovedParcelIds((prev) => {
@@ -448,16 +461,28 @@ export default function TehsildarPage() {
       return next;
     });
 
-    // Update selectedApproval state to approved -> triggers green button and approved card
-    setSelectedApproval((prev) =>
-      prev
-        ? {
-            ...prev,
-            status: "approved",
-            alignment_status: "approved",
-          }
-        : null
-    );
+    // Retain approved parcel in localStorage so it is NOT removed from Tehsildar screen
+    try {
+      const existingRetained = JSON.parse(localStorage.getItem("geosync_retained_approvals") || "[]");
+      const filteredRetained = existingRetained.filter(
+        (r: any) => String(r.khasra_no) !== khasraStr && r.approval_id !== selectedApproval.approval_id && r.parcel_id !== parcelId
+      );
+      localStorage.setItem("geosync_retained_approvals", JSON.stringify([approvedItem, ...filteredRetained]));
+
+      const localCustom = JSON.parse(localStorage.getItem("geosync_custom_approvals") || "[]");
+      const updatedCustom = localCustom.map((c: any) =>
+        String(c.khasra_no) === khasraStr || c.parcel_id === parcelId || c.approval_id === selectedApproval.approval_id
+          ? { ...c, status: "approved", alignment_status: "approved" }
+          : c
+      );
+      if (!updatedCustom.some((c: any) => String(c.khasra_no) === khasraStr)) {
+        updatedCustom.unshift(approvedItem);
+      }
+      localStorage.setItem("geosync_custom_approvals", JSON.stringify(updatedCustom));
+    } catch {}
+
+    // Keep selectedApproval set to this approved item so PDF download is immediately ready
+    setSelectedApproval(approvedItem);
 
     // Update pendingApprovals list so the badge turns green in the left panel
     setPendingApprovals((prev) =>
@@ -465,7 +490,7 @@ export default function TehsildarPage() {
         a.parcel_id === parcelId ||
         a.approval_id === selectedApproval.approval_id ||
         String(a.khasra_no) === khasraStr
-          ? { ...a, status: "approved", alignment_status: "approved" }
+          ? approvedItem
           : a
       )
     );
@@ -553,7 +578,10 @@ export default function TehsildarPage() {
   const handleReject = async () => {
     if (!selectedApproval) return;
     setLoading(true);
-    const tId = toast.loading(`Rejecting alignment for Khasra ${selectedApproval.khasra_no}...`);
+    const khasraStr = String(selectedApproval.khasra_no);
+    const parcelId = selectedApproval.parcel_id;
+    const apprId = selectedApproval.approval_id;
+    const tId = toast.loading(`Returning Khasra ${khasraStr} to Patwari for re-survey...`);
 
     try {
       if (!selectedApproval.approval_id.startsWith("preview-")) {
@@ -563,17 +591,33 @@ export default function TehsildarPage() {
           body: JSON.stringify({
             reviewed_by: officer?.officerId || "REV-TEH-3210 (Priya Sharma, PCS)",
             action: "rejected",
-            remarks: remarks || "Boundary discrepancy detected against 5cm drone raster.",
+            remarks: remarks || "Boundary discrepancy detected against 5cm drone raster. Returned for re-survey.",
           }),
-        });
+        }).catch(() => null);
       }
+
+      // Remove from retained approvals and local queues on re-survey return
       try {
+        const retained = JSON.parse(localStorage.getItem("geosync_retained_approvals") || "[]");
+        const filteredRetained = retained.filter(
+          (r: any) => String(r.khasra_no) !== khasraStr && r.approval_id !== apprId && r.parcel_id !== parcelId
+        );
+        localStorage.setItem("geosync_retained_approvals", JSON.stringify(filteredRetained));
+
         const localCustom = JSON.parse(localStorage.getItem("geosync_custom_approvals") || "[]");
-        const filtered = localCustom.filter((c: any) => String(c.khasra_no) !== String(selectedApproval.khasra_no));
+        const filtered = localCustom.filter((c: any) => String(c.khasra_no) !== khasraStr && c.approval_id !== apprId);
         localStorage.setItem("geosync_custom_approvals", JSON.stringify(filtered));
+
+        const approvedIds = JSON.parse(localStorage.getItem("geosync_approved_parcel_ids") || "[]");
+        const filteredIds = approvedIds.filter((id: string) => id !== parcelId && id !== apprId && id !== khasraStr);
+        localStorage.setItem("geosync_approved_parcel_ids", JSON.stringify(filteredIds));
+        setApprovedParcelIds(new Set(filteredIds));
       } catch {}
 
-      toast.success(`Khasra ${selectedApproval.khasra_no} returned to Patwari field queue`, { id: tId });
+      setPendingApprovals((prev) =>
+        prev.filter((p) => String(p.khasra_no) !== khasraStr && p.approval_id !== apprId && p.parcel_id !== parcelId)
+      );
+      toast.success(`Khasra ${khasraStr} returned to Patwari field queue for re-survey`, { id: tId });
       setSelectedApproval(null);
       setRemarks("");
       await fetchData();
@@ -582,6 +626,13 @@ export default function TehsildarPage() {
     }
     setLoading(false);
   };
+
+  const isItemApproved = (a: PendingApproval) =>
+    a.status === "approved" ||
+    a.alignment_status === "approved" ||
+    approvedParcelIds.has(a.parcel_id) ||
+    approvedParcelIds.has(a.approval_id) ||
+    approvedParcelIds.has(String(a.khasra_no));
 
   const filteredApprovals = pendingApprovals.filter((a) => {
     const q = docketSearch.toLowerCase().trim();
@@ -593,7 +644,8 @@ export default function TehsildarPage() {
 
     if (!matchesSearch) return false;
     if (docketFilter === "ALL") return true;
-    if (docketFilter === "PENDING") return a.status === "pending";
+    if (docketFilter === "PENDING") return !isItemApproved(a) && a.status === "pending";
+    if (docketFilter === "APPROVED") return isItemApproved(a);
     if (docketFilter === "OCCLUDED") return (a.alignment_confidence ?? 1.0) < 0.8;
     return true;
   });
@@ -810,11 +862,21 @@ export default function TehsildarPage() {
                   </div>
 
                   {/* Filter Tabs */}
-                  <div style={{ display: "flex", gap: 4 }}>
+                  <div style={{ display: "flex", gap: 3 }}>
                     {[
                       { id: "ALL", label: `All (${pendingApprovals.length})` },
-                      { id: "PENDING", label: `Pending (${pendingApprovals.filter(a => a.status === 'pending').length})` },
-                      { id: "OCCLUDED", label: `⚠ (${pendingApprovals.filter(a => (a.alignment_confidence ?? 1.0) < 0.8).length})` },
+                      {
+                        id: "PENDING",
+                        label: `Pending (${pendingApprovals.filter((a) => !isItemApproved(a) && a.status === "pending").length})`,
+                      },
+                      {
+                        id: "APPROVED",
+                        label: `Approved (${pendingApprovals.filter((a) => isItemApproved(a)).length})`,
+                      },
+                      {
+                        id: "OCCLUDED",
+                        label: `⚠ (${pendingApprovals.filter((a) => (a.alignment_confidence ?? 1.0) < 0.8).length})`,
+                      },
                     ].map((tab) => (
                       <button
                         key={tab.id}
@@ -849,12 +911,7 @@ export default function TehsildarPage() {
                   {filteredApprovals.map((a) => {
                     const isSelected = selectedApproval?.approval_id === a.approval_id;
                     const isLowConf = (a.alignment_confidence ?? 1.0) < 0.8;
-                    const isItemApproved =
-                      a.status === "approved" ||
-                      a.alignment_status === "approved" ||
-                      approvedParcelIds.has(a.parcel_id) ||
-                      approvedParcelIds.has(a.approval_id) ||
-                      approvedParcelIds.has(String(a.khasra_no));
+                    const approved = isItemApproved(a);
 
                     return (
                       <button
@@ -862,11 +919,15 @@ export default function TehsildarPage() {
                         onClick={() => {
                           setSelectedApproval(a);
                           const aligned =
-                            a.alignedMapUrl && !a.alignedMapUrl.includes("demo_cadastral_map")
+                            a.alignedMapUrl &&
+                            !a.alignedMapUrl.includes("demo_cadastral_map") &&
+                            !a.alignedMapUrl.includes("sample-aligned-cadastre")
                               ? a.alignedMapUrl
-                              : (alignedMapOverlayUrl && !alignedMapOverlayUrl.includes("demo_cadastral_map"))
+                              : (alignedMapOverlayUrl &&
+                                 !alignedMapOverlayUrl.includes("demo_cadastral_map") &&
+                                 !alignedMapOverlayUrl.includes("sample-aligned-cadastre"))
                                 ? alignedMapOverlayUrl
-                                : "/sample-aligned-cadastre.svg";
+                                : null;
                           setAlignedMapOverlayUrl(aligned);
                           if (a.droneMapOverlayUrl && !a.droneMapOverlayUrl.includes("demo_cadastral_map")) {
                             setDroneMapOverlayUrl(a.droneMapOverlayUrl);
@@ -878,16 +939,16 @@ export default function TehsildarPage() {
                         style={{
                           width: "100%", display: "flex", alignItems: "flex-start", gap: 8,
                           padding: "8px 10px", borderRadius: "var(--radius-sm)",
-                          background: isSelected ? "var(--accent-judicial-bg)" : isItemApproved ? "#F0FDF4" : "#FFFFFF",
-                          border: isSelected ? "1.5px solid #93C5FD" : isItemApproved ? "1px solid #BBF7D0" : "1px solid var(--border-subtle)",
+                          background: isSelected ? "var(--accent-judicial-bg)" : approved ? "#F0FDF4" : "#FFFFFF",
+                          border: isSelected ? "1.5px solid #93C5FD" : approved ? "1px solid #BBF7D0" : "1px solid var(--border-subtle)",
                           cursor: "pointer", textAlign: "left",
                           transition: "all 0.15s ease",
                         }}
-                        onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = isItemApproved ? "#DCFCE7" : "#F1F5F9"; }}
-                        onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = isItemApproved ? "#F0FDF4" : "#FFFFFF"; }}
+                        onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = approved ? "#DCFCE7" : "#F1F5F9"; }}
+                        onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = approved ? "#F0FDF4" : "#FFFFFF"; }}
                         title={`Select Khasra ${a.khasra_no} for Statutory Adjudication`}
                       >
-                        {isItemApproved ? (
+                        {approved ? (
                           <CheckCircle2
                             size={14}
                             style={{
@@ -906,10 +967,10 @@ export default function TehsildarPage() {
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <strong style={{ fontSize: "0.78rem", color: isItemApproved ? "#065F46" : "var(--text-primary)" }}>
+                            <strong style={{ fontSize: "0.78rem", color: approved ? "#065F46" : "var(--text-primary)" }}>
                               Kh. {a.khasra_no}
                             </strong>
-                            {isItemApproved ? (
+                            {approved ? (
                               <span style={{ fontSize: "0.6rem", fontWeight: 800, background: "#D1FAE5", color: "#065F46", padding: "1px 6px", borderRadius: "var(--radius-sm)", border: "1px solid #A7F3D0" }}>
                                 Approved
                               </span>
@@ -1016,9 +1077,11 @@ export default function TehsildarPage() {
                       alignment_confidence: feat.properties.alignment_confidence ?? 0.94,
                       geometry: feat.geometry,
                       alignedMapUrl:
-                        alignedMapOverlayUrl && !alignedMapOverlayUrl.includes("demo_cadastral_map")
+                        alignedMapOverlayUrl &&
+                        !alignedMapOverlayUrl.includes("demo_cadastral_map") &&
+                        !alignedMapOverlayUrl.includes("sample-aligned-cadastre")
                           ? alignedMapOverlayUrl
-                          : "/sample-aligned-cadastre.svg",
+                          : undefined,
                       scannedMapOverlayUrl: undefined,
                       droneMapOverlayUrl:
                         droneMapOverlayUrl && !droneMapOverlayUrl.includes("demo_cadastral_map")
@@ -1037,9 +1100,11 @@ export default function TehsildarPage() {
               suppressEmptyBanner={false}
               isAligned={true}
               alignedMapOverlayUrl={
-                alignedMapOverlayUrl && !alignedMapOverlayUrl.includes("demo_cadastral_map")
+                alignedMapOverlayUrl &&
+                !alignedMapOverlayUrl.includes("demo_cadastral_map") &&
+                !alignedMapOverlayUrl.includes("sample-aligned-cadastre")
                   ? alignedMapOverlayUrl
-                  : "/sample-aligned-cadastre.svg"
+                  : undefined
               }
               droneMapOverlayUrl={
                 droneMapOverlayUrl && !droneMapOverlayUrl.includes("demo_cadastral_map")
@@ -1048,15 +1113,19 @@ export default function TehsildarPage() {
               }
               scannedMapOverlayUrl={undefined}
               droneBaseUrl={
-                alignedMapOverlayUrl && !alignedMapOverlayUrl.includes("demo_cadastral_map")
+                alignedMapOverlayUrl &&
+                !alignedMapOverlayUrl.includes("demo_cadastral_map") &&
+                !alignedMapOverlayUrl.includes("sample-aligned-cadastre")
                   ? alignedMapOverlayUrl
                   : (droneMapOverlayUrl || "/demo_datasets/demo_drone_map.jpg")
               }
               cadastralOverlayUrl={undefined}
               unifiedOverlayUrl={
-                alignedMapOverlayUrl && !alignedMapOverlayUrl.includes("demo_cadastral_map")
+                alignedMapOverlayUrl &&
+                !alignedMapOverlayUrl.includes("demo_cadastral_map") &&
+                !alignedMapOverlayUrl.includes("sample-aligned-cadastre")
                   ? alignedMapOverlayUrl
-                  : "/sample-aligned-cadastre.svg"
+                  : undefined
               }
               alignmentConfidence={
                 selectedApproval?.alignment_confidence
@@ -1229,27 +1298,26 @@ export default function TehsildarPage() {
                       <span>{isSelectedApproved ? "Approved" : "Approve & Publish (Commit SHA-256)"}</span>
                     </button>
 
-                    {/* Return for Re-survey Button */}
-                    {!isSelectedApproved && (
-                      <button
-                        onClick={handleReject}
-                        disabled={loading}
-                        style={{
-                          width: "100%", padding: "8px 14px",
-                          background: "#FEF2F2", border: "1px solid #FECDD3",
-                          borderRadius: "var(--radius-md)", color: "#DC2626",
-                          fontWeight: 700, fontSize: "0.78rem",
-                          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                          cursor: loading ? "not-allowed" : "pointer",
-                          opacity: loading ? 0.7 : 1,
-                          transition: "all 0.15s ease",
-                          marginBottom: 10,
-                        }}
-                      >
-                        <XCircle size={15} />
-                        <span>Return to Patwari for Re-survey</span>
-                      </button>
-                    )}
+                    {/* Return for Re-survey Button (Always available so Tehsildar can return parcel to Patwari if needed) */}
+                    <button
+                      onClick={handleReject}
+                      disabled={loading}
+                      style={{
+                        width: "100%", padding: "8px 14px",
+                        background: "#FEF2F2", border: "1px solid #FECDD3",
+                        borderRadius: "var(--radius-md)", color: "#DC2626",
+                        fontWeight: 700, fontSize: "0.78rem",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                        cursor: loading ? "not-allowed" : "pointer",
+                        opacity: loading ? 0.7 : 1,
+                        transition: "all 0.15s ease",
+                        marginBottom: 10,
+                      }}
+                      title="Return this parcel to Patwari field officer for physical re-survey"
+                    >
+                      <XCircle size={15} />
+                      <span>{isSelectedApproved ? "Revoke & Return to Patwari for Re-survey" : "Return to Patwari for Re-survey"}</span>
+                    </button>
 
                     {/* Secondary Actions Grid: PDF & Audit */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>

@@ -1121,9 +1121,14 @@ def submit_for_approval(payload: ApprovalRequestCreate, db: Session = Depends(ge
 
 
 @router.get("/approvals/pending", tags=["Approvals"])
-def list_pending_approvals(db: Session = Depends(get_db)):
-    """Lists all pending approval requests for the Tehsildar."""
-    return get_pending_approvals(db)
+def list_pending_approvals(include_approved: bool = True, db: Session = Depends(get_db)):
+    """Lists approval requests for the Tehsildar (defaults to including approved for decree review)."""
+    return get_pending_approvals(db, include_approved=include_approved)
+
+@router.get("/approvals", tags=["Approvals"])
+def list_all_approvals(include_approved: bool = True, db: Session = Depends(get_db)):
+    """Lists all approval requests for the Tehsildar."""
+    return get_pending_approvals(db, include_approved=include_approved)
 
 
 @router.post("/approvals/seed-demo", tags=["Approvals"])

@@ -253,15 +253,17 @@ def process_approval_action(
     }
 
 
-def get_pending_approvals(db: Session) -> list:
-    """Returns all pending approval requests with parcel details."""
-    records = (
+def get_pending_approvals(db: Session, include_approved: bool = True) -> list:
+    """Returns all pending (and optionally approved) approval requests with parcel details."""
+    query = (
         db.query(ApprovalRequest, Parcel)
         .join(Parcel, ApprovalRequest.parcel_id == Parcel.id)
-        .filter(ApprovalRequest.status == "pending")
-        .order_by(ApprovalRequest.requested_at.desc())
-        .all()
     )
+    if not include_approved:
+        query = query.filter(ApprovalRequest.status == "pending")
+    else:
+        query = query.filter(ApprovalRequest.status.in_(["pending", "approved"]))
+    records = query.order_by(ApprovalRequest.requested_at.desc()).all()
 
     result = []
     for ar, p in records:
