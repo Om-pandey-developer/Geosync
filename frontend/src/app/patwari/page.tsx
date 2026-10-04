@@ -972,6 +972,12 @@ export default function PatwariPage() {
   const handleResetWorkspace = () => {
     try {
       localStorage.removeItem("geosync_alignment_session");
+      localStorage.removeItem("geosync_custom_approvals");
+      localStorage.removeItem("geosync_retained_approvals");
+      localStorage.removeItem("geosync_approved_parcel_ids");
+      sessionStorage.removeItem("geosync_clean_init_v3");
+      window.dispatchEvent(new Event("geosync-approval-submitted"));
+      window.dispatchEvent(new Event("storage"));
     } catch {}
     setIsAligned(false);
     setIsSideBySideActive(false);

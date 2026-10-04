@@ -1131,6 +1131,17 @@ def list_all_approvals(include_approved: bool = True, db: Session = Depends(get_
     return get_pending_approvals(db, include_approved=include_approved)
 
 
+@router.post("/approvals/clear", tags=["Approvals"])
+@router.post("/v1/reset-demo", tags=["Approvals"])
+def clear_all_approvals(db: Session = Depends(get_db)):
+    """Clears all approval requests and resets parcel status to clean unapproved draft state."""
+    db.query(CadastralAuditLog).delete()
+    db.query(ApprovalRequest).delete()
+    db.query(Parcel).update({"alignment_status": AlignmentStatusEnum.DRAFT})
+    db.commit()
+    return {"status": "success", "message": "All approval dockets cleared. Zero pre-approved items."}
+
+
 @router.post("/approvals/seed-demo", tags=["Approvals"])
 def seed_demo_approvals(db: Session = Depends(get_db)):
     """Seeds 4 realistic pending approval dockets for live demonstrations."""

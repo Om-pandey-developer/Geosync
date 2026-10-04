@@ -470,16 +470,36 @@ export default function TehsildarPage() {
     };
   }, [fetchData]);
 
-  const handleResetDemo = async () => {
-    const tId = toast.loading("Resetting Tehsildar queue with 4 test dockets...");
+  // One-time initialization check: Ensure clean state with 0 approved Khasras on load
+  useEffect(() => {
     try {
-      const res = await fetch(`${API}/v1/reset-demo`, { method: "POST" });
-      if (!res.ok) throw new Error("Reset endpoint failed");
-      toast.success("Demo Dockets Reset: 4 parcels queued for adjudication!", { id: tId });
+      const isCleaned = sessionStorage.getItem("geosync_clean_init_v3");
+      if (!isCleaned) {
+        sessionStorage.setItem("geosync_clean_init_v3", "true");
+        // Clear any leftover legacy approved items so initial load starts at 0 approved Khasras
+        localStorage.removeItem("geosync_approved_parcel_ids");
+        localStorage.removeItem("geosync_retained_approvals");
+        localStorage.removeItem("geosync_custom_approvals");
+        setApprovedParcelIds(new Set());
+      }
+    } catch {}
+  }, []);
+
+  const handleResetDemo = async () => {
+    const tId = toast.loading("Clearing docket to fresh state...");
+    try {
+      localStorage.removeItem("geosync_custom_approvals");
+      localStorage.removeItem("geosync_retained_approvals");
+      localStorage.removeItem("geosync_approved_parcel_ids");
+      sessionStorage.removeItem("geosync_clean_init_v3");
+      setApprovedParcelIds(new Set());
+      setPendingApprovals([]);
       setSelectedApproval(null);
+      await fetch(`${API}/approvals/clear`, { method: "POST" }).catch(() => null);
+      toast.success("Docket cleared: Ready for fresh Patwari submissions!", { id: tId });
       await fetchData();
     } catch {
-      toast.error("Failed to reset demo state on backend", { id: tId });
+      toast.error("Failed to reset docket state", { id: tId });
     }
   };
 
@@ -931,7 +951,7 @@ export default function TehsildarPage() {
                       </span>
                     </div>
                     <span style={{ fontSize: "0.6875rem", fontWeight: 800, padding: "2px 7px", borderRadius: 12, background: "var(--accent-gold-bg)", color: "#92400E", border: "1px solid #FDE68A" }}>
-                      {pendingApprovals.length} Pending
+                      {pendingApprovals.filter((a) => !isItemApproved(a)).length} Pending
                     </span>
                   </div>
 
@@ -1084,10 +1104,22 @@ export default function TehsildarPage() {
                   })}
 
                   {filteredApprovals.length === 0 && (
-                    <div style={{ padding: "20px 8px", textAlign: "center", color: "var(--text-muted)" }}>
-                      <CheckCircle2 size={20} style={{ margin: "0 auto 6px", color: "var(--accent-primary)", opacity: 0.8 }} />
-                      <p style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-primary)" }}>No Cases Found</p>
-                      <p style={{ fontSize: "0.6875rem", marginTop: 2 }}>No matching items in current filter.</p>
+                    <div style={{ padding: "32px 14px", textAlign: "center", color: "var(--text-muted)" }}>
+                      <div
+                        style={{
+                          width: 44, height: 44, borderRadius: "50%",
+                          background: "#F1F5F9", display: "flex", alignItems: "center",
+                          justifyContent: "center", margin: "0 auto 10px", color: "#64748B",
+                        }}
+                      >
+                        <Scale size={22} />
+                      </div>
+                      <p style={{ fontSize: "0.8125rem", fontWeight: 800, color: "var(--text-primary)" }}>
+                        No Parcels Submitted
+                      </p>
+                      <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: 4, lineHeight: 1.4 }}>
+                        Awaiting submission from Patwari field officer. Only submitted Khasras will appear here for adjudication.
+                      </p>
                     </div>
                   )}
                 </div>
