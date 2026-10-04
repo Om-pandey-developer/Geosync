@@ -442,7 +442,13 @@ export default function PatwariPage() {
             parcelsHarmonized: parcels.length || 18,
           },
         };
-        const updated = [newApprovalItem, ...storedApprovals.filter((a: any) => String(a.khasra_no) !== String(selectedParcel.khasra_no))];
+        const activeMapUrl = alignedMapUrl || unifiedOverlayUrl || "/demo_datasets/cd_map_2_unified_overlay.png";
+        const updated = [
+          newApprovalItem,
+          ...storedApprovals
+            .filter((a: any) => String(a.khasra_no) !== String(selectedParcel.khasra_no))
+            .map((a: any) => ({ ...a, alignedMapUrl: activeMapUrl })),
+        ];
         localStorage.setItem("geosync_custom_approvals", JSON.stringify(updated));
 
         // Also persist alignment session so Tehsildar sees the new aligned map
@@ -1009,9 +1015,14 @@ export default function PatwariPage() {
       };
       localStorage.setItem("geosync_alignment_session", JSON.stringify(sessionData));
 
-      // Ensure approvals list has items for all parcels
+      // Ensure approvals list has items for all parcels and all items use active aligned map
+      const activeMapUrl = alignedMapUrl || unifiedOverlayUrl || "/demo_datasets/cd_map_2_unified_overlay.png";
       const storedApprovals = JSON.parse(localStorage.getItem("geosync_custom_approvals") || "[]");
-      const existingKhasras = new Set(storedApprovals.map((a: any) => String(a.khasra_no)));
+      const updatedStored = storedApprovals.map((a: any) => ({
+        ...a,
+        alignedMapUrl: activeMapUrl,
+      }));
+      const existingKhasras = new Set(updatedStored.map((a: any) => String(a.khasra_no)));
       const newItems = parcels
         .filter((p) => !existingKhasras.has(String(p.khasra_no)))
         .map((p, idx) => ({
@@ -1030,7 +1041,7 @@ export default function PatwariPage() {
           alignment_status: "PENDING_APPROVAL",
           alignment_confidence: p.alignment_confidence || 0.95,
           geometry: geojson?.features?.find((f: any) => String(f.properties?.khasra_no) === String(p.khasra_no) || f.id === p.id)?.geometry,
-          alignedMapUrl: alignedMapUrl || unifiedOverlayUrl || undefined,
+          alignedMapUrl: activeMapUrl,
           scannedMapOverlayUrl: undefined,
           droneMapOverlayUrl: droneMapOverlayUrl || "/demo_datasets/demo_drone_map.jpg",
           alignmentMetrics: alignmentMetrics || {
@@ -1042,7 +1053,7 @@ export default function PatwariPage() {
           },
         }));
 
-      const mergedApprovals = [...newItems, ...storedApprovals];
+      const mergedApprovals = [...newItems, ...updatedStored];
       localStorage.setItem("geosync_custom_approvals", JSON.stringify(mergedApprovals));
       window.dispatchEvent(new Event("geosync-approval-submitted"));
       window.dispatchEvent(new Event("storage"));

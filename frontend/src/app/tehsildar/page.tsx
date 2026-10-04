@@ -132,35 +132,73 @@ export default function TehsildarPage() {
   // Left sidebar collapse state
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
 
-  const restoreAlignmentSession = useCallback(() => {
+  const getMasterSurveyMap = useCallback(() => {
     try {
       const localCustom = JSON.parse(localStorage.getItem("geosync_custom_approvals") || "[]");
       const retainedApprovals = JSON.parse(localStorage.getItem("geosync_retained_approvals") || "[]");
       const allLocal = [...retainedApprovals, ...localCustom];
+
+      // 1. Highest priority: The aligned map of Khasra 36475 (the verified newly aligned survey map)
+      const item36475 = allLocal.find(
+        (c: any) =>
+          String(c.khasra_no) === "36475" &&
+          c.alignedMapUrl &&
+          !c.alignedMapUrl.includes("demo_cadastral_map") &&
+          !c.alignedMapUrl.includes("sample-aligned-cadastre")
+      );
+      if (item36475?.alignedMapUrl) return item36475.alignedMapUrl;
+
+      // 2. Active alignment session saved when Patwari transmitted
+      const saved = localStorage.getItem("geosync_alignment_session");
+      if (saved) {
+        const session = JSON.parse(saved);
+        const sessionUrl = session.alignedMapUrl || session.unifiedOverlayUrl;
+        if (
+          sessionUrl &&
+          !sessionUrl.includes("demo_cadastral_map") &&
+          !sessionUrl.includes("sample-aligned-cadastre")
+        ) {
+          return sessionUrl;
+        }
+      }
+
+      // 3. Any non-demo aligned map in local approvals
       const foundCustomAligned = allLocal.find(
         (c: any) =>
           c.alignedMapUrl &&
           !c.alignedMapUrl.includes("demo_cadastral_map") &&
           !c.alignedMapUrl.includes("sample-aligned-cadastre")
       )?.alignedMapUrl;
+      if (foundCustomAligned) return foundCustomAligned;
 
+      // 4. Current state if valid
+      if (
+        alignedMapOverlayUrl &&
+        !alignedMapOverlayUrl.includes("demo_cadastral_map") &&
+        !alignedMapOverlayUrl.includes("sample-aligned-cadastre")
+      ) {
+        return alignedMapOverlayUrl;
+      }
+
+      return "/demo_datasets/cd_map_2_unified_overlay.png";
+    } catch {
+      return "/demo_datasets/cd_map_2_unified_overlay.png";
+    }
+  }, [alignedMapOverlayUrl]);
+
+  const restoreAlignmentSession = useCallback(() => {
+    try {
+      const masterMap = getMasterSurveyMap();
       const saved = localStorage.getItem("geosync_alignment_session");
       if (saved) {
         const session = JSON.parse(saved);
         if (session.isAligned || session.transmitted) {
           setIsAligned(true);
-          const rawAlignedUrl = session.alignedMapUrl || session.unifiedOverlayUrl || foundCustomAligned;
           const droneUrl =
             session.droneMapOverlayUrl && !session.droneMapOverlayUrl.includes("demo_cadastral_map")
               ? session.droneMapOverlayUrl
               : "/demo_datasets/demo_drone_map.jpg";
-          const alignedUrl =
-            rawAlignedUrl &&
-            !rawAlignedUrl.includes("demo_cadastral_map") &&
-            !rawAlignedUrl.includes("sample-aligned-cadastre")
-              ? rawAlignedUrl
-              : (droneUrl || "/demo_datasets/demo_drone_map.jpg");
-          setAlignedMapOverlayUrl(alignedUrl);
+          setAlignedMapOverlayUrl(masterMap);
           setDroneMapOverlayUrl(droneUrl);
           setScannedMapOverlayUrl(null);
           setAlignmentSession(session);
@@ -170,15 +208,14 @@ export default function TehsildarPage() {
         }
       } else {
         setIsAligned(true);
-        const fallbackAligned = foundCustomAligned || "/demo_datasets/demo_drone_map.jpg";
-        setAlignedMapOverlayUrl(fallbackAligned);
+        setAlignedMapOverlayUrl(masterMap);
         setDroneMapOverlayUrl("/demo_datasets/demo_drone_map.jpg");
         setScannedMapOverlayUrl(null);
       }
     } catch (e) {
       console.error("Session restore note:", e);
     }
-  }, []);
+  }, [getMasterSurveyMap]);
 
   useEffect(() => {
     restoreAlignmentSession();
@@ -308,17 +345,39 @@ export default function TehsildarPage() {
           console.warn("Local storage merge note:", e);
         }
 
-        // Active survey map fallback for all items
-        const activeSurveyAlignedUrl =
-          merged.find(
-            (c: any) =>
-              c.alignedMapUrl &&
-              !c.alignedMapUrl.includes("demo_cadastral_map") &&
-              !c.alignedMapUrl.includes("sample-aligned-cadastre")
-          )?.alignedMapUrl ||
-          alignedMapOverlayUrl ||
-          droneMapOverlayUrl ||
-          "/demo_datasets/demo_drone_map.jpg";
+        // Obtain single authoritative master survey map across all docket items
+        const masterMap = getMasterSurveyMap();
+
+        // Sanitize any stale local storage approvals so all items point to masterMap
+        try {
+          const localCustom = JSON.parse(localStorage.getItem("geosync_custom_approvals") || "[]");
+          let changed = false;
+          const sanitizedLocal = localCustom.map((item: any) => {
+            if (
+              !item.alignedMapUrl ||
+              item.alignedMapUrl.includes("demo_cadastral_map") ||
+              item.alignedMapUrl.includes("sample-aligned-cadastre") ||
+              item.alignedMapUrl !== masterMap
+            ) {
+              changed = true;
+              return { ...item, alignedMapUrl: masterMap };
+            }
+            return item;
+          });
+          if (changed) {
+            localStorage.setItem("geosync_custom_approvals", JSON.stringify(sanitizedLocal));
+          }
+        } catch {}
+
+        // Ensure every item in merged uses masterMap without switching
+        merged = merged.map((item) => ({
+          ...item,
+          alignedMapUrl: masterMap,
+          droneMapOverlayUrl:
+            item.droneMapOverlayUrl && !item.droneMapOverlayUrl.includes("demo_cadastral_map")
+              ? item.droneMapOverlayUrl
+              : "/demo_datasets/demo_drone_map.jpg",
+        }));
 
         // Apply any saved approvals from localStorage (so approved status is preserved)
         try {
@@ -339,6 +398,7 @@ export default function TehsildarPage() {
         } catch {}
 
         setPendingApprovals(merged);
+        setAlignedMapOverlayUrl(masterMap);
         if (merged.length > 0) {
           setSelectedApproval((prev) => {
             // If already selecting an item, keep that exact item selected in merged!
@@ -349,28 +409,9 @@ export default function TehsildarPage() {
                   m.approval_id === prev.approval_id ||
                   String(m.khasra_no) === String(prev.khasra_no)
               );
-              if (match) {
-                const mapToSet =
-                  match.alignedMapUrl &&
-                  !match.alignedMapUrl.includes("sample-aligned-cadastre") &&
-                  !match.alignedMapUrl.includes("demo_cadastral_map")
-                    ? match.alignedMapUrl
-                    : activeSurveyAlignedUrl;
-                setAlignedMapOverlayUrl(mapToSet);
-                return match;
-              }
+              if (match) return match;
             }
-            const chosen = merged[0];
-            if (chosen) {
-              const mapToSet =
-                chosen.alignedMapUrl &&
-                !chosen.alignedMapUrl.includes("sample-aligned-cadastre") &&
-                !chosen.alignedMapUrl.includes("demo_cadastral_map")
-                  ? chosen.alignedMapUrl
-                  : activeSurveyAlignedUrl;
-              setAlignedMapOverlayUrl(mapToSet);
-            }
-            return chosen;
+            return merged[0];
           });
         }
       }
@@ -981,19 +1022,8 @@ export default function TehsildarPage() {
                         key={a.approval_id}
                         onClick={() => {
                           setSelectedApproval(a);
-                          const activeSurveyMap =
-                            a.alignedMapUrl &&
-                            !a.alignedMapUrl.includes("demo_cadastral_map") &&
-                            !a.alignedMapUrl.includes("sample-aligned-cadastre")
-                              ? a.alignedMapUrl
-                              : (alignedMapOverlayUrl &&
-                                 !alignedMapOverlayUrl.includes("demo_cadastral_map") &&
-                                 !alignedMapOverlayUrl.includes("sample-aligned-cadastre"))
-                                ? alignedMapOverlayUrl
-                                : (alignmentSession?.alignedMapUrl && !alignmentSession.alignedMapUrl.includes("sample-aligned-cadastre"))
-                                  ? alignmentSession.alignedMapUrl
-                                  : (a.droneMapOverlayUrl || droneMapOverlayUrl || "/demo_datasets/demo_drone_map.jpg");
-                          setAlignedMapOverlayUrl(activeSurveyMap);
+                          const masterMap = getMasterSurveyMap();
+                          setAlignedMapOverlayUrl(masterMap);
                           if (a.droneMapOverlayUrl && !a.droneMapOverlayUrl.includes("demo_cadastral_map")) {
                             setDroneMapOverlayUrl(a.droneMapOverlayUrl);
                           }
@@ -1141,12 +1171,7 @@ export default function TehsildarPage() {
                       alignment_status: feat.properties.alignment_status || "aligned",
                       alignment_confidence: feat.properties.alignment_confidence ?? 0.94,
                       geometry: feat.geometry,
-                      alignedMapUrl:
-                        alignedMapOverlayUrl &&
-                        !alignedMapOverlayUrl.includes("demo_cadastral_map") &&
-                        !alignedMapOverlayUrl.includes("sample-aligned-cadastre")
-                          ? alignedMapOverlayUrl
-                          : undefined,
+                      alignedMapUrl: getMasterSurveyMap(),
                       scannedMapOverlayUrl: undefined,
                       droneMapOverlayUrl:
                         droneMapOverlayUrl && !droneMapOverlayUrl.includes("demo_cadastral_map")
@@ -1211,6 +1236,7 @@ export default function TehsildarPage() {
               customOldMapGeojson={customOldMapGeojson}
               oldMapOpacity={oldMapOpacity}
               oldMapStrokeColor={oldMapStrokeColor}
+              selectedKhasraNo={selectedApproval?.khasra_no ? String(selectedApproval.khasra_no) : undefined}
               onOpenMapSourceModal={() => setIsMapSourceModalOpen(true)}
             />
           </div>
