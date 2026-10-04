@@ -3490,9 +3490,25 @@ export default function MapViewer({
                   display: "flex",
                   alignItems: "center",
                   gap: 8,
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
                 }}
               >
                 <span>{isAligned ? "✨ NEW ALIGNED MAP (DRONE + GEOSAM)" : "🛰️ DRONE IMAGE (PRE-ALIGNMENT)"}</span>
+                {isAligned && (
+                  <span
+                    style={{
+                      background: "#065F46",
+                      padding: "2px 8px",
+                      borderRadius: 10,
+                      fontSize: "0.7rem",
+                      color: "#6EE7B7",
+                      fontWeight: 800,
+                      border: "1px solid #10B981",
+                    }}
+                  >
+                    {alignmentConfidence ? `${alignmentConfidence.toFixed(1)}% Confidence` : "80.5% Confidence"}
+                  </span>
+                )}
                 {!isAligned && onRunAlign && (
                   <button
                     onClick={onRunAlign}
@@ -3501,9 +3517,9 @@ export default function MapViewer({
                       background: "linear-gradient(135deg, #0D9488 0%, #059669 100%)",
                       color: "#FFFFFF",
                       border: "none",
-                      padding: "3px 12px",
+                      padding: "4px 14px",
                       borderRadius: 6,
-                      fontSize: "0.74rem",
+                      fontSize: "0.76rem",
                       fontWeight: 800,
                       cursor: isAligning ? "not-allowed" : "pointer",
                       display: "flex",
@@ -3531,15 +3547,21 @@ export default function MapViewer({
                       background: "#FFFFFF",
                       color: "#0F766E",
                       border: "none",
-                      padding: "2px 8px",
-                      borderRadius: 4,
-                      fontSize: "0.68rem",
+                      padding: "4px 12px",
+                      borderRadius: 6,
+                      fontSize: "0.74rem",
                       fontWeight: 800,
                       cursor: "pointer",
                       marginLeft: 6,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
                     }}
+                    title="Switch to full-screen aligned map view"
                   >
-                    View Full Aligned ➔
+                    <Eye size={12} />
+                    <span>View Full Aligned Map ➔</span>
                   </button>
                 )}
               </div>
