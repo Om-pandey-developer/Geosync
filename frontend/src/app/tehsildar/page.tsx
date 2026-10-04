@@ -105,13 +105,11 @@ export default function TehsildarPage() {
   const [activeOldMapPresetId, setActiveOldMapPresetId] = useState<string>("standard-cadastre-1974");
   const [customOldMapGeojson, setCustomOldMapGeojson] = useState<FeatureCollection | null>(null);
   const [alignedMapOverlayUrl, setAlignedMapOverlayUrl] = useState<string | null>(
-    "/demo_datasets/demo_cadastral_map.jpg"
+    "/sample-aligned-cadastre.svg"
   );
-  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(
-    "/demo_datasets/demo_cadastral_map.jpg"
-  );
+  const [scannedMapOverlayUrl, setScannedMapOverlayUrl] = useState<string | null>(null);
   const [droneMapOverlayUrl, setDroneMapOverlayUrl] = useState<string | null>(
-    "/sample-drone-orthomosaic.svg"
+    "/demo_datasets/demo_drone_map.jpg"
   );
   const [isSideBySideActive, setIsSideBySideActive] = useState<boolean>(false);
   const [alignmentSession, setAlignmentSession] = useState<{
@@ -136,16 +134,18 @@ export default function TehsildarPage() {
         const session = JSON.parse(saved);
         if (session.isAligned || session.transmitted) {
           setIsAligned(true);
+          const rawAlignedUrl = session.alignedMapUrl || session.unifiedOverlayUrl;
           const alignedUrl =
-            session.alignedMapUrl ||
-            session.scannedMapOverlayUrl ||
-            session.droneMapOverlayUrl ||
-            "/demo_datasets/demo_cadastral_map.jpg";
-          const droneUrl = session.droneMapOverlayUrl || "/sample-drone-orthomosaic.svg";
-          const scannedUrl = session.scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg";
+            rawAlignedUrl && !rawAlignedUrl.includes("demo_cadastral_map")
+              ? rawAlignedUrl
+              : "/sample-aligned-cadastre.svg";
+          const droneUrl =
+            session.droneMapOverlayUrl && !session.droneMapOverlayUrl.includes("demo_cadastral_map")
+              ? session.droneMapOverlayUrl
+              : "/demo_datasets/demo_drone_map.jpg";
           setAlignedMapOverlayUrl(alignedUrl);
           setDroneMapOverlayUrl(droneUrl);
-          setScannedMapOverlayUrl(scannedUrl);
+          setScannedMapOverlayUrl(null);
           setAlignmentSession(session);
           if (session.geojson) {
             setGeojson(session.geojson);
@@ -153,9 +153,9 @@ export default function TehsildarPage() {
         }
       } else {
         setIsAligned(true);
-        setAlignedMapOverlayUrl("/demo_datasets/demo_cadastral_map.jpg");
-        setDroneMapOverlayUrl("/sample-drone-orthomosaic.svg");
-        setScannedMapOverlayUrl("/demo_datasets/demo_cadastral_map.jpg");
+        setAlignedMapOverlayUrl("/sample-aligned-cadastre.svg");
+        setDroneMapOverlayUrl("/demo_datasets/demo_drone_map.jpg");
+        setScannedMapOverlayUrl(null);
       }
     } catch (e) {
       console.error("Session restore note:", e);
@@ -221,9 +221,15 @@ export default function TehsildarPage() {
           alignment_status: item.alignment_status || item.parcel?.alignment_status || "aligned",
           alignment_confidence: item.alignment_confidence ?? item.parcel?.alignment_confidence ?? 0.92,
           geometry: item.geometry || item.parcel?.geometry,
-          alignedMapUrl: item.alignedMapUrl,
-          scannedMapOverlayUrl: item.scannedMapOverlayUrl,
-          droneMapOverlayUrl: item.droneMapOverlayUrl,
+          alignedMapUrl:
+            item.alignedMapUrl && !item.alignedMapUrl.includes("demo_cadastral_map")
+              ? item.alignedMapUrl
+              : undefined,
+          scannedMapOverlayUrl: undefined,
+          droneMapOverlayUrl:
+            item.droneMapOverlayUrl && !item.droneMapOverlayUrl.includes("demo_cadastral_map")
+              ? item.droneMapOverlayUrl
+              : "/demo_datasets/demo_drone_map.jpg",
           alignmentMetrics: item.alignmentMetrics,
         }));
 
@@ -232,9 +238,23 @@ export default function TehsildarPage() {
         try {
           const localCustom = JSON.parse(localStorage.getItem("geosync_custom_approvals") || "[]");
           if (Array.isArray(localCustom) && localCustom.length > 0) {
-            const localKhasras = new Set(localCustom.map((c: any) => String(c.khasra_no)));
+            const sanitizedCustom = localCustom.map((c: any) => ({
+              ...c,
+              alignedMapUrl:
+                c.alignedMapUrl && !c.alignedMapUrl.includes("demo_cadastral_map")
+                  ? c.alignedMapUrl
+                  : (c.droneMapOverlayUrl && !c.droneMapOverlayUrl.includes("demo_cadastral_map"))
+                    ? c.droneMapOverlayUrl
+                    : "/sample-aligned-cadastre.svg",
+              scannedMapOverlayUrl: undefined,
+              droneMapOverlayUrl:
+                c.droneMapOverlayUrl && !c.droneMapOverlayUrl.includes("demo_cadastral_map")
+                  ? c.droneMapOverlayUrl
+                  : "/demo_datasets/demo_drone_map.jpg",
+            }));
+            const localKhasras = new Set(sanitizedCustom.map((c: any) => String(c.khasra_no)));
             const filteredBackend = mapped.filter((b) => !localKhasras.has(String(b.khasra_no)));
-            merged = [...localCustom, ...filteredBackend];
+            merged = [...sanitizedCustom, ...filteredBackend];
           }
         } catch (e) {
           console.warn("Local storage merge note:", e);
@@ -261,14 +281,19 @@ export default function TehsildarPage() {
         setPendingApprovals(merged);
         if (merged.length > 0) {
           setSelectedApproval((prev) => {
-            if (!prev || prev.khasra_no === "N/A") return merged[0];
-            const match = merged.find(
-              (m) =>
-                m.parcel_id === prev.parcel_id ||
-                m.approval_id === prev.approval_id ||
-                String(m.khasra_no) === String(prev.khasra_no)
-            );
-            return match || merged[0];
+            const chosen =
+              !prev || prev.khasra_no === "N/A"
+                ? merged[0]
+                : (merged.find(
+                    (m) =>
+                      m.parcel_id === prev.parcel_id ||
+                      m.approval_id === prev.approval_id ||
+                      String(m.khasra_no) === String(prev.khasra_no)
+                  ) || merged[0]);
+            if (chosen?.alignedMapUrl && !chosen.alignedMapUrl.includes("demo_cadastral_map")) {
+              setAlignedMapOverlayUrl(chosen.alignedMapUrl);
+            }
+            return chosen;
           });
         }
       }
@@ -295,15 +320,19 @@ export default function TehsildarPage() {
 
   useEffect(() => {
     if (!selectedApproval) return;
-    if (selectedApproval.alignedMapUrl) {
+    if (selectedApproval.alignedMapUrl && !selectedApproval.alignedMapUrl.includes("demo_cadastral_map")) {
       setAlignedMapOverlayUrl(selectedApproval.alignedMapUrl);
+    } else {
+      setAlignedMapOverlayUrl((prev) =>
+        prev && !prev.includes("demo_cadastral_map") ? prev : "/sample-aligned-cadastre.svg"
+      );
     }
-    if (selectedApproval.droneMapOverlayUrl) {
+    if (selectedApproval.droneMapOverlayUrl && !selectedApproval.droneMapOverlayUrl.includes("demo_cadastral_map")) {
       setDroneMapOverlayUrl(selectedApproval.droneMapOverlayUrl);
+    } else {
+      setDroneMapOverlayUrl("/demo_datasets/demo_drone_map.jpg");
     }
-    if (selectedApproval.scannedMapOverlayUrl) {
-      setScannedMapOverlayUrl(selectedApproval.scannedMapOverlayUrl);
-    }
+    setScannedMapOverlayUrl(null);
     setIsAligned(true);
   }, [selectedApproval]);
 
@@ -832,9 +861,17 @@ export default function TehsildarPage() {
                         key={a.approval_id}
                         onClick={() => {
                           setSelectedApproval(a);
-                          if (a.alignedMapUrl) setAlignedMapOverlayUrl(a.alignedMapUrl);
-                          if (a.droneMapOverlayUrl) setDroneMapOverlayUrl(a.droneMapOverlayUrl);
-                          if (a.scannedMapOverlayUrl) setScannedMapOverlayUrl(a.scannedMapOverlayUrl);
+                          const aligned =
+                            a.alignedMapUrl && !a.alignedMapUrl.includes("demo_cadastral_map")
+                              ? a.alignedMapUrl
+                              : (alignedMapOverlayUrl && !alignedMapOverlayUrl.includes("demo_cadastral_map"))
+                                ? alignedMapOverlayUrl
+                                : "/sample-aligned-cadastre.svg";
+                          setAlignedMapOverlayUrl(aligned);
+                          if (a.droneMapOverlayUrl && !a.droneMapOverlayUrl.includes("demo_cadastral_map")) {
+                            setDroneMapOverlayUrl(a.droneMapOverlayUrl);
+                          }
+                          setScannedMapOverlayUrl(null);
                           setIsAligned(true);
                           toast.success(`Loaded Khasra ${a.khasra_no} for Adjudication`, { icon: "⚖️" });
                         }}
@@ -978,9 +1015,15 @@ export default function TehsildarPage() {
                       alignment_status: feat.properties.alignment_status || "aligned",
                       alignment_confidence: feat.properties.alignment_confidence ?? 0.94,
                       geometry: feat.geometry,
-                      alignedMapUrl: alignedMapOverlayUrl || undefined,
-                      scannedMapOverlayUrl: scannedMapOverlayUrl || undefined,
-                      droneMapOverlayUrl: droneMapOverlayUrl || undefined,
+                      alignedMapUrl:
+                        alignedMapOverlayUrl && !alignedMapOverlayUrl.includes("demo_cadastral_map")
+                          ? alignedMapOverlayUrl
+                          : "/sample-aligned-cadastre.svg",
+                      scannedMapOverlayUrl: undefined,
+                      droneMapOverlayUrl:
+                        droneMapOverlayUrl && !droneMapOverlayUrl.includes("demo_cadastral_map")
+                          ? droneMapOverlayUrl
+                          : "/demo_datasets/demo_drone_map.jpg",
                     });
                   }
                 }
@@ -992,12 +1035,29 @@ export default function TehsildarPage() {
               enableSideBySide={false}
               onToggleSideBySide={() => {}}
               suppressEmptyBanner={false}
-              isAligned={isAligned}
-              alignedMapOverlayUrl={alignedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg"}
-              droneMapOverlayUrl={droneMapOverlayUrl || "/sample-drone-orthomosaic.svg"}
-              scannedMapOverlayUrl={scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg"}
-              droneBaseUrl={droneMapOverlayUrl || "/sample-drone-orthomosaic.svg"}
-              cadastralOverlayUrl={alignedMapOverlayUrl || scannedMapOverlayUrl || "/demo_datasets/demo_cadastral_map.jpg"}
+              isAligned={true}
+              alignedMapOverlayUrl={
+                alignedMapOverlayUrl && !alignedMapOverlayUrl.includes("demo_cadastral_map")
+                  ? alignedMapOverlayUrl
+                  : "/sample-aligned-cadastre.svg"
+              }
+              droneMapOverlayUrl={
+                droneMapOverlayUrl && !droneMapOverlayUrl.includes("demo_cadastral_map")
+                  ? droneMapOverlayUrl
+                  : "/demo_datasets/demo_drone_map.jpg"
+              }
+              scannedMapOverlayUrl={undefined}
+              droneBaseUrl={
+                alignedMapOverlayUrl && !alignedMapOverlayUrl.includes("demo_cadastral_map")
+                  ? alignedMapOverlayUrl
+                  : (droneMapOverlayUrl || "/demo_datasets/demo_drone_map.jpg")
+              }
+              cadastralOverlayUrl={undefined}
+              unifiedOverlayUrl={
+                alignedMapOverlayUrl && !alignedMapOverlayUrl.includes("demo_cadastral_map")
+                  ? alignedMapOverlayUrl
+                  : "/sample-aligned-cadastre.svg"
+              }
               alignmentConfidence={
                 selectedApproval?.alignment_confidence
                   ? (selectedApproval.alignment_confidence > 1 ? selectedApproval.alignment_confidence : Math.round(selectedApproval.alignment_confidence * 100))

@@ -1954,13 +1954,13 @@ export default function MapViewer({
                 transition: isPanningUnified ? "none" : "transform 0.05s ease-out",
               }}
             >
-              {/* 1. Base Layer: Drone Orthophoto */}
-              {Boolean(droneBaseUrl || droneMapOverlayUrl || alignedMapOverlayUrl) && (
+              {/* 1. Base Layer: Drone Orthophoto / Newly Aligned Map */}
+              {Boolean(alignedOnlyMode ? (alignedMapOverlayUrl || unifiedOverlayUrl || droneBaseUrl || droneMapOverlayUrl) : (droneBaseUrl || droneMapOverlayUrl || alignedMapOverlayUrl)) && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   id="unified-base-drone-img"
-                  src={(droneBaseUrl || droneMapOverlayUrl || alignedMapOverlayUrl) || undefined}
-                  alt="Drone Orthomosaic Base Map"
+                  src={(alignedOnlyMode ? (alignedMapOverlayUrl || unifiedOverlayUrl || droneBaseUrl || droneMapOverlayUrl) : (droneBaseUrl || droneMapOverlayUrl || alignedMapOverlayUrl)) || undefined}
+                  alt={alignedOnlyMode ? "Newly Aligned Cadastral Map" : "Drone Orthomosaic Base Map"}
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
                   }}
@@ -1975,8 +1975,8 @@ export default function MapViewer({
                 />
               )}
 
-              {/* 2. Overlay Layer: Aligned Cadastre (Neon green lines, 25% fill, khasra badges) */}
-              {showCadastral && Boolean(cadastralOverlayUrl || unifiedOverlayUrl || alignedMapOverlayUrl) && (
+              {/* 2. Overlay Layer: Aligned Cadastre (Neon green lines, 25% fill, khasra badges) - Skipped in alignedOnlyMode if using unified aligned map */}
+              {showCadastral && (!alignedOnlyMode || (cadastralOverlayUrl && cadastralOverlayUrl !== alignedMapOverlayUrl && !cadastralOverlayUrl.includes("demo_cadastral_map"))) && Boolean(cadastralOverlayUrl || unifiedOverlayUrl || alignedMapOverlayUrl) && (
                 <div
                   style={{
                     position: "absolute",
