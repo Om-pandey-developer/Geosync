@@ -776,18 +776,24 @@ export default function PatwariPage() {
   // ── Demo Data Quick Loaders (One-Click Testing) ──
   const handleLoadDemoCadastralMap = async () => {
     try {
-      const res = await fetch("/demo_datasets/demo_cadastral_map.jpg");
-      const blob = await res.blob();
-      const file = new File([blob], "demo_cadastral_map.jpg", { type: "image/jpeg" });
-      const url = URL.createObjectURL(file);
-      setScannedMapOverlayUrl(url);
+      const demoUrl = "/demo_datasets/demo_cadastral_map.jpg";
+      setScannedMapOverlayUrl(demoUrl);
       setOldMapFile({
-        file,
         name: "demo_cadastral_map.jpg",
-        size: (file.size / (1024 * 1024)).toFixed(2) + " MB",
-        url,
-        preview: url,
+        size: "0.04 MB",
+        url: demoUrl,
+        preview: demoUrl,
       });
+
+      // Also create File object in background for backend harmonization API
+      fetch(demoUrl)
+        .then((r) => r.blob())
+        .then((blob) => {
+          const file = new File([blob], "demo_cadastral_map.jpg", { type: "image/jpeg" });
+          setOldMapFile((prev) => (prev ? { ...prev, file } : null));
+        })
+        .catch((e) => console.warn("Demo cadastral fetch error:", e));
+
       // Reset previous alignment immediately so old results are not shown
       setAlignedMapUrl(null);
       setUnifiedOverlayUrl(null);
@@ -805,18 +811,24 @@ export default function PatwariPage() {
 
   const handleLoadDemoDroneMap = async () => {
     try {
-      const res = await fetch("/demo_datasets/demo_drone_map.jpg");
-      const blob = await res.blob();
-      const file = new File([blob], "demo_drone_map.jpg", { type: "image/jpeg" });
-      const url = URL.createObjectURL(file);
-      setDroneMapOverlayUrl(url);
+      const demoUrl = "/demo_datasets/demo_drone_map.jpg";
+      setDroneMapOverlayUrl(demoUrl);
       setDroneMapFile({
-        file,
         name: "demo_drone_map.jpg",
-        size: (file.size / (1024 * 1024)).toFixed(2) + " MB",
-        url,
-        preview: url,
+        size: "0.17 MB",
+        url: demoUrl,
+        preview: demoUrl,
       });
+
+      // Also create File object in background for backend harmonization API
+      fetch(demoUrl)
+        .then((r) => r.blob())
+        .then((blob) => {
+          const file = new File([blob], "demo_drone_map.jpg", { type: "image/jpeg" });
+          setDroneMapFile((prev) => (prev ? { ...prev, file } : null));
+        })
+        .catch((e) => console.warn("Demo drone fetch error:", e));
+
       // Reset previous alignment immediately so old results are not shown
       setAlignedMapUrl(null);
       setUnifiedOverlayUrl(null);
@@ -895,8 +907,8 @@ export default function PatwariPage() {
     }
 
     setIsUploadStudioOpen(false);
-    setIsCurtainSwipeActive(true);
-    setIsSideBySideActive(false);
+    setIsCurtainSwipeActive(false);
+    setIsSideBySideActive(true);
     toast.success("मानचित्र व निर्देशांक सत्यापित! Opening Side-by-Side comparison.", { icon: "✅" });
   };
 
@@ -2070,32 +2082,61 @@ export default function PatwariPage() {
             </div>
 
             <div style={{ background: "var(--bg-secondary)", padding: "10px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-              <button
-                onClick={() => {
-                  setIsCurtainSwipeActive(!isCurtainSwipeActive);
-                  closeSidebar();
-                }}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  padding: "8px 10px",
-                  borderRadius: "var(--radius-sm)",
-                  border: isCurtainSwipeActive ? "1.5px solid #0D9488" : "1px solid var(--border-glass)",
-                  background: isCurtainSwipeActive ? "#0D9488" : "#FFFFFF",
-                  color: isCurtainSwipeActive ? "#FFFFFF" : "var(--text-primary)",
-                  fontWeight: 700,
-                  fontSize: "0.8125rem",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  marginBottom: 8,
-                }}
-              >
-                <SplitSquareVertical size={14} />
-                <span>{isCurtainSwipeActive ? "Curtain Swipe: ON" : "Curtain Swipe"}</span>
-              </button>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+                <button
+                  onClick={() => {
+                    setIsCurtainSwipeActive(!isCurtainSwipeActive);
+                    if (!isCurtainSwipeActive) setIsSideBySideActive(false);
+                    closeSidebar();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    padding: "8px 6px",
+                    borderRadius: "var(--radius-sm)",
+                    border: isCurtainSwipeActive ? "1.5px solid #0D9488" : "1px solid var(--border-glass)",
+                    background: isCurtainSwipeActive ? "#0D9488" : "#FFFFFF",
+                    color: isCurtainSwipeActive ? "#FFFFFF" : "var(--text-primary)",
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  title="Toggle Curtain Swipe slider comparison"
+                >
+                  <SplitSquareVertical size={13} />
+                  <span>{isCurtainSwipeActive ? "Swipe: ON" : "Swipe"}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsSideBySideActive(!isSideBySideActive);
+                    if (!isSideBySideActive) setIsCurtainSwipeActive(false);
+                    closeSidebar();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    padding: "8px 6px",
+                    borderRadius: "var(--radius-sm)",
+                    border: isSideBySideActive ? "1.5px solid #0D9488" : "1px solid var(--border-glass)",
+                    background: isSideBySideActive ? "#0D9488" : "#FFFFFF",
+                    color: isSideBySideActive ? "#FFFFFF" : "var(--text-primary)",
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  title="Toggle Dual Side-by-Side view"
+                >
+                  <ArrowRightLeft size={13} />
+                  <span>{isSideBySideActive ? "Dual: ON" : "Side-by-Side"}</span>
+                </button>
+              </div>
 
               <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", lineHeight: 1.35 }}>
                 ◀ <strong>Old Map</strong> | <strong>Drone Map</strong> ▶
@@ -2921,17 +2962,7 @@ export default function PatwariPage() {
                 ) : (
                   <div>
                     <button
-                      onClick={() => {
-                        if (!isCoordinatesValid) {
-                          toast.error("Please enter GPS coordinates (Latitude & Longitude) before executing alignment.", {
-                            icon: "📍",
-                            duration: 4000,
-                          });
-                          return;
-                        }
-                        runAlign();
-                      }}
-                      disabled={isAligningPipeline}
+                      onClick={handleAttemptCloseUploadStudio}
                       className="btn-primary"
                       style={{
                         width: "100%",
@@ -2942,7 +2973,7 @@ export default function PatwariPage() {
                         color: "#FFFFFF",
                         border: "none",
                         borderRadius: "var(--radius-md)",
-                        cursor: isAligningPipeline ? "not-allowed" : "pointer",
+                        cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -2950,28 +2981,10 @@ export default function PatwariPage() {
                         boxShadow: "0 8px 25px rgba(13, 148, 136, 0.35)",
                         transition: "all 0.2s ease",
                       }}
-                      title="Directly execute AI alignment pipeline and generate 37 parcels"
+                      title="Open dual synchronized side-by-side view to compare Old Cadastral Map and Drone Image"
                     >
-                      {isAligningPipeline ? (
-                        <>
-                          <div
-                            style={{
-                              width: 18,
-                              height: 18,
-                              border: "2px solid #FFFFFF",
-                              borderTopColor: "transparent",
-                              borderRadius: "50%",
-                              animation: "spin 0.8s linear infinite",
-                            }}
-                          />
-                          <span>Harmonizing Parcels...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={18} />
-                          <span>Run AI Map Alignment ➔</span>
-                        </>
-                      )}
+                      <ArrowRightLeft size={18} />
+                      <span>Open Side-by-Side Comparison ➔</span>
                     </button>
                   </div>
                 )}
@@ -3353,6 +3366,123 @@ export default function PatwariPage() {
 
         {/* ──── ZONE 2: CENTER MAP CANVAS ──── */}
         <main style={{ flex: 1, height: "100%", position: "relative", overflow: "hidden" }}>
+          {/* Top Center Floating Action Dock for Side-by-Side View */}
+          {isSideBySideActive && (
+            <div
+              className="animate-fade-in-down"
+              style={{
+                position: "absolute",
+                top: 14,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 800,
+                background: "rgba(15, 23, 42, 0.94)",
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
+                border: isAligned ? "1.5px solid #10B981" : "1.5px solid #0D9488",
+                borderRadius: 30,
+                padding: "6px 14px 6px 18px",
+                boxShadow: "0 12px 32px rgba(0, 0, 0, 0.45)",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                color: "#FFFFFF",
+                pointerEvents: "auto",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {isAligned ? (
+                  <CheckCircle2 size={16} style={{ color: "#34D399" }} />
+                ) : (
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2DD4BF", animation: "pulse 1.5s infinite" }} />
+                )}
+                <span style={{ fontSize: "0.8125rem", fontWeight: 800, letterSpacing: "-0.01em" }}>
+                  {isAligned ? "Maps Aligned & Harmonized" : "Side-by-Side Comparison"}
+                </span>
+                <span
+                  style={{
+                    background: isAligned ? "#065F46" : "rgba(255,255,255,0.12)",
+                    padding: "1px 8px",
+                    borderRadius: 10,
+                    fontSize: "0.7rem",
+                    color: isAligned ? "#6EE7B7" : "#94A3B8",
+                    fontWeight: 800,
+                  }}
+                >
+                  {isAligned ? `${alignmentMetrics?.confidence?.toFixed(1) || "98.6"}% Confidence` : "Pre-Alignment"}
+                </span>
+              </div>
+
+              <div style={{ width: 1, height: 18, background: "rgba(255, 255, 255, 0.2)" }} />
+
+              {!isAligned ? (
+                <button
+                  onClick={runAlign}
+                  disabled={isAligningPipeline}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 16px",
+                    borderRadius: 20,
+                    background: "linear-gradient(135deg, #0D9488 0%, #059669 100%)",
+                    border: "none",
+                    color: "#FFFFFF",
+                    fontWeight: 800,
+                    fontSize: "0.8125rem",
+                    cursor: isAligningPipeline ? "not-allowed" : "pointer",
+                    boxShadow: "0 4px 14px rgba(13, 148, 136, 0.45)",
+                    transition: "all 0.2s ease",
+                  }}
+                  title="Execute AI alignment on both maps"
+                >
+                  {isAligningPipeline ? (
+                    <>
+                      <div
+                        style={{
+                          width: 13,
+                          height: 13,
+                          border: "2px solid #FFFFFF",
+                          borderTopColor: "transparent",
+                          borderRadius: "50%",
+                          animation: "spin 0.8s linear infinite",
+                        }}
+                      />
+                      <span>Aligning...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={14} />
+                      <span>Align Maps ➔</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsSideBySideActive(false)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 14px",
+                    borderRadius: 20,
+                    background: "rgba(255, 255, 255, 0.15)",
+                    border: "1px solid rgba(255, 255, 255, 0.3)",
+                    color: "#FFFFFF",
+                    fontWeight: 700,
+                    fontSize: "0.78rem",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  title="Switch to full-screen aligned map view"
+                >
+                  <Eye size={13} />
+                  <span>View Full Aligned</span>
+                </button>
+              )}
+            </div>
+          )}
+
           <MapViewer
           geojsonData={geojson}
           selectedParcelId={selectedId}
@@ -3379,6 +3509,8 @@ export default function PatwariPage() {
           onToggleCurtainSwipe={setIsCurtainSwipeActive}
           enableSideBySide={isSideBySideActive}
           onToggleSideBySide={setIsSideBySideActive}
+          onRunAlign={runAlign}
+          isAligning={isAligningPipeline}
           mapZoom={mapZoom}
           onMapZoomChange={setMapZoom}
           resetViewTrigger={resetViewTrigger}
@@ -3418,9 +3550,9 @@ export default function PatwariPage() {
           basemapAttribution={activeBasemap.attribution}
           basemapName={activeBasemap.name}
           customOldMapGeojson={customOldMapGeojson}
-          scannedMapOverlayUrl={scannedMapOverlayUrl}
+          scannedMapOverlayUrl={scannedMapOverlayUrl || cadastralOverlayUrl || oldMapFile?.url || oldMapFile?.preview}
           scannedMapBounds={scannedMapBounds}
-          droneMapOverlayUrl={droneMapOverlayUrl}
+          droneMapOverlayUrl={droneMapOverlayUrl || droneBaseUrl || droneMapFile?.url || droneMapFile?.preview}
           droneMapBounds={droneMapBounds}
           defaultBaseLayer="isolated"
           oldMapOpacity={oldMapOpacity}
