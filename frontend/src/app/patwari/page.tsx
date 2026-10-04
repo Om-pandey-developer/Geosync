@@ -1622,9 +1622,10 @@ export default function PatwariPage() {
       setUnifiedOverlayUrl(alignedResultUrl);
       setIsAligned(true);
       setIsCurtainSwipeActive(false);
+      setIsSideBySideActive(false);
       setIsUploadStudioOpen(false);
 
-      toast.success("Spatial Harmonization Complete! Aligned Map loaded on the right.", {
+      toast.success("Spatial Harmonization Complete! Displaying Newly Aligned Map.", {
         id: tId,
         icon: "🎯",
         duration: 3500,
@@ -3418,6 +3419,7 @@ export default function PatwariPage() {
           resetViewTrigger={resetViewTrigger}
           suppressEmptyBanner={true}
           isAligned={isAligned}
+          alignedOnlyMode={isAligned && !isSideBySideActive && !isCurtainSwipeActive}
           alignedMapOverlayUrl={alignedMapUrl || undefined}
           // Unified Overlaid Alignment Canvas Props (Phase 4 Master Directive)
           unifiedOverlayUrl={unifiedOverlayUrl || undefined}

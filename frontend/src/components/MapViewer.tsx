@@ -190,7 +190,7 @@ interface MapViewerProps {
   isAligned?: boolean;
   alignedMapOverlayUrl?: string | null;
   defaultBaseLayer?: "isolated" | "drone" | "minimal";
-  // onLoadSampleMaps removed: mock data prohibited — real uploads only
+  // onLoadSampleMaps removed: mock data prohibited — real uploads only
   oldMapOpacity?: number;
   oldMapStrokeColor?: string;
   onOpenMapSourceModal?: () => void;
@@ -603,7 +603,7 @@ export default function MapViewer({
   const activeScannedBounds = scannedMapBounds || fallbackBounds;
   const activeDroneBounds = droneMapBounds || fallbackBounds;
 
-  // Sync enableCurtainSwipe prop → state (deduplicated — single effect)
+  // Sync enableCurtainSwipe prop → state (deduplicated — single effect)
   useEffect(() => {
     setIsSwipeActive(enableCurtainSwipe);
   }, [enableCurtainSwipe]);
@@ -718,6 +718,8 @@ export default function MapViewer({
   const [isCurtainActive, setIsCurtainActive] = useState<boolean>(enableCurtainSwipe || false);
   const [curtainPos, setCurtainPos] = useState<number>(50);
   const [isDraggingCurtain, setIsDraggingCurtain] = useState<boolean>(false);
+  // Ref to track dragging state for stable event handlers (avoids stale closure)
+  const isDraggingCurtainRef = useRef<boolean>(false);
 
   useEffect(() => {
     setIsCurtainActive(Boolean(enableCurtainSwipe));
@@ -1033,7 +1035,7 @@ export default function MapViewer({
       if (bounds) {
         const isInside = Math.abs(offX) <= bounds.halfW && Math.abs(offY) <= bounds.halfH;
         if (!isInside) {
-          toast.error("GCP map boundary ke bahar nahi drop kar sakte!", { icon: "⚠️" });
+          toast.error("GCP map boundary ke bahar nahi drop kar sakte!", { icon: "- " });
           return;
         }
       }
@@ -1072,7 +1074,7 @@ export default function MapViewer({
       };
       setActiveAnchors((prev) => [...prev, newPin]);
       setSelectedAnchorPin(newPin);
-      toast.success(`Assisted GCP Landmark #${newId} pinned at [${newPin.lat}° N, ${newPin.lon}° E]`, { icon: "📍" });
+      toast.success(`Assisted GCP Landmark #${newId} pinned at [${newPin.lat}° N, ${newPin.lon}° E]`, { icon: "📍" });
     }
   };
 
@@ -1195,39 +1197,42 @@ export default function MapViewer({
   const handleCurtainDragStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    isDraggingCurtainRef.current = true;
     setIsDraggingCurtain(true);
   };
 
+  // Stable callback — uses ref to avoid stale closure, so no need to re-register on every drag state change
   const handleCurtainMove = useCallback(
     (e: MouseEvent | TouchEvent) => {
-      if (!isDraggingCurtain || !containerRef.current) return;
+      if (!isDraggingCurtainRef.current || !containerRef.current) return;
+      e.preventDefault();
       const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
       const rect = containerRef.current.getBoundingClientRect();
       const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
       const pct = Math.max(5, Math.min(95, Math.round((x / rect.width) * 100)));
       setCurtainPos(pct);
     },
-    [isDraggingCurtain]
+    [] // stable — no deps needed because ref is used
   );
 
   const handleCurtainEnd = useCallback(() => {
+    isDraggingCurtainRef.current = false;
     setIsDraggingCurtain(false);
   }, []);
 
+  // Register global listeners once, gate logic via ref
   useEffect(() => {
-    if (isDraggingCurtain) {
-      window.addEventListener("mousemove", handleCurtainMove);
-      window.addEventListener("mouseup", handleCurtainEnd);
-      window.addEventListener("touchmove", handleCurtainMove, { passive: false });
-      window.addEventListener("touchend", handleCurtainEnd);
-    }
+    window.addEventListener("mousemove", handleCurtainMove);
+    window.addEventListener("mouseup", handleCurtainEnd);
+    window.addEventListener("touchmove", handleCurtainMove, { passive: false });
+    window.addEventListener("touchend", handleCurtainEnd);
     return () => {
       window.removeEventListener("mousemove", handleCurtainMove);
       window.removeEventListener("mouseup", handleCurtainEnd);
       window.removeEventListener("touchmove", handleCurtainMove);
       window.removeEventListener("touchend", handleCurtainEnd);
     };
-  }, [isDraggingCurtain, handleCurtainMove, handleCurtainEnd]);
+  }, [handleCurtainMove, handleCurtainEnd]);
 
   // Anchor pin dragging
   const handlePinMouseDown = (id: number, e: React.MouseEvent) => {
@@ -1487,7 +1492,7 @@ export default function MapViewer({
           fontWeight: 600,
         }}
       >
-        Initializing GIS Canvas…
+        Initializing GIS Canvas-
       </div>
     );
   }
@@ -1675,7 +1680,13 @@ export default function MapViewer({
     const isAmber = band === "AMBER" || props.status_color === "#F59E0B";
     const statusBadgeBg = isRed ? "#FEE2E2" : isAmber ? "#FEF3C7" : "#DCFCE7";
     const statusBadgeColor = isRed ? "#991B1B" : isAmber ? "#92400E" : "#166534";
-    const statusLabel = props.situation || (isRed ? "सरकारी भूमि / अवैध कब्जा" : isAmber ? "ओकल्शन (पेड़ / छाया)" : "सही (Verified Clear)");
+    const statusLabel =
+      props.situation ||
+      (isRed
+        ? "Govt Land / Encroachment"
+        : isAmber
+        ? "Occluded / Canopy"
+        : "Verified Clear");
 
     const popupContent = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 250px; padding: 4px; color: #0F172A;">
@@ -2088,7 +2099,7 @@ export default function MapViewer({
                             gap: 4,
                           }}
                         >
-                          <span>📍 {anchor.label}</span>
+                          <span>📍 {anchor.label}</span>
                           <span style={{ color: "#38BDF8", fontSize: "0.62rem", fontFamily: "monospace" }}>
                             [{(anchor.lat || pinCoords.lat).toFixed(4)}°, {(anchor.lon || pinCoords.lon).toFixed(4)}°]
                           </span>
@@ -2114,7 +2125,7 @@ export default function MapViewer({
                       e.stopPropagation();
                       if ((e.target as HTMLElement).closest("button")) return;
                       setLockedGcp(gcp);
-                      toast(`Locked GCP #${gcp.id}: [${gcp.lat.toFixed(6)}° N, ${gcp.lng.toFixed(6)}° E]`, { icon: "📍" });
+                      toast(`Locked GCP #${gcp.id}: [${gcp.lat.toFixed(6)}° N, ${gcp.lng.toFixed(6)}° E]`, { icon: "📍" });
                     }}
                     style={{
                       position: "absolute",
@@ -2173,7 +2184,7 @@ export default function MapViewer({
                           userSelect: "none",
                         }}
                       >
-                        <span style={{ color: isSelected ? "#FBBF24" : "#FACC15" }}>📌 {gcp.label || `GCP #${gcp.id}`}</span>
+                        <span style={{ color: isSelected ? "#FBBF24" : "#FACC15" }}>📍 {gcp.label || `GCP #${gcp.id}`}</span>
                         <span style={{ color: "#38BDF8", fontSize: "0.62rem", fontFamily: "monospace" }}>
                           [{gcp.lat.toFixed(5)}°, {gcp.lng.toFixed(5)}°]
                         </span>
@@ -2395,7 +2406,7 @@ export default function MapViewer({
                     onClick={() => {
                       setActiveAnchors((prev) => prev.filter((a) => a.id !== selectedAnchorPin.id));
                       setSelectedAnchorPin(null);
-                      toast.success(`Deleted Pin #${selectedAnchorPin.id}`, { icon: "🗑️" });
+                      toast.success(`Deleted Pin #${selectedAnchorPin.id}`, { icon: "🗑️" });
                     }}
                     style={{
                       padding: "7px 10px",
@@ -2598,7 +2609,7 @@ export default function MapViewer({
                   }}
                 >
                   <span style={{ fontSize: "0.8rem", fontWeight: 900, color: (alignmentConfidence || 80) >= 85 ? "#10B981" : "#F59E0B" }}>
-                    🎯 {alignmentConfidence || 80.0}% {alignmentConfidenceBand || "AMBER"}
+                     {alignmentConfidence || 80.0}% {alignmentConfidenceBand || "AMBER"}
                   </span>
                 </div>
                 <span style={{ fontSize: "0.72rem", color: "#94A3B8" }}>
@@ -2822,7 +2833,7 @@ export default function MapViewer({
                     boxShadow: "0 2px 8px rgba(13, 148, 136, 0.4)",
                   }}
                 >
-                  ✨ View Aligned Map ➔
+                   View Aligned Map →
                 </button>
               </div>
             )}
@@ -3002,7 +3013,7 @@ export default function MapViewer({
               aria-valuenow={swipePosition}
               aria-valuemin={5}
               aria-valuemax={95}
-              aria-label="Curtain comparison slider — use Left/Right arrow keys to adjust"
+              aria-label="Curtain comparison slider — use Left/Right arrow keys to adjust"
               style={{
                 position: "absolute",
                 top: "50%",
@@ -3058,7 +3069,7 @@ export default function MapViewer({
               >
                 <ArrowRightLeft size={16} />
               </div>
-              {/* Position badge — above the handle to avoid bottom-edge clipping */}
+              {/* Position badge — above the handle to avoid bottom-edge clipping */}
               <div
                 style={{
                   position: "absolute",
@@ -3157,7 +3168,7 @@ export default function MapViewer({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.12)", paddingBottom: 4 }}>
-                  <span style={{ fontWeight: 800, color: "#38BDF8", fontSize: "0.72rem" }}>🎯 AI Comparison Result</span>
+                  <span style={{ fontWeight: 800, color: "#38BDF8", fontSize: "0.72rem" }}> AI Comparison Result</span>
                   <span style={{ fontWeight: 800, color: "#10B981", fontSize: "0.72rem", background: "rgba(16,185,129,0.2)", padding: "1px 6px", borderRadius: 4 }}>
                     98.4% Match
                   </span>
@@ -3218,7 +3229,7 @@ export default function MapViewer({
                       borderRight: "1px solid rgba(255, 255, 255, 0.18)",
                     }}
                   >
-                    {isAligned ? "🎯 Aligned Map" : "🛰️ Drone Image"}
+                    {isAligned ? " Aligned Map" : " Drone Image"}
                   </span>
 
                   <button
@@ -3239,7 +3250,7 @@ export default function MapViewer({
                     }}
                     title="Zoom Out Right Map (-)"
                   >
-                    −
+                    -
                   </button>
 
                   <input
@@ -3301,7 +3312,7 @@ export default function MapViewer({
                     }}
                     title="Reset Right Map to Full Screen"
                   >
-                    ⟲ Fit
+                     Fit
                   </button>
                 </div>
               </>
@@ -3309,73 +3320,34 @@ export default function MapViewer({
           </>
         ) : (!alignedOnlyMode && isSideBySide) ? (
           /* ──────────────────────────────────────────────────────
-             SIDE-BY-SIDE MODE: two flex-children, half width each
+             TRUE CURTAIN WIPE: both maps render at FULL SIZE.
+             clip-path controls which portion of each is VISIBLE.
+             Left map  → inset(0 (100-pos)% 0 0)  — reveals left portion
+             Right map → inset(0 0 0 pos%)          — reveals right portion
+             Images NEVER resize — only revealed area changes.
           ────────────────────────────────────────────────────── */
-          <div style={{ display: "flex", width: "100%", height: "100%", position: "relative", background: "#0F172A" }}>
-            {/* LEFT MAP: OLD CADASTRAL MAP */}
-            <div style={{ flex: 1, height: "100%", position: "relative", borderRight: "2.5px solid #0D9488", background: "#0F172A", overflow: "hidden" }}>
-              <div
-                style={{
-                  position: "absolute",
-                  top: 14, left: 14,
-                  zIndex: 500,
-                  background: "rgba(15,23,42,0.92)",
-                  color: "#FFFFFF",
-                  padding: "6px 14px",
-                  borderRadius: 8,
-                  fontSize: "0.78rem",
-                  fontWeight: 800,
-                  letterSpacing: "0.04em",
-                  backdropFilter: "blur(8px)",
-                  pointerEvents: "none",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <span>📜 OLD CADASTRAL MAP (PRE-ALIGNMENT)</span>
-              </div>
-
-              {/* Zoom & Pan floating controls */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 16,
-                  left: 16,
-                  zIndex: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "rgba(15, 23, 42, 0.85)",
-                  padding: "4px 8px",
-                  borderRadius: 8,
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
-                }}
-              >
-                <button
-                  onClick={zoomInLeft}
-                  style={{ background: "transparent", border: "none", color: "#FFF", cursor: "pointer", padding: "3px 6px", fontWeight: 700 }}
-                  title="Zoom In Left Map"
-                >
-                  +
-                </button>
-                <button
-                  onClick={zoomOutLeft}
-                  style={{ background: "transparent", border: "none", color: "#FFF", cursor: "pointer", padding: "3px 6px", fontWeight: 700 }}
-                  title="Zoom Out Left Map"
-                >
-                  -
-                </button>
-                <button
-                  onClick={resetLeftView}
-                  style={{ background: "transparent", border: "none", color: "#2DD4BF", cursor: "pointer", padding: "3px 6px", fontSize: "0.7rem", fontWeight: 700 }}
-                  title="Reset Left View"
-                >
-                  ⟲ Fit
-                </button>
-              </div>
-
+          <div
+            ref={containerRef}
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "100%",
+              background: "#0F172A",
+              overflow: "hidden",
+              userSelect: isDraggingCurtain ? "none" : "auto",
+              cursor: isDraggingCurtain ? "col-resize" : "default",
+            }}
+          >
+            {/* ── LAYER 1 (bottom): LEFT MAP — Old Cadastral — clipped to left portion ── */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                clipPath: `inset(0 ${100 - curtainPos}% 0 0)`,
+                transition: isDraggingCurtain ? "none" : "clip-path 0.04s ease-out",
+                zIndex: 1,
+              }}
+            >
               {(scannedMapOverlayUrl || cadastralOverlayUrl) ? (
                 <div
                   onMouseDown={handleLeftMouseDown}
@@ -3423,7 +3395,7 @@ export default function MapViewer({
                 </div>
               ) : (
                 <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, color: "#94A3B8" }}>
-                  <div style={{ fontSize: "2rem" }}>📜</div>
+                  <div style={{ fontSize: "2rem" }}></div>
                   <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#E2E8F0" }}>No Old Cadastral Map Loaded</div>
                   <div style={{ fontSize: "0.75rem", color: "#64748B", maxWidth: 220, textAlign: "center" }}>
                     Upload cadastral map in Upload Studio to compare
@@ -3431,16 +3403,7 @@ export default function MapViewer({
                   {onOpenMapSourceModal && (
                     <button
                       onClick={onOpenMapSourceModal}
-                      style={{
-                        background: "#0D9488",
-                        color: "#FFFFFF",
-                        border: "none",
-                        padding: "5px 12px",
-                        borderRadius: 6,
-                        fontSize: "0.76rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
+                      style={{ background: "#0D9488", color: "#FFFFFF", border: "none", padding: "5px 12px", borderRadius: 6, fontSize: "0.76rem", fontWeight: 700, cursor: "pointer" }}
                     >
                       Open Upload Studio
                     </button>
@@ -3449,162 +3412,16 @@ export default function MapViewer({
               )}
             </div>
 
-            {/* Central Sync Badge */}
+            {/* ── LAYER 2 (top): RIGHT MAP — Drone/Aligned — clipped to right portion ── */}
             <div
               style={{
                 position: "absolute",
-                left: "50%", top: "50%",
-                transform: "translate(-50%, -50%)",
-                zIndex: 600,
-                background: "#0D9488",
-                color: "#FFFFFF",
-                width: 38, height: 38,
-                borderRadius: "50%",
-                border: "3px solid #FFFFFF",
-                boxShadow: "0 4px 16px rgba(13,148,136,0.5)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                pointerEvents: "none",
+                inset: 0,
+                clipPath: `inset(0 0 0 ${curtainPos}%)`,
+                transition: isDraggingCurtain ? "none" : "clip-path 0.04s ease-out",
+                zIndex: 2,
               }}
             >
-              <ArrowRightLeft size={16} />
-            </div>
-
-            {/* RIGHT MAP: DRONE MAP (PRE-ALIGNMENT) OR ALIGNED MAP */}
-            <div style={{ flex: 1, height: "100%", position: "relative", overflow: "hidden", background: "#0F172A" }}>
-              <div
-                style={{
-                  position: "absolute",
-                  top: 14, left: 14,
-                  zIndex: 500,
-                  background: isAligned ? "rgba(13,148,136,0.95)" : "rgba(30,58,138,0.92)",
-                  color: "#FFFFFF",
-                  padding: "6px 14px",
-                  borderRadius: 8,
-                  fontSize: "0.78rem",
-                  fontWeight: 800,
-                  letterSpacing: "0.04em",
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255,255,255,0.25)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-                }}
-              >
-                <span>{isAligned ? "✨ NEW ALIGNED MAP (DRONE + GEOSAM)" : "🛰️ DRONE IMAGE (PRE-ALIGNMENT)"}</span>
-                {isAligned && (
-                  <span
-                    style={{
-                      background: "#065F46",
-                      padding: "2px 8px",
-                      borderRadius: 10,
-                      fontSize: "0.7rem",
-                      color: "#6EE7B7",
-                      fontWeight: 800,
-                      border: "1px solid #10B981",
-                    }}
-                  >
-                    {alignmentConfidence ? `${alignmentConfidence.toFixed(1)}% Confidence` : "80.5% Confidence"}
-                  </span>
-                )}
-                {!isAligned && onRunAlign && (
-                  <button
-                    onClick={onRunAlign}
-                    disabled={isAligning}
-                    style={{
-                      background: "linear-gradient(135deg, #0D9488 0%, #059669 100%)",
-                      color: "#FFFFFF",
-                      border: "none",
-                      padding: "4px 14px",
-                      borderRadius: 6,
-                      fontSize: "0.76rem",
-                      fontWeight: 800,
-                      cursor: isAligning ? "not-allowed" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                      marginLeft: 8,
-                      boxShadow: "0 2px 8px rgba(13, 148, 136, 0.4)",
-                      transition: "all 0.15s ease",
-                    }}
-                    title="Click to execute AI alignment on these maps"
-                  >
-                    <Sparkles size={12} />
-                    <span>{isAligning ? "Aligning..." : "Align Maps ➔"}</span>
-                  </button>
-                )}
-                {isAligned && (
-                  <button
-                    onClick={() => {
-                      setIsSideBySide(false);
-                      setIsSwipeActive(false);
-                      if (onToggleSideBySide) onToggleSideBySide(false);
-                      if (onToggleCurtainSwipe) onToggleCurtainSwipe(false);
-                    }}
-                    style={{
-                      background: "#FFFFFF",
-                      color: "#0F766E",
-                      border: "none",
-                      padding: "4px 12px",
-                      borderRadius: 6,
-                      fontSize: "0.74rem",
-                      fontWeight: 800,
-                      cursor: "pointer",
-                      marginLeft: 6,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                      boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-                    }}
-                    title="Switch to full-screen aligned map view"
-                  >
-                    <Eye size={12} />
-                    <span>View Full Aligned Map ➔</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Zoom & Pan floating controls */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 16,
-                  right: 16,
-                  zIndex: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "rgba(15, 23, 42, 0.85)",
-                  padding: "4px 8px",
-                  borderRadius: 8,
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
-                }}
-              >
-                <button
-                  onClick={zoomInRight}
-                  style={{ background: "transparent", border: "none", color: "#FFF", cursor: "pointer", padding: "3px 6px", fontWeight: 700 }}
-                  title="Zoom In Right Map"
-                >
-                  +
-                </button>
-                <button
-                  onClick={zoomOutRight}
-                  style={{ background: "transparent", border: "none", color: "#FFF", cursor: "pointer", padding: "3px 6px", fontWeight: 700 }}
-                  title="Zoom Out Right Map"
-                >
-                  -
-                </button>
-                <button
-                  onClick={resetRightView}
-                  style={{ background: "transparent", border: "none", color: "#38BDF8", cursor: "pointer", padding: "3px 6px", fontSize: "0.7rem", fontWeight: 700 }}
-                  title="Reset Right View"
-                >
-                  ⟲ Fit
-                </button>
-              </div>
-
               {(droneMapOverlayUrl || droneBaseUrl || (isAligned && (alignedMapOverlayUrl || unifiedOverlayUrl))) ? (
                 <div
                   onMouseDown={handleRightMouseDown}
@@ -3656,7 +3473,7 @@ export default function MapViewer({
                 </div>
               ) : (
                 <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, color: "#94A3B8" }}>
-                  <div style={{ fontSize: "2rem" }}>🛰️</div>
+                  <div style={{ fontSize: "2rem" }}></div>
                   <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#E2E8F0" }}>No Drone Image Loaded</div>
                   <div style={{ fontSize: "0.75rem", color: "#64748B", maxWidth: 220, textAlign: "center" }}>
                     Upload drone orthophoto in Upload Studio to compare
@@ -3664,20 +3481,273 @@ export default function MapViewer({
                   {onOpenMapSourceModal && (
                     <button
                       onClick={onOpenMapSourceModal}
-                      style={{
-                        background: "#0284C7",
-                        color: "#FFFFFF",
-                        border: "none",
-                        padding: "5px 12px",
-                        borderRadius: 6,
-                        fontSize: "0.76rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
+                      style={{ background: "#0284C7", color: "#FFFFFF", border: "none", padding: "5px 12px", borderRadius: 6, fontSize: "0.76rem", fontWeight: 700, cursor: "pointer" }}
                     >
                       Open Upload Studio
                     </button>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* ── LAYER 3: UI overlays — labels, zoom controls, handle (not clipped) ── */}
+
+            {/* Left label — OLD MAP */}
+            <div
+              style={{
+                position: "absolute",
+                top: 14, left: 14,
+                zIndex: 500,
+                background: "rgba(15,23,42,0.92)",
+                color: "#FFFFFF",
+                padding: "6px 14px",
+                borderRadius: 8,
+                fontSize: "0.78rem",
+                fontWeight: 800,
+                letterSpacing: "0.04em",
+                backdropFilter: "blur(8px)",
+                pointerEvents: "none",
+                border: "1px solid rgba(255,255,255,0.2)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                opacity: curtainPos < 16 ? 0 : 1,
+                transition: "opacity 0.15s ease",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span> OLD CADASTRAL MAP</span>
+            </div>
+
+            {/* Right label — DRONE/ALIGNED MAP */}
+            <div
+              style={{
+                position: "absolute",
+                top: 14, right: 14,
+                zIndex: 500,
+                background: isAligned ? "rgba(13,148,136,0.95)" : "rgba(30,58,138,0.92)",
+                color: "#FFFFFF",
+                padding: "6px 14px",
+                borderRadius: 8,
+                fontSize: "0.78rem",
+                fontWeight: 800,
+                letterSpacing: "0.04em",
+                backdropFilter: "blur(8px)",
+                border: "1px solid rgba(255,255,255,0.25)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                opacity: curtainPos > 84 ? 0 : 1,
+                transition: "opacity 0.15s ease",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span>{isAligned ? " ALIGNED MAP" : " DRONE IMAGE"}</span>
+              {isAligned && (
+                <span
+                  style={{
+                    background: "#065F46",
+                    padding: "2px 8px",
+                    borderRadius: 10,
+                    fontSize: "0.7rem",
+                    color: "#6EE7B7",
+                    fontWeight: 800,
+                    border: "1px solid #10B981",
+                  }}
+                >
+                  {alignmentConfidence ? `${alignmentConfidence.toFixed(1)}% Confidence` : "80.5% Confidence"}
+                </span>
+              )}
+              {!isAligned && onRunAlign && (
+                <button
+                  onClick={() => {
+                    setIsSideBySide(false);
+                    setIsSwipeActive(false);
+                    if (onToggleSideBySide) onToggleSideBySide(false);
+                    if (onToggleCurtainSwipe) onToggleCurtainSwipe(false);
+                    onRunAlign();
+                  }}
+                  disabled={isAligning}
+                  style={{
+                    background: "linear-gradient(135deg, #0D9488 0%, #059669 100%)",
+                    color: "#FFFFFF",
+                    border: "none",
+                    padding: "4px 14px",
+                    borderRadius: 6,
+                    fontSize: "0.76rem",
+                    fontWeight: 800,
+                    cursor: isAligning ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    boxShadow: "0 2px 8px rgba(13, 148, 136, 0.4)",
+                  }}
+                >
+                  <Sparkles size={12} />
+                  <span>{isAligning ? "Aligning..." : "Align Maps →"}</span>
+                </button>
+              )}
+              {isAligned && (
+                <button
+                  onClick={() => {
+                    setIsSideBySide(false);
+                    setIsSwipeActive(false);
+                    if (onToggleSideBySide) onToggleSideBySide(false);
+                    if (onToggleCurtainSwipe) onToggleCurtainSwipe(false);
+                  }}
+                  style={{
+                    background: "#FFFFFF",
+                    color: "#0F766E",
+                    border: "none",
+                    padding: "4px 12px",
+                    borderRadius: 6,
+                    fontSize: "0.74rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                  }}
+                >
+                  <Eye size={12} />
+                  <span>View Full Aligned →</span>
+                </button>
+              )}
+            </div>
+
+            {/* Left zoom controls */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 16, left: 16,
+                zIndex: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: "rgba(15, 23, 42, 0.85)",
+                padding: "4px 8px",
+                borderRadius: 8,
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                opacity: curtainPos < 16 ? 0 : 1,
+                transition: "opacity 0.15s ease",
+                pointerEvents: curtainPos < 16 ? "none" : "auto",
+              }}
+            >
+              <button onClick={zoomInLeft} style={{ background: "transparent", border: "none", color: "#FFF", cursor: "pointer", padding: "3px 6px", fontWeight: 700 }} title="Zoom In Old Map">+</button>
+              <button onClick={zoomOutLeft} style={{ background: "transparent", border: "none", color: "#FFF", cursor: "pointer", padding: "3px 6px", fontWeight: 700 }} title="Zoom Out Old Map">-</button>
+              <button onClick={resetLeftView} style={{ background: "transparent", border: "none", color: "#2DD4BF", cursor: "pointer", padding: "3px 6px", fontSize: "0.7rem", fontWeight: 700 }} title="Reset Old Map View"> Fit</button>
+            </div>
+
+            {/* Right zoom controls */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 16, right: 16,
+                zIndex: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: "rgba(15, 23, 42, 0.85)",
+                padding: "4px 8px",
+                borderRadius: 8,
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                opacity: curtainPos > 84 ? 0 : 1,
+                transition: "opacity 0.15s ease",
+                pointerEvents: curtainPos > 84 ? "none" : "auto",
+              }}
+            >
+              <button onClick={zoomInRight} style={{ background: "transparent", border: "none", color: "#FFF", cursor: "pointer", padding: "3px 6px", fontWeight: 700 }} title="Zoom In Drone Map">+</button>
+              <button onClick={zoomOutRight} style={{ background: "transparent", border: "none", color: "#FFF", cursor: "pointer", padding: "3px 6px", fontWeight: 700 }} title="Zoom Out Drone Map">-</button>
+              <button onClick={resetRightView} style={{ background: "transparent", border: "none", color: "#38BDF8", cursor: "pointer", padding: "3px 6px", fontSize: "0.7rem", fontWeight: 700 }} title="Reset Drone Map View"> Fit</button>
+            </div>
+
+            {/* ── Divider glow line (sits above both map layers) ── */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0, bottom: 0,
+                left: `${curtainPos}%`,
+                width: isDraggingCurtain ? 4 : 3,
+                background: isDraggingCurtain
+                  ? "linear-gradient(180deg, #10B981 0%, #06B6D4 50%, #10B981 100%)"
+                  : "linear-gradient(180deg, #0D9488 0%, #06B6D4 100%)",
+                zIndex: 600,
+                pointerEvents: "none",
+                transform: "translateX(-50%)",
+                boxShadow: isDraggingCurtain
+                  ? "0 0 16px rgba(16, 185, 129, 0.8), 0 0 6px rgba(6, 182, 212, 0.9)"
+                  : "0 0 10px rgba(13, 148, 136, 0.5)",
+                transition: isDraggingCurtain ? "none" : "left 0.04s ease-out, box-shadow 0.15s ease",
+              }}
+            />
+
+            {/* ── Draggable circular handle ── */}
+            <div
+              onMouseDown={handleCurtainDragStart}
+              onTouchStart={handleCurtainDragStart}
+              className="curtain-handle"
+              style={{
+                position: "absolute",
+                left: `${curtainPos}%`,
+                top: "50%",
+                transform: "translate(-50%, -50%)",
+                zIndex: 610,
+                cursor: "col-resize",
+                touchAction: "none",
+                userSelect: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 56,
+                height: 56,
+                transition: isDraggingCurtain ? "none" : "left 0.04s ease-out",
+              }}
+              title="Drag left/right to compare Old Cadastral Map & Drone Map"
+            >
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: "50%",
+                  background: isDraggingCurtain
+                    ? "linear-gradient(135deg, #10B981 0%, #06B6D4 100%)"
+                    : "linear-gradient(135deg, #0D9488 0%, #0891B2 100%)",
+                  color: "#FFFFFF",
+                  border: `${isDraggingCurtain ? 3.5 : 3}px solid #FFFFFF`,
+                  boxShadow: isDraggingCurtain
+                    ? "0 6px 20px rgba(16, 185, 129, 0.65), 0 0 14px rgba(6, 182, 212, 0.7)"
+                    : "0 4px 16px rgba(13, 148, 136, 0.55)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.15s ease",
+                  transform: isDraggingCurtain ? "scale(1.15)" : "scale(1)",
+                }}
+              >
+                <ArrowRightLeft size={17} />
+              </div>
+
+              {/* Live % tooltip while dragging */}
+              {isDraggingCurtain && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: -30,
+                    background: "rgba(15, 23, 42, 0.95)",
+                    color: "#34D399",
+                    border: "1px solid #10B981",
+                    padding: "2px 9px",
+                    borderRadius: 6,
+                    fontSize: "0.72rem",
+                    fontWeight: 800,
+                    whiteSpace: "nowrap",
+                    pointerEvents: "none",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+                  }}
+                >
+                  {curtainPos}%
                 </div>
               )}
             </div>
@@ -3807,7 +3877,7 @@ export default function MapViewer({
                   </Popup>
                 </Marker>
                 <Polyline positions={[pair.legacy, pair.drone]} pathOptions={{ color: "#F59E0B", weight: 2.5, dashArray: "5, 5" }}>
-                  <Tooltip sticky direction="center">Δ {pair.displacementMeters}m ({pair.errorPixels}px)</Tooltip>
+                  <Tooltip sticky direction="center">Δ {pair.displacementMeters}m ({pair.errorPixels}px)</Tooltip>
                 </Polyline>
               </div>
             ))}
@@ -3912,7 +3982,7 @@ export default function MapViewer({
                 onClick={(e) => {
                   e.stopPropagation();
                   setLockedGcp(null);
-                  toast("Resumed Live GPS", { icon: "🛰️" });
+                  toast("Resumed Live GPS", { icon: "" });
                 }}
                 title="Dismiss locked coordinates"
                 style={{
@@ -4014,16 +4084,17 @@ export default function MapViewer({
         </div>
       )}
 
-      {/* Phase 4: Collapsible Dynamic Regional Cadastral Legend */}
+      {/* Phase 4: Collapsible Dynamic Regional Cadastral Legend — only in aligned map mode */}
+      {(isAligned && !isSideBySide && !isSwipeActive) && (
       <div
         style={{
           position: "absolute",
-            bottom: (isAligned && (alignedMapOverlayUrl || cadastralOverlayUrl || unifiedOverlayUrl)) ? 78 : 20,
-            left: 20,
-            zIndex: 1000,
-            fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-          }}
-        >
+          bottom: 20,
+          left: 20,
+          zIndex: 1000,
+          fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        }}
+      >
         {!isLegendOpen ? (
           <button
             onClick={() => setIsLegendOpen(true)}
@@ -4157,8 +4228,9 @@ export default function MapViewer({
           </div>
         )}
       </div>
+      )}
 
-      {/* Inline empty banner removed — handled by the pre-mount guard above */}
+      {/* Inline empty banner removed — handled by the pre-mount guard above */}
 
       </div>
     </div>
