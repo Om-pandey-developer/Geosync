@@ -121,6 +121,9 @@ npm run dev
 - Web Application: [http://localhost:3000](http://localhost:3000)
 
 ---
+## Link of deployed project :
+https://geosync.anshikapal2512.workers.dev/
+----
 
 ## 🗺️ Application Routes
 
